@@ -1,4 +1,5 @@
 ﻿using FMV_OG.Shared;
+using FMV_OG.Shared.MainApp.Services;
 using FMV_OG.Shared.MainApp.Views.FMI;
 using Microsoft.AspNetCore.Components;
 using System.Data;
@@ -11,11 +12,30 @@ namespace FMV_OG.Shared
 {
     public class StateContainer
     {
+        private readonly IExpressionEvaluator expressionEvaluator;
+        private readonly IFMIDisplayConfigService fmiDisplayConfigService;
+        private readonly IMetadataService metadataService;
+        private readonly IUndoService undoService;
+        private readonly IProjectDocumentService projectDocumentService;
+
+        public StateContainer(
+            IExpressionEvaluator expressionEvaluator,
+            IFMIDisplayConfigService fmiDisplayConfigService,
+            IMetadataService metadataService,
+            IUndoService undoService,
+            IProjectDocumentService projectDocumentService)
+        {
+            this.expressionEvaluator = expressionEvaluator;
+            this.fmiDisplayConfigService = fmiDisplayConfigService;
+            this.metadataService = metadataService;
+            this.undoService = undoService;
+            this.projectDocumentService = projectDocumentService;
+        }
+
         //Done
         private string _selectedFn = "-1";
         //Done
         private string _selectedLabel = "";
-        private List<string> _typeFMIdisplay = new List<string> { "", "Blend", "Blend", "Blend", "Blend", "Blend", "Blend" };
         
         public bool showProperties = false;
         public bool showAspects = false;
@@ -28,9 +48,21 @@ namespace FMV_OG.Shared
         public int cycleFMI = -1;
         public Function? selectedFunction;
         public Coupling? selectedCoupling;
-        public DataSet metadataDS = new DataSet();
-        public Dictionary<string, string> metaDataKeys = new Dictionary<string, string>();
-        public bool metaIsDirty = false;
+        public DataSet metadataDS
+        {
+            get => metadataService.MetadataDS;
+            set => metadataService.MetadataDS = value;
+        }
+        public Dictionary<string, string> metaDataKeys
+        {
+            get => metadataService.MetaDataKeys;
+            set => metadataService.MetaDataKeys = value;
+        }
+        public bool metaIsDirty
+        {
+            get => metadataService.MetaIsDirty;
+            set => metadataService.MetaIsDirty = value;
+        }
         //Done
         public string fnClass { get; set; } = "fn-hover";
         public List<string[]> dataRows { get; set; } = new List<string[]>();
@@ -157,12 +189,23 @@ namespace FMV_OG.Shared
         public double canvasHeight { get; set; }
         public double viewWidth { get; set; } = 0;
         public double viewHeight { get; set; } = 0;
-        public XmlDocument[] projectData_Undo { get; set; } = new XmlDocument[700];
-        public readonly int undoLength = 700;
-        private readonly int moveBack = 200;
+        public XmlDocument[] projectData_Undo
+        {
+            get => undoService.ProjectDataUndo;
+            set => undoService.ProjectDataUndo = value;
+        }
+        public int undoLength => undoService.UndoLength;
         public XmlNode? fnGroups { get; set; }
-        public string[] selectedFn_Undo { get; set; } = new string[700];
-        public int undoIndex { get; set; } = 0;
+        public string[] selectedFn_Undo
+        {
+            get => undoService.SelectedFnUndo;
+            set => undoService.SelectedFnUndo = value;
+        }
+        public int undoIndex
+        {
+            get => undoService.UndoIndex;
+            set => undoService.UndoIndex = value;
+        }
         public List<Coupling> couplingList { get; set; } = new List<Coupling>();
         public List<Function> functionList { get; set; } = new List<Function>();
         public string fnName { get; set; } = "";
@@ -190,85 +233,24 @@ namespace FMV_OG.Shared
         public bool isSelecting { get; set; } = false;
         public double startX { get; set; } = 0;
         public double startY { get; set; } = 0;
-        public Dictionary<string, string> displaySetup = new Dictionary<string, string>();
-        public Dictionary<string, double> displayValue = new Dictionary<string, double>();
+        public Dictionary<string, string> displaySetup => fmiDisplayConfigService.DisplaySetup;
+        public Dictionary<string, double> displayValue => fmiDisplayConfigService.DisplayValue;
         public bool hideFMIhighlight { get; set; } = false;
         public bool hideFMIdisplaytext { get; set; } = false;
         public List<string> typeFMIdisplay 
         {
             get 
             {
-                return _typeFMIdisplay;
+                return fmiDisplayConfigService.TypeFMIDisplay;
             } 
             set
             {
-                _typeFMIdisplay = value;
-                if (projectData_Undo[0].SelectSingleNode($"//FM/Functions/@typeFMIdisplay") == null)
-                {
-                    projectData_Undo[0].SelectSingleNode("//FM/Functions")!.Attributes!.Append(projectData_Undo[0].CreateAttribute("typeFMIdisplay"));
-                }
-                projectData_Undo[0].SelectSingleNode($"//FM/Functions/@typeFMIdisplay")!.Value = string.Join("|", _typeFMIdisplay);
+                fmiDisplayConfigService.SetTypeFMIDisplay(projectData_Undo[0], value);
             }
         }
         public void defaultFnAttributes(XmlNode fn)
         {
-            if (fn.SelectSingleNode("@orphans") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("orphans"));
-            }
-            fn.SelectSingleNode("@orphans")!.Value = "0";
-            if (fn.SelectSingleNode("@profileFn") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("profileFn"));
-            }
-            if (fn.SelectSingleNode("@profileI") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("profileI"));
-            }
-            if (fn.SelectSingleNode("@profileP") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("profileP"));
-            }
-            if (fn.SelectSingleNode("@profileR") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("profileR"));
-            }
-            if (fn.SelectSingleNode("@profileC") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("profileC"));
-            }
-            if (fn.SelectSingleNode("@profileT") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("profileT"));
-            }
-            if (fn.SelectSingleNode("@groupType") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("groupType"));
-            }
-            if (fn.SelectSingleNode("@groupIDNr") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("groupIDNr"));
-            }
-            if (fn.SelectSingleNode("@groupActive") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("groupActive"));
-            }
-            if (fn.SelectSingleNode("@groupX") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("groupX"));
-            }
-            if (fn.SelectSingleNode("@groupY") == null)
-            {
-                fn.Attributes!.Append(projectData_Undo[0].CreateAttribute("groupY"));
-            }
-            if (fn.SelectSingleNode("metadata") == null)
-            {
-                fn.AppendChild(projectData_Undo[0].CreateElement("metadata"));
-            }
-            if (fn.SelectSingleNode("Description") == null)
-            {
-                fn.AppendChild(projectData_Undo[0].CreateElement("Description"));
-            }
+            projectDocumentService.DefaultFnAttributes(projectData_Undo[0], fn);
         }
         public void defaultFnLabel()
         {
@@ -278,146 +260,54 @@ namespace FMV_OG.Shared
         }
         public void sFnIsInput(string isInput)
         {
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]/@isInput")!.InnerText = isInput;
-            selectedFunction!.isInput = isInput;
+            projectDocumentService.SetFunctionIsInput(projectData_Undo[0], _selectedFn, selectedFunction, isInput);
         }
         public void sFnOrphans(int orphans)
         {
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]/@orphans")!.InnerText = orphans.ToString();
-            selectedFunction!.orphans = orphans;
+            projectDocumentService.SetFunctionOrphans(projectData_Undo[0], _selectedFn, selectedFunction, orphans);
         }
         public void sFnFunctionType()
         {
-            var check1 = projectData_Undo[0].SelectNodes($"//FM/Preconditions/Precondition[FunctionIDNr=\"{selectedFn}\"]")?.Count;
-            check1 += projectData_Undo[0].SelectNodes($"//FM/Resources/Resource[FunctionIDNr=\"{selectedFn}\"]")?.Count;
-            check1 += projectData_Undo[0].SelectNodes($"//FM/Controls/Control[FunctionIDNr=\"{selectedFn}\"]")?.Count;
-            check1 += projectData_Undo[0].SelectNodes($"//FM/Times/Time[FunctionIDNr=\"{selectedFn}\"]")?.Count;
-            var check2 = projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[FunctionIDNr=\"{selectedFn}\"]")?.Count;
-            var check3 = projectData_Undo[0].SelectNodes($"//FM/Inputs/Input[FunctionIDNr=\"{selectedFn}\"]")?.Count;
-            if (check1 == 0 && (check2 == 0 || check3 == 0)) //has only inputs or only outputs
-            {
-              //background
-                projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]/FunctionType")!.InnerText = "2";
-                selectedFunction!.FunctionType = "2";
-            }
-            else
-            {
-                //foreground
-                projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]/FunctionType")!.InnerText = "0";
-                selectedFunction!.FunctionType = "0";
-            }
+            projectDocumentService.SetFunctionTypeByConnections(projectData_Undo[0], selectedFn, selectedFunction);
+        }
+        public void setFunctionType(string functionId, string functionType, Function? function = null)
+        {
+            projectDocumentService.SetFunctionType(projectData_Undo[0], functionId, functionType, function);
         }
         public void deleteFn()
         {
-            if (aspectsList.FindAll(x => x.FunctionIDNr == _selectedFn).Count == 0 && projectData_Undo[0].SelectNodes($"//FM//Outputs/Output[FunctionIDNr=\"{_selectedFn}\"]")?.Count == 0)
+            if (projectDocumentService.DeleteFunction(this))
             {
-                updateUndo();
-                projectData_Undo[0].SelectSingleNode("//FM/Functions")!.RemoveChild(projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]")!);
-                functionList.RemoveAll(x => x.IDNr == _selectedFn);
-                couplingList.RemoveAll(x => x.outputFn == _selectedFn || x.toFn == _selectedFn);
-                XmlNodeList oldChildren = projectData_Undo[0].SelectNodes($"//FM/Aspects/Aspect[@outputFn='{_selectedFn}' or @toFn='{_selectedFn}']")!;
-                foreach (XmlNode oldChild in oldChildren)
-                {
-                    projectData_Undo[0].SelectSingleNode("//FM/Aspects")!.RemoveChild(oldChild);
-                }
                 _selectedFn = "-1";
             }
         }
         public void sFnIDName(string IDName)
         {
-            updateUndo();
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]/IDName")!.InnerText = IDName;
-            selectedFunction!.IDName = IDName;
+            projectDocumentService.SetFunctionIdName(this, IDName);
         }
         public void sFnDesc(string FnDesc)
         {
-            updateUndo();
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={_selectedFn}]/Description")!.InnerText = FnDesc;
-            selectedFunction!.Description = FnDesc;
+            projectDocumentService.SetFunctionDescription(this, FnDesc);
         }
         public void updateFnXY(double x, double y, string? sFn = null)
         {
-            if (sFn == null)
-            {
-                sFn = _selectedFn;
-            }
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={sFn}]/@x")!.InnerText = x.ToString("0.##", CultureInfo.InvariantCulture);
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={sFn}]/@y")!.InnerText = y.ToString("0.##", CultureInfo.InvariantCulture);
+            projectDocumentService.UpdateFunctionXY(projectData_Undo[0], _selectedFn, x, y, sFn);
         }
         public void updateAspectXY(double x, double y, string directionX, string directionY)
         {
-            projectData_Undo[0].SelectSingleNode($"//FM/Aspects/Aspect[Name=\"{selectedLabel}\"]/@x")!.InnerText = x.ToString("0.##", CultureInfo.InvariantCulture);
-            projectData_Undo[0].SelectSingleNode($"//FM/Aspects/Aspect[Name=\"{selectedLabel}\"]/@y")!.InnerText = y.ToString("0.##", CultureInfo.InvariantCulture);
-            projectData_Undo[0].SelectSingleNode($"//FM/Aspects/Aspect[Name=\"{selectedLabel}\"]/@directionX")!.InnerText = directionX;
-            projectData_Undo[0].SelectSingleNode($"//FM/Aspects/Aspect[Name=\"{selectedLabel}\"]/@directionY")!.InnerText = directionY;
+            projectDocumentService.UpdateAspectXY(projectData_Undo[0], selectedLabel, x, y, directionX, directionY);
         }
         public void updateDisplaySetup(string index, string attr, string value)
         {
-            if (projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}") == null)
-            {
-                projectData_Undo[0].SelectSingleNode("//FM/Functions")!.Attributes!.Append(projectData_Undo[0].CreateAttribute(attr));
-            }
-            projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}")!.Value = value;
-            displaySetup[attr] = value;
-            double dValue = double.NaN;
-            double.TryParse(value, CultureInfo.InvariantCulture, out dValue);
-            if (displaySetup[attr] == "")
-            {
-                displayValue[attr] = double.NaN;
-            }
-            else
-            {
-                displayValue[attr] = dValue;
-            }
-            checkDisplayValues(index);
+            fmiDisplayConfigService.UpdateDisplaySetup(projectData_Undo[0], index, attr, value);
         }
         public void checkDisplayValues(string index)
         {
-            var minA = Math.Min(displayValue[$"colour_{index}4"], displayValue[$"colour_{index}3"]);
-            minA = Math.Max(minA, displayValue[$"colour_{index}2"]);
-            minA = Math.Max(minA, displayValue[$"colour_{index}1"]);
-            if (minA is double.NaN) { minA = 0; }
-
-            var maxA = Math.Max(displayValue[$"colour_{index}0"], displayValue[$"colour_{index}1"]);
-            maxA = Math.Max(maxA, displayValue[$"colour_{index}2"]);
-            maxA = Math.Max(maxA, displayValue[$"colour_{index}3"]);
-            if (maxA is double.NaN) { maxA = 1; }
-
-            if (displayValue[$"colour_{index}0"] is double.NaN) { displayValue[$"colour_{index}0"] = minA - 1.0; }
-            if (displayValue[$"colour_{index}4"] is double.NaN) { displayValue[$"colour_{index}4"] = maxA * 1.0; }
-            if (displayValue[$"colour_{index}2"] is double.NaN) { displayValue[$"colour_{index}2"] = (displayValue[$"colour_{index}0"] + displayValue[$"colour_{index}4"]) * 0.5; }
-            if (displayValue[$"colour_{index}1"] is double.NaN) { displayValue[$"colour_{index}1"] = (displayValue[$"colour_{index}0"] + displayValue[$"colour_{index}2"]) * 0.5; }
-            if (displayValue[$"colour_{index}3"] is double.NaN) { displayValue[$"colour_{index}3"] = (displayValue[$"colour_{index}2"] + displayValue[$"colour_{index}4"]) * 0.5; }
+            fmiDisplayConfigService.CheckDisplayValues(index);
         }
         public void initialDisplaySetup(string attr, string value, bool overwrite = false)
         {
-            if (projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}") == null)
-            {
-                projectData_Undo[0].SelectSingleNode("//FM/Functions")!.Attributes!.Append(projectData_Undo[0].CreateAttribute(attr));
-                projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}")!.Value = value;
-            }
-            double dValue = double.NaN;
-            if (projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}")!.Value is not null)
-            {
-                if (overwrite)
-                {
-                    projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}")!.Value = value;
-                }
-                displaySetup[attr] = projectData_Undo[0].SelectSingleNode($"//FM/Functions/@{attr}")!.Value!;
-                double.TryParse(displaySetup[attr], CultureInfo.InvariantCulture, out dValue);
-            }
-            else
-            {
-                displaySetup[attr] = "";
-            }
-            if (displaySetup[attr] == "")
-            {
-                displayValue[attr] = double.NaN;
-            }
-            else
-            {
-                displayValue[attr] = dValue;
-            }
+            fmiDisplayConfigService.InitialDisplaySetup(projectData_Undo[0], attr, value, overwrite);
         }
         public void updateKvalue(Function fn, string attr, string value)
         {
@@ -463,150 +353,19 @@ namespace FMV_OG.Shared
         }
         public void updateUndo()
         {
-            if (projectData_Undo[0] is not null)
-            {
-                if (undoIndex > undoLength - 5)
-                {
-                    Array.Copy(projectData_Undo, moveBack + 1, projectData_Undo, 1, undoIndex - moveBack);
-                    Array.Copy(selectedFn_Undo, moveBack + 1, selectedFn_Undo, 1, undoIndex - moveBack);
-                    undoIndex -= moveBack;
-                }
-                undoIndex += 1;
-                projectData_Undo[undoIndex] = (XmlDocument)projectData_Undo[0].Clone();
-                selectedFn_Undo[undoIndex] = _selectedFn;
-                projectData_Undo[undoIndex + 1] = new XmlDocument();
-                projectData_Undo[undoIndex + 2] = new XmlDocument();
-            }
+            undoService.UpdateUndo(_selectedFn);
         }
         public void reSetAspect(string[] dictArray, double xO, double yO, double aX, double aY, int aFW)
         {
-            var aName = string.Join("|", dictArray);
-            bool appendNew = false;
-            double labelDx = 0;
-            double labelDy = 0;
-            string directionX = "from";
-            string directionY = "to";
-            string notGroup = "";
-            XmlNode? aspectI = projectData_Undo[0].SelectSingleNode($"//FM/Aspects/Aspect[Name=\"{aName}\"]");
-            if (aspectI == null)
-            {
-                aspectI = projectData_Undo[0].CreateElement("Aspect");
-                XmlAttribute aspectIx = projectData_Undo[0].CreateAttribute("x");
-                aspectIx.Value = "0";
-                aspectI.Attributes!.Append(aspectIx);
-                XmlAttribute aspectIy = projectData_Undo[0].CreateAttribute("y");
-                aspectIy.Value = "0";
-                aspectI.Attributes.Append(aspectIy);
-                XmlAttribute aspectIdx = projectData_Undo[0].CreateAttribute("directionX");
-                aspectIdx.Value = "from";
-                aspectI.Attributes.Append(aspectIdx);
-                XmlAttribute aspectIdy = projectData_Undo[0].CreateAttribute("directionY");
-                aspectIdy.Value = "to";
-                aspectI.Attributes.Append(aspectIdy);
-                XmlAttribute aspectIof = projectData_Undo[0].CreateAttribute("outputFn");
-                aspectIof.Value = dictArray[0];
-                aspectI.Attributes.Append(aspectIof);
-                XmlAttribute aspectItf = projectData_Undo[0].CreateAttribute("toFn");
-                aspectItf.Value = dictArray[2];
-                aspectI.Attributes.Append(aspectItf);
-                XmlAttribute addNotGroup = projectData_Undo[0].CreateAttribute("notGroup");
-                addNotGroup.Value = "";
-                aspectI.Attributes.Append(addNotGroup);
-                XmlNode aspectIname = projectData_Undo[0].CreateElement("Name");
-                aspectIname.InnerText = aName;
-                aspectI.AppendChild(aspectIname);
-                appendNew = true;
-            }
-            else
-            {
-                labelDx = 0;
-                labelDy = 0;
-                double.TryParse(aspectI.SelectSingleNode("@x")?.InnerText ?? "0", CultureInfo.InvariantCulture, out labelDx);
-                double.TryParse(aspectI.SelectSingleNode("@y")?.InnerText ?? "0", CultureInfo.InvariantCulture, out labelDy);
-                directionX = aspectI.SelectSingleNode("@directionX")?.InnerText ?? "from";
-                directionY = aspectI.SelectSingleNode("@directionY")?.InnerText ?? "to";
-                if (aspectI.SelectSingleNode("Curve") is not null)
-                {
-                    aspectI.RemoveChild(aspectI.SelectSingleNode("Curve")!);
-                }
-                if (aspectI.SelectSingleNode("Curve2") is not null)
-                {
-                    aspectI.RemoveChild(aspectI.SelectSingleNode("Curve2")!);
-                }
-                notGroup = aspectI.SelectSingleNode("@notGroup")?.InnerText ?? "";
-                if (notGroup == "true") //This is added to open old files because of the slight repurposing of the notGroup attribute
-                {
-                    notGroup = "";
-                    aspectI.SelectSingleNode("@notGroup")!.InnerText = "";
-                }
-            }
-            XmlNode aspectIcurve = projectData_Undo[0].CreateElement("Curve");
-            XmlNode aspectIcurve2 = projectData_Undo[0].CreateElement("Curve2");
-            Coupling addCoupling = new(aName, labelDx, labelDy, directionX, directionY, notGroup, dictArray[0], dictArray[1], dictArray[2], dictArray[3],
-                functionList.Find(x => x.IDNr == dictArray[0])!.x + xO, functionList.Find(x => x.IDNr == dictArray[0])!.y + yO, 0, 0);
-            couplingList.Add(addCoupling);
-            addCoupling.ReturnTextLines(aFW);
-            aspectIcurve2.InnerText = addCoupling.reDrawLines(functionList.Find(x => x.IDNr == dictArray[2])!.x + aX,
-                functionList.Find(x => x.IDNr == dictArray[2])!.y + aY, false);
-            aspectIcurve.InnerText = addCoupling.curve;
-            aspectI.AppendChild(aspectIcurve);
-            aspectI.AppendChild(aspectIcurve2);
-            if (appendNew) projectData_Undo[0].SelectSingleNode("//FM/Aspects")!.AppendChild(aspectI);
+            projectDocumentService.ResetAspect(this, dictArray, xO, yO, aX, aY, aFW);
         }
         public void CreateMetadataTable(XmlNode fn)
         {
-            if (!metadataDS.Tables.Contains("Metadata"))
-            {
-                DataTable metadataTable = new DataTable("Metadata");
-                metadataTable.Columns.Add(new DataColumn("Cycle", typeof(int)));
-                DataColumn colIdNr = new DataColumn("IDNr", typeof(int));
-                metadataTable.Columns.Add(colIdNr);
-                //metadataTable.PrimaryKey = new DataColumn[] { colIdNr };
-                metadataTable.Columns.Add(new DataColumn("IDName", typeof(string)));
-                metadataDS.Tables.Add(metadataTable);
-            }
-            foreach (XmlElement key in fn.SelectSingleNode("metadata")!)
-            {
-                if (!metadataDS.Tables["Metadata"]!.Columns.Contains(key.Name))
-                {
-                    metaDataKeys.Add(key.Name,"");
-                    metadataDS.Tables["Metadata"]!.Columns.Add(new DataColumn(key.Name, typeof(string)));
-                    metadataDS.Tables["Metadata"]!.Columns.Add(new DataColumn($"{key.Name}-active",typeof(string)));
-                    metadataDS.Tables["Metadata"]!.Columns.Add(new DataColumn($"{key.Name}-equation", typeof(string)));
-                }
-            }
-            var row = metadataDS.Tables["Metadata"]!.NewRow();
-            row["Cycle"] = -1;
-            row["IDNr"] = fn.SelectSingleNode("IDNr")!.InnerText;
-            row["IDName"] = fn.SelectSingleNode("IDName")!.InnerText;
-            foreach (XmlElement key in fn.SelectSingleNode("metadata")!)
-            {
-                row[key.Name] = key.InnerText;
-                row[$"{key.Name}-active"] = key.Attributes["active"]?.Value ?? "";
-                row[$"{key.Name}-equation"] = key.Attributes["equation"]?.Value ?? "";
-            }
-            metadataDS.Tables["Metadata"]!.Rows.Add(row);
+            metadataService.CreateMetadataTable(fn);
         }
         public void updateMetadata (Function sFn)
         {
-            var fnMD = projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={sFn.IDNr}]/metadata");
-            if (fnMD is not null)
-            {
-                fnMD.RemoveAll();
-                foreach (var keyValue in sFn.metadata)
-                {
-                    XmlNode addMeta = projectData_Undo[0].CreateElement(keyValue[0]);
-                    addMeta.InnerText = keyValue[1];
-                    XmlAttribute metaCheck = projectData_Undo[0].CreateAttribute("active");
-                    metaCheck.Value = keyValue[2];
-                    addMeta.Attributes!.Append(metaCheck);
-                    XmlAttribute metaEquation = projectData_Undo[0].CreateAttribute("equation");
-                    metaEquation.Value = keyValue[3];
-                    addMeta.Attributes.Append(metaEquation);
-                    fnMD.AppendChild(addMeta);
-                }
-            }
-            metaIsDirty = false;
+            metadataService.UpdateMetadata(projectData_Undo[0], sFn);
         }
         public void beginMultiSelect()
         {
@@ -635,29 +394,15 @@ namespace FMV_OG.Shared
         }
         public void addMetadataResults(Function fnBG)
         {
-            DataRow row = metadataDS.Tables["Metadata"]!.NewRow();
-            foreach (DataColumn col in metadataDS.Tables["Metadata"]!.Columns)
-            { //this section adds a new row to the Metadata table for the results of the evaluated Function (for the current Cycle)
-                switch (col.ColumnName)
-                {
-                    case "Cycle": row[col] = cycleFMI; break;
-                    case "IDNr": row[col] = fnBG.IDNr; break;
-                    case "IDName": row[col] = fnBG.IDName; break;
-                    default:
-                        {
-                            var evalRow = metadataDS.Tables["Metadata"]!.Select($"IDNr = '{fnBG.IDNr}' and Cycle = -1")[0];
-                            if (evalRow is not null)
-                            {
-                                row[col] = evalRow[col];
-                            }
-                            break;
-                        }
-                }
-            }
-            metadataDS.Tables["Metadata"]!.Rows.Add(row);
+            metadataService.AddMetadataResults(fnBG, cycleFMI);
         }
         public void calcVariables(Function iBG)
         {
+            if (metadataService is not null)
+            {
+                metadataService.CalcVariables(iBG, couplingList, functionList, cycleFMI);
+                return;
+            }
             //iBG.metadata.Exists(key => key[2] == "true" && key[3].Contains(""))
             //Console.WriteLine($"===========================");
             //Console.WriteLine($"calcVariables_Function: {iBG.IDNr};{iBG.IDName}");
@@ -852,6 +597,11 @@ namespace FMV_OG.Shared
         }
         public string eval(string str, Dictionary<string, string[]> variables)
         {
+            if (expressionEvaluator is not null)
+            {
+                return expressionEvaluator.Eval(str, variables, dataRows, dataKeys);
+            }
+
             int pos = -1;
             char ch;
             void nextChar()

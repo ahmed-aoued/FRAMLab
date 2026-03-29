@@ -724,12 +724,12 @@
                         if (mdKey[1] == "1" || mdKey[1] == "true")
                         {
                             fn.FunctionType = "1";
-                            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fn.IDNr}]/FunctionType")!.InnerText = "1";
+                            stateContainer.setFunctionType(fn.IDNr, "1", fn);
                         }
                         else
                         {
                             fn.FunctionType = "0";
-                            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fn.IDNr}]/FunctionType")!.InnerText = "0";
+                            stateContainer.setFunctionType(fn.IDNr, "0", fn);
                         }
                     }
                 }
@@ -1124,12 +1124,12 @@
                             if (fnMDv2[1] == "1" || fnMDv2[1] == "true")
                             {
                                 fnBG2.FunctionType = "1";
-                                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fnBG2.IDNr}]/FunctionType")!.InnerText = "1";
+                                stateContainer.setFunctionType(fnBG2.IDNr, "1", fnBG2);
                             }
                             else
                             {
                                 fnBG2.FunctionType = "0";
-                                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fnBG2.IDNr}]/FunctionType")!.InnerText = "0";
+                                stateContainer.setFunctionType(fnBG2.IDNr, "0", fnBG2);
                             }
                         }
                         if (canActivate2)
@@ -1251,12 +1251,12 @@
             if (fnMDv2[1] == "1" || fnMDv2[1] == "true")
             {
                 fnBG.FunctionType = "1";
-                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fnBG.IDNr}]/FunctionType")!.InnerText = "1";
+                stateContainer.setFunctionType(fnBG.IDNr, "1", fnBG);
             }
             else
             {
                 fnBG.FunctionType = "0";
-                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fnBG.IDNr}]/FunctionType")!.InnerText = "0";
+                stateContainer.setFunctionType(fnBG.IDNr, "0", fnBG);
             }
         }
         if (canActivate)

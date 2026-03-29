@@ -3,6 +3,7 @@
 @inject IJSRuntime JSRuntime
 @inject ILocalStorageService localStorage
 @inject StateContainer stateContainer
+@inject FMV_OG.Shared.MainApp.Services.IProjectDocumentService projectDocumentService
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
 @inject HttpClient Http
@@ -314,7 +315,7 @@
         XmlNode IDName = stateContainer.projectData_Undo[0].CreateElement("IDName");
         IDName.InnerText = "";
         itemF.AppendChild(IDName);
-        stateContainer.defaultFnAttributes(itemF);/*
+        projectDocumentService.DefaultFnAttributes(stateContainer.projectData_Undo[0], itemF);/*
         XmlAttribute orphans = stateContainer.projectData_Undo[0].CreateAttribute("orphans");
         orphans.Value = "0";
         itemF.Attributes.Append(orphans);
@@ -417,7 +418,7 @@
                     isInput.Value = "false";
                     fn.Attributes!.Append(isInput);
                 }
-                stateContainer.defaultFnAttributes(fn);/*
+                projectDocumentService.DefaultFnAttributes(stateContainer.projectData_Undo[0], fn);/*
                 if (fn.SelectSingleNode("@orphans") == null)
                 {
                     fn.Attributes!.Append(stateContainer.projectData_Undo[0].CreateAttribute("orphans"));
@@ -615,7 +616,7 @@
                 {
                     dictArray[2] = aspect.FunctionIDNr;
                     dictArray[3] = aspect.Type.Substring(0, 1);
-                    stateContainer.reSetAspect(dictArray, double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:O"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:O"]!, CultureInfo.InvariantCulture),
+                    projectDocumentService.ResetAspect(stateContainer, dictArray, double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:O"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:O"]!, CultureInfo.InvariantCulture),
                         double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:{dictArray[3]}"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:{dictArray[3]}"]!, CultureInfo.InvariantCulture),
                         int.Parse(render[$"{stateContainer.newFnStyle}:aspect-font-wrap"]!));
                     aspect.Orphan = "false";

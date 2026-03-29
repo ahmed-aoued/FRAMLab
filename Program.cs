@@ -1,5 +1,6 @@
 using FMV_OG;
 using FMV_OG.Shared;
+using FMV_OG.Shared.MainApp.Services;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -11,6 +12,11 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<BrowserService>();
+builder.Services.AddSingleton<IUndoService, UndoService>();
+builder.Services.AddSingleton<IExpressionEvaluator, ExpressionEvaluator>();
+builder.Services.AddSingleton<IFMIDisplayConfigService, FMIDisplayConfigService>();
+builder.Services.AddSingleton<IMetadataService, MetadataService>();
+builder.Services.AddSingleton<IProjectDocumentService, ProjectDocumentService>();
 
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddSingleton<StateContainer>();
