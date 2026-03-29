@@ -1,0 +1,241 @@
+﻿@inject StateContainer stateContainer
+@inject IJSRuntime JSRuntime
+@inject IConfiguration render
+
+<div id="myModal" class="modal fade show" style="display:block" aria-modal="true" role="dialog" tabindex="100" @onkeydown=checkforEsc @onclick=clickOut>
+    <div class="modal-dialog modal-fmi" @onclick=clickNothing @onclick:stopPropagation>
+        <div class="modal-content">
+            <div class="modal-header sticky-top bg-white p-0 pl-1 align-items-center">
+                Display
+                <select id="display" class="fmi-key fmi-setup" @onchange=checkDisplay >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                </select>
+                <select id="selectKey" class="fmi-key fmi-setup w-100" @onchange=updateKey >
+                    <option value="">- none -</option>
+                    @foreach (var key in stateContainer.metaDataKeys.Keys)
+                    {
+                        <option value="@key">
+                            @key
+                        </option>
+                    }
+                </select>
+                <div class="float-right">
+                    <button type="button" class="close m-0 pt-1 pb-1 pl-3 pr-3" @onclick="@(() => OnClose.InvokeAsync(false))">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body p-1 overflow-hidden">
+                <div class="d-flex">
+                    <svg width="120" height="120" @onclick=selectDisplay>
+                        @if (!stateContainer.hideFMIhighlight)
+                        {
+                            <circle id="fmi-highlight" cx="60" cy="60" r=@render[$"{stateContainer.newFnStyle}:highlight-r"] fill=@($"url(#entry-fill)") opacity="0.75" />
+                        }
+                        <g transform="translate(10,10)" stroke-width=@render[$"{stateContainer.newFnStyle}:0:fn-stroke-width"] stroke=@render[$"{stateContainer.newFnStyle}:0:fn-stroke"]>
+                            <path fill=@render[$"{stateContainer.newFnStyle}:canvas-color"] fill-opacity=@render[$"{stateContainer.newFnStyle}:canvas-opacity"] d=@render[$"{stateContainer.newFnStyle}:0:fn-path"] />
+                            <path fill=@render[$"{stateContainer.newFnStyle}:0:fn-fill"] fill-opacity=@render[$"{stateContainer.newFnStyle}:0:fn-opacity"] d=@render[$"{stateContainer.newFnStyle}:0:fn-path"] />
+                        </g>
+                        <g transform="translate(10,10)" stroke-width="12" stroke="#FFD800" stroke-linecap="round" opacity="0.75">
+                            <g transform=@render[$"{stateContainer.newFnStyle}:tracer-{selectedDisplay}-transform"]>
+                                <path fill="none" d=@render[$"{stateContainer.newFnStyle}:tracer-{selectedDisplay}-path"] />
+                            </g>
+                        </g>
+
+                    </svg>
+                    <div>
+                        <div class="d-flex">
+                            <input id="c0" class="fmi-color" type="color" @onchange=@((e) => updateCvalue(e, "0")) />
+                            <svg width="48" height="32">
+                                <g stroke-width="0.5" stroke="dimgrey">
+                                    @if (stateContainer.typeFMIdisplay[Convert.ToInt32(selectedDisplay)] == "Ratio")
+                                    {
+                                        <path fill="dimgrey" fill-opacity="0.5" d="M 3 5 l 42 0 l 0 22 l -42 0 l 0 -22"></path>
+                                    }
+                                    else
+                                    {
+                                        <path fill=@stateContainer.displaySetup[$"c_{selectedDisplay}0_value"] fill-opacity="0.5" d="M 3 5 l 42 0 l 0 22 l -42 0 l 0 -22"></path>
+                                        <path fill=@stateContainer.displaySetup[$"c_{selectedDisplay}2_value"] fill-opacity="0.5" d="M 3 5 l 42 0 l 0 22 l -42 0 l 0 -22"></path>
+                                    }
+                                </g>
+                            </svg>
+                            <input id="c2" class="fmi-color" type="color" @onchange=@((e) => updateCvalue(e, "2")) />
+                            <svg width="48" height="32">
+                                <g stroke-width="0.5" stroke="dimgrey">
+                                    @if (stateContainer.typeFMIdisplay[Convert.ToInt32(selectedDisplay)] == "Ratio")
+                                    {
+                                        <path fill="dimgrey" fill-opacity="0.5" d="M 3 5 l 42 0 l 0 22 l -42 0 l 0 -22"></path>
+                                    }
+                                    else
+                                    {
+                                        <path fill=@stateContainer.displaySetup[$"c_{selectedDisplay}2_value"] fill-opacity="0.5" d="M 3 5 l 42 0 l 0 22 l -42 0 l 0 -22"></path>
+                                        <path fill=@stateContainer.displaySetup[$"c_{selectedDisplay}4_value"] fill-opacity="0.5" d="M 3 5 l 42 0 l 0 22 l -42 0 l 0 -22"></path>
+                                    }
+                                </g>
+                            </svg>
+                            <input id="c4" class="fmi-color" type="color" @onchange=@((e) => updateCvalue(e, "4")) />
+                        </div>
+                        <div class="d-flex">
+                            <input id="t0" class="fmi-color text-center" type="text" @oninput=@((e) => checkValidNumber(e, "t0")) @onchange=@((e) => updateTvalue(e, "0")) />
+                            @if (stateContainer.typeFMIdisplay[Convert.ToInt32(selectedDisplay)] == "Ratio")
+                            {
+                                <input id="t1" class="fmi-color text-center" type="text" disabled="disabled" value="-" />
+                                <input id="t2" class="fmi-color text-center" type="text" disabled="disabled" value="-" />
+                                <input id="t3" class="fmi-color text-center" type="text" disabled="disabled" value="-" />
+                            }
+                            else
+                            {
+                                <input id="t1" class="fmi-color text-center" type="text" @oninput=@((e) => checkValidNumber(e, "t1")) @onchange=@((e) => updateTvalue(e, "1")) />
+                                <input id="t2" class="fmi-color text-center" type="text" @oninput=@((e) => checkValidNumber(e, "t2")) @onchange=@((e) => updateTvalue(e, "2")) />
+                                <input id="t3" class="fmi-color text-center" type="text" @oninput=@((e) => checkValidNumber(e, "t3")) @onchange=@((e) => updateTvalue(e, "3")) />
+                            }
+                            <input id="t4" class="fmi-color text-center" type="text" @oninput=@((e) => checkValidNumber(e, "t4")) @onchange=@((e) => updateTvalue(e, "4")) />
+                        </div>
+                        <div class="d-flex">
+                            <div class="flex-column w-100">
+                                <div class="d-flex align-items-center">
+                                    <input id="hFMIh" type="checkbox" @bind="stateContainer.hideFMIhighlight" />
+                                    <label for="hFMIh" class="pl-1 m-0">Hide FMI Highlight</label>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <input id="hFMIt" type="checkbox" @bind="stateContainer.hideFMIdisplaytext" />
+                                    <label for="hFMIt" class="pl-1 m-0">Hide Display Values</label>
+                                </div>
+                            </div>
+                            <div class="flex-column">
+                                <select id="fmiDisplayType" name="fmiDisplayType" class="p-1" @bind="stateContainer.typeFMIdisplay[Convert.ToInt32(selectedDisplay)]" @onfocusout=checkTypeFMIdisplay>
+                                    <option value="Blend">Blend</option>
+                                    <option value="Ratio">Ratio</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+    private string selectedDisplay = "1";
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            FocusElement("myModal");
+        }
+    }
+    private void checkDisplay(ChangeEventArgs e)
+    {
+        selectedDisplay = e.Value?.ToString()??"1";
+        updateDisplay();
+    }
+    private void checkTypeFMIdisplay(FocusEventArgs e)
+    {
+        stateContainer.typeFMIdisplay = stateContainer.typeFMIdisplay;
+    }
+    private async void checkValidNumber(ChangeEventArgs e, string fieldID)
+    {
+        string checkNumber = e.Value?.ToString() ?? "";
+        var matchKey = Regex.Match(checkNumber, "^[-]?[0-9.]*$");
+        if (!matchKey.Success || matchKey.Value.Length != checkNumber.Length)
+        {
+            var oldText = checkNumber.Substring(0, checkNumber.Length - 1);
+            await JSRuntime.InvokeVoidAsync("setInput", fieldID, oldText);
+        }
+    }
+    private void updateKey(ChangeEventArgs e)
+    {
+        stateContainer.updateDisplaySetup(selectedDisplay, $"tracer_{selectedDisplay}", e.Value?.ToString() ?? "");
+    }
+    private void updateCvalue(ChangeEventArgs e, string Cindex)
+    {
+        stateContainer.updateDisplaySetup(selectedDisplay, $"c_{selectedDisplay}{Cindex}_value", e.Value?.ToString() ?? "");
+    }
+    private async void updateTvalue(ChangeEventArgs e, string Tindex)
+    {
+        var checkValue = e.Value?.ToString() ?? "";
+        if (checkValue == "" && (Tindex == "0" || Tindex == "4"))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"A value is required.");
+            if (Tindex == "0")
+            {
+                var minA = Math.Min(stateContainer.displayValue[$"colour_{selectedDisplay}4"], stateContainer.displayValue[$"colour_{selectedDisplay}3"]);
+                minA = Math.Max(minA, stateContainer.displayValue[$"colour_{selectedDisplay}2"]);
+                minA = Math.Max(minA, stateContainer.displayValue[$"colour_{selectedDisplay}1"]);
+                checkValue = (minA - 1.0).ToString();
+            }
+            else if (Tindex == "4")
+            {
+                var maxA = Math.Max(stateContainer.displayValue[$"colour_{selectedDisplay}0"], stateContainer.displayValue[$"colour_{selectedDisplay}1"]);
+                maxA = Math.Max(maxA, stateContainer.displayValue[$"colour_{selectedDisplay}2"]);
+                maxA = Math.Max(maxA, stateContainer.displayValue[$"colour_{selectedDisplay}3"]);
+                checkValue = (maxA * 2.0).ToString();
+            }
+            await JSRuntime.InvokeVoidAsync("setInput", $"t{Tindex}", checkValue);
+            await JSRuntime.InvokeVoidAsync("focusInput", $"t{Tindex}");
+        }
+        stateContainer.updateDisplaySetup(selectedDisplay, $"colour_{selectedDisplay}{Tindex}", checkValue);
+    }
+    private async void selectDisplay(MouseEventArgs e)
+    {
+        selectedDisplay = (Convert.ToInt32(selectedDisplay) + 1).ToString();
+        if (selectedDisplay == "7") selectedDisplay = "1";
+        await JSRuntime.InvokeVoidAsync("setInput", "display", selectedDisplay);
+        updateDisplay();
+    }
+    private async void updateDisplay()
+    {
+        await JSRuntime.InvokeVoidAsync("setInput", "selectKey", stateContainer.displaySetup[$"tracer_{selectedDisplay}"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "c0", stateContainer.displaySetup[$"c_{selectedDisplay}0_value"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "c2", stateContainer.displaySetup[$"c_{selectedDisplay}2_value"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "c4", stateContainer.displaySetup[$"c_{selectedDisplay}4_value"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t0", stateContainer.displaySetup[$"colour_{selectedDisplay}0"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t1", stateContainer.displaySetup[$"colour_{selectedDisplay}1"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t2", stateContainer.displaySetup[$"colour_{selectedDisplay}2"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t3", stateContainer.displaySetup[$"colour_{selectedDisplay}3"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t4", stateContainer.displaySetup[$"colour_{selectedDisplay}4"]);
+    }
+    private async void clickOut(MouseEventArgs e)
+    {
+        await OnClose.InvokeAsync(false);
+    }
+    private void clickNothing(MouseEventArgs e)
+    {
+    }
+    private async void checkforEsc(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await OnClose.InvokeAsync(false);
+        }
+        // else if (e.Key == "Enter")
+        // {
+        //     await OnClose.InvokeAsync(false);
+        // }
+    }
+    public async void FocusElement(string elementName)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("focusInput", elementName);
+        }
+        catch
+        {
+        }
+        await JSRuntime.InvokeVoidAsync("setInput", "selectKey", stateContainer.displaySetup["tracer_1"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "c0", stateContainer.displaySetup["c_10_value"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "c2", stateContainer.displaySetup["c_12_value"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "c4", stateContainer.displaySetup["c_14_value"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t0", stateContainer.displaySetup["colour_10"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t1", stateContainer.displaySetup["colour_11"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t2", stateContainer.displaySetup["colour_12"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t3", stateContainer.displaySetup["colour_13"]);
+        await JSRuntime.InvokeVoidAsync("setInput", "t4", stateContainer.displaySetup["colour_14"]);
+    }
+}

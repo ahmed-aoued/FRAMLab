@@ -1,0 +1,140 @@
+﻿/* Sticky header while scrolling */
+::deep thead {
+    position: sticky;
+    top: 0;
+    background-color: rgb(180, 187, 195);
+    z-index: 1;
+}
+    ::deep thead .show-properties {
+        background-color: rgb(253, 168, 112, 0.75);
+    }
+    ::deep thead .show-aspects {
+        background-color: rgb(154, 224, 140, 0.75);
+    }
+    ::deep thead .show-fmiprofile {
+        background-color: rgb(141, 180, 226, 0.75);
+    }
+    ::deep thead .show-metadata {
+        background-color: rgb(180, 141, 226, 0.75);
+    }
+    ::deep thead .show-selected {
+        background-color: rgb(255, 216, 0, 0.75);
+    }
+::deep tbody {
+    border: thin solid grey;
+}
+/* Assign default width to Function label column */ 
+::deep thead .fn-idname {
+    min-width: 15rem;
+}
+::deep thead .fn-idnameM {
+    min-width: 10rem;
+}
+/* Stop Function label text from wrapping, and truncate with ellipsis 
+::deep tbody .fn-idname {
+    white-space: normal;
+    overflow: visible;
+    max-width: 0;
+}*/
+::deep .col-title-text {
+    font-weight: bold;
+    font-size: smaller;
+}
+::deep th {
+    font-weight: normal;
+    border: thin solid grey;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    font-size: initial;
+}
+::deep td {
+    border: thin solid grey;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    font-size: smaller;
+}
+/* Stop the last page from collapsing to the number of rows on it */
+::deep tr {
+    height: 1.8rem;
+}
+/* Subtle stripe effect 
+::deep tr:nth-child(even) {
+    background: rgb(180, 200, 226, 0.40);
+}*/
+    ::deep tr:has(.selected-fill) {
+        /*background: rgb(255, 216, 0, 0.5);*/
+        background: var(--selected-fill);
+    }
+    ::deep tr:has(.entry-fill) {
+        /*background: rgb(42, 155, 0, 0.5);*/
+        background: var(--entry-fill);
+    }
+    ::deep tr:has(.exit-fill) {
+        /*background: rgb(255, 17, 0, 0.5);*/
+        background: var(--exit-fill);
+    }
+    ::deep tr:has(.background-fill) {
+        /*background: rgb(126, 157, 188, 0.5);*/
+        background: var(--background-fill);
+    }
+    ::deep tr:has(.hold-fill) {
+        /*background: rgb(191, 191, 0, 0.5);*/
+        background: var(--hold-fill);
+    }
+/* Magnifying glass */
+::deep .search .col-options-button {
+    margin-right: 0.25rem;
+}
+::deep .eq-font {
+    font-size: smaller;
+    font-family: 'PT Sans Caption', sans-serif;
+}
+.search-box input {
+    border: thin solid grey;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+    .search-box input:focus {
+        outline: none;
+    }
+label {
+    gap: 0.5rem;
+    border: 1px solid #F1F3F4;
+    padding: 0 0.75rem;
+    margin-left: 0.5rem;
+    margin-bottom: 0;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0,0,0,0.04);
+    cursor: pointer;
+}
+    label:hover {
+        border: 1px solid dimgrey;
+    }
+.show-properties {
+    background: rgb(253, 168, 112, 0.75);
+    font-size: smaller;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+.show-aspects {
+    background: rgb(154, 224, 140, 0.75);
+    font-size: smaller;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+.show-fmiprofile {
+    background: rgb(141, 180, 226, 0.75);
+    font-size: smaller;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+.show-metadata {
+    background: rgb(180, 141, 226, 0.75);
+    font-size: smaller;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+a {
+    cursor: pointer;
+}

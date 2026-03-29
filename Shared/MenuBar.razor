@@ -1,0 +1,311 @@
+﻿@inject ILocalStorageService localStorage
+@inject IJSRuntime JSRuntime
+@inject BrowserService Service
+@inject StateContainer stateContainer
+@inject IConfiguration render
+@inject IStringLocalizer<Localization.SharedResource> Loc
+<!-- here -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none">
+    <defs>
+        <circle id="circle-test" cx="5" cy="5" r="4" />
+        <path id="calendar-icon" d="M7.5 8C7.75 8 8 8.25 8 8.5V11.5C8 11.7812 7.75 12 7.5 12H4.5C4.21875 12 4 11.7812 4 11.5V8.5C4 8.25 4.21875 8 4.5 8H7.5ZM5 0C5.40625 0 5.75 0.34375 5.75 0.75V2H10.25V0.75C10.25 0.34375 10.5625 0 11 0C11.4062 0 11.75 0.34375 11.75 0.75V2H13C14.0938 2 15 2.90625 15 4V14C15 15.125 14.0938 16 13 16H3C1.875 16 1 15.125 1 14V4C1 2.90625 1.875 2 3 2H4.25V0.75C4.25 0.34375 4.5625 0 5 0ZM13.5 6H2.5V14C2.5 14.2812 2.71875 14.5 3 14.5H13C13.25 14.5 13.5 14.2812 13.5 14V6Z" />
+    </defs>
+</svg>
+<!-- here -->
+<div class="navbar fixed-top bg-light p-2">
+    <div>
+        <div class="btn btn-menu file-input-zone oi oi-data-transfer-upload" >
+            <InputFile id="openFileBtn" OnChange="onInputFileChange" single accept=".xfmv" title=@Loc["OPEN_TOOLTIP"] />
+        </div>
+        <button id="saveFileBtn" class="btn btn-menu oi oi-data-transfer-download" title=@Loc["SAVE_TOOLTIP"] @onclick=OnFileSave></button>
+        <button class="btn btn-menu oi oi-image" title=@Loc["IMAGE_TOOLTIP"] @onclick=OnImageSave></button>
+        <button class="btn btn-menu oi oi-document" title="PDF" @onclick=b_showPDF></button>
+        <button class="btn btn-menu oi oi-zoom-out" title=@Loc["ZOOM_MINUS_TOOLTIP"] @onclick=zoomMinus @onfocusin=@(() => stateContainer.updateUndo())></button>
+        <button class="btn btn-menu oi oi-fullscreen-enter" title=@Loc["ZOOM_FULLSCREEN"] @onclick=zoomFill @onfocusin=@(() => stateContainer.updateUndo())></button>
+        <button class="btn btn-menu oi oi-zoom-in" title=@Loc["ZOOM_PLUS_TOOLTIP"] @onclick=zoomPlus @onfocusin=@(() => stateContainer.updateUndo())></button>
+        <button class="btn btn-menu oi oi-action-undo" title=@Loc["UNDO_TOOLTIP"] @onclick=actionUndo></button>
+        <button class="btn btn-menu oi oi-action-redo" title=@Loc["REDO_TOOLTIP"] @onclick=actionRedo></button>
+        <div class="btn btn-vr oi"></div>
+        <button class="btn btn-menu oi" title="Group" @onclick=actionGroup>
+            <svg viewBox="5 12 90 100">
+                <defs>
+                    <path transform="translate(-50, -50)" id="fno" d="M 14 50 L 32 18.8 L 67.5 18.8 L 85.5 50 L 67.5 81.1 L 32 81.1 L 14 50 Z" stroke="dimgrey" stroke-width="4" fill-opacity="0" />
+                </defs>
+                <g transform="translate(50, 50)">
+                    <use xlink:href="#fno" transform="scale(0.75)" />
+                    <use xlink:href="#fno" />
+                </g>
+            </svg>
+        </button>
+    </div>
+    <div class="float-right">
+        <button class="btn btn-menu oi oi-tags" title=@Loc["SHOW_LABEL"] @onclick=ShowLabels></button>
+        <button class="btn btn-menu oi oi-eye" title=@Loc["RENDER"] @onclick=ChangeFnStyle @onfocusin=@(() => stateContainer.updateUndo())></button>
+        <button class="btn btn-menu oi oi-spreadsheet" title=@Loc["TABLE_VIEW"] @onclick=showSpreadsheet></button>
+        <button class="btn btn-menu oi oi-reload" title=@Loc["RELOAD"] @onclick=Recover></button>
+        <button class="btn btn-menu oi oi-info" title=@Loc["INFO_TOOLTIP"] @onclick=ShowInfo></button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback refreshParent { get; set; }
+    [Parameter]
+    public EventCallback<InputFileChangeEventArgs> onInputFileChange { get; set; }
+    [Parameter]
+    public EventCallback fileIsLoaded { get; set; }
+
+    public void showSpreadsheet()
+    {
+        stateContainer.spreadsheetVisible += 1;
+        if (stateContainer.spreadsheetVisible > 2)
+        {
+            stateContainer.spreadsheetVisible = 0;
+        }
+        refreshParent.InvokeAsync();
+    }
+    public async void OnFileSave()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            foreach (var fn in stateContainer.functionList)
+            {
+                foreach (string[] mdKey in fn.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
+                {
+                    mdKey[1] = mdKey[4]; //return to initial value
+                }
+            }
+            stateContainer.selectedFn = "-1"; //this action also updates the metadata in the xml
+            var saveXfmv = stateContainer.projectData_Undo[0].OuterXml;
+            //var textBytes = Encoding.UTF8.GetBytes(saveXfmv);
+            //string saveBase = Convert.ToBase64String(textBytes);
+            await JSRuntime.InvokeAsync<object>(
+                "FileSaveAs",
+                stateContainer.fileName,
+                saveXfmv
+            );
+        }
+    }
+    public async void OnImageSave()
+    {
+        string imageName = $"{stateContainer.fileName.Substring(0, stateContainer.fileName.LastIndexOf("."))}.svg";
+        await JSRuntime.InvokeAsync<object>(
+        "FileSaveAs",
+        imageName,
+        await JSRuntime.InvokeAsync<string>("getHTML", "canvas_1")
+        );
+    }
+    private void zoomPlus()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            stateContainer.scaleZoom += 0.25;
+            if (stateContainer.scaleZoom > 4)
+            {
+                stateContainer.scaleZoom = 4;
+            }
+            stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+            stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void zoomMinus()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            stateContainer.scaleZoom -= 0.25;
+            if (stateContainer.scaleZoom < 0.25)
+            {
+                stateContainer.scaleZoom = 0.25;
+            }
+            stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+            stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+            refreshParent.InvokeAsync();
+        }
+    }
+    public async void zoomFill()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            var dimensions = await Service.getDimensions();
+            if (stateContainer.canvasWidth / stateContainer.canvasHeight > Convert.ToDouble(dimensions.width - 270) / Convert.ToDouble(dimensions.height - 90))
+            {
+                stateContainer.canvasWidth = dimensions.width - 270;
+                stateContainer.scaleZoom = stateContainer.canvasWidth / stateContainer.viewWidth;
+                stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+            }
+            else
+            {
+                stateContainer.canvasHeight = dimensions.height - 90;
+                stateContainer.scaleZoom = stateContainer.canvasHeight / stateContainer.viewHeight;
+                stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+            }
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+            await refreshParent.InvokeAsync();
+        }
+    }
+    private void actionUndo()
+    {
+        if (stateContainer.undoIndex > 0)
+        {
+            if (stateContainer.projectData_Undo[stateContainer.undoIndex + 1].OuterXml.Length == 0)
+            {
+                stateContainer.updateUndo();
+                stateContainer.undoIndex -= 1;
+            }
+            stateContainer.projectData_Undo[0] = (XmlDocument)stateContainer.projectData_Undo[stateContainer.undoIndex].Clone();
+            fileIsLoaded.InvokeAsync();
+            stateContainer.selectedFn = stateContainer.selectedFn_Undo[stateContainer.undoIndex];
+            if (stateContainer.selectedFn != "-1")
+            {
+                stateContainer.fnName = stateContainer.selectedFunction?.IDName ?? "";
+                stateContainer.isDisabled = false;
+            }
+            stateContainer.undoIndex -= 1;
+        }
+    }
+    private void actionRedo()
+    {
+        if (stateContainer.projectData_Undo[stateContainer.undoIndex + 2] is not null)
+        {
+            if (stateContainer.projectData_Undo[stateContainer.undoIndex + 2].HasChildNodes)
+            {
+                stateContainer.undoIndex += 1;
+                stateContainer.projectData_Undo[0] = (XmlDocument)stateContainer.projectData_Undo[stateContainer.undoIndex + 1].Clone();
+                fileIsLoaded.InvokeAsync();
+                stateContainer.selectedFn = stateContainer.selectedFn_Undo[stateContainer.undoIndex + 1];
+                if (stateContainer.selectedFn != "-1")
+                {
+                    stateContainer.fnName = stateContainer.selectedFunction?.IDName ?? "";
+                    stateContainer.isDisabled = false;
+                }
+            }
+        }
+    }
+    private void ShowLabels()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            if (stateContainer.aspectLabelsDisplay == "none")
+            {
+                stateContainer.aspectLabelsDisplay = "";
+            }
+            else
+            {
+                stateContainer.aspectLabelsDisplay = "none";
+            }
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void ChangeFnStyle()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            stateContainer.newFnStyle += 1;
+            if (render[$"{stateContainer.newFnStyle}:Name"] == null)
+            {
+                stateContainer.newFnStyle = 0;
+            }
+            foreach (XmlNode fn in stateContainer.projectData_Undo[0].SelectNodes("//FM/Functions/Function")!)
+            {
+                fn.SelectSingleNode("@fnStyle")!.Value = stateContainer.newFnStyle.ToString();
+                stateContainer.functionList.Find(x => x.IDNr == fn.SelectSingleNode("IDNr")?.InnerText)!.fnStyle = stateContainer.newFnStyle.ToString();
+            }
+            fileIsLoaded.InvokeAsync();
+        }
+    }
+    public async Task Restore()
+    {
+        try
+        {
+            stateContainer.isBackup = await localStorage.GetItemAsync<bool>("isBackup");
+            if (stateContainer.isBackup)
+            {
+                stateContainer.debugOutput = "Backup loading ...";
+                stateContainer.fileLoaded = false;
+                stateContainer.viewWidth = 0;
+                stateContainer.viewHeight = 0;
+                stateContainer.undoIndex = 0;
+                stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+                stateContainer.projectData_Undo[0] = new XmlDocument();
+                stateContainer.projectData_Undo[0].LoadXml(await localStorage.GetItemAsync<string>("backupData"));
+                stateContainer.fileName = await localStorage.GetItemAsync<string>("backupFileName");
+                stateContainer.inputDropStatus = "file-input-zone-hide";
+                stateContainer.isBackup = false;
+                await fileIsLoaded.InvokeAsync();
+                await localStorage.SetItemAsync("isBackup", false);
+            }
+        }
+        catch
+        {
+            stateContainer.debugOutput = "";
+        }
+    }
+    public async Task Recover()
+    {
+        await localStorage.SetItemAsync("isBackup", true);
+        await Restore();
+    }
+    private void ShowInfo()
+    {
+        stateContainer.showModal = true;
+        refreshParent.InvokeAsync();
+    }
+    private void b_showPDF()
+    {
+        stateContainer.showPDFreport = !stateContainer.showPDFreport;
+        refreshParent.InvokeAsync();
+    }
+    private void actionGroup()
+    {
+        if (stateContainer.selectedMulti.Count > 0)
+        {
+            var parentIDNr = stateContainer.selectedMulti[0];
+            XmlNode? group = stateContainer.fnGroups!.SelectSingleNode($"Group[FunctionIDNr={parentIDNr}]");
+            if (group == null)
+            {
+                group = stateContainer.projectData_Undo[0].CreateElement("Group");
+                XmlAttribute addActive = stateContainer.projectData_Undo[0].CreateAttribute("active");
+                XmlNode addFnIDNr = stateContainer.projectData_Undo[0].CreateElement("FunctionIDNr");
+                XmlNode addChild = stateContainer.projectData_Undo[0].CreateElement("CHILD");
+                group.Attributes!.Append(addActive);
+                group.AppendChild(addFnIDNr);
+                group.AppendChild(addChild);
+                stateContainer.fnGroups!.AppendChild(group);
+            }
+            else
+            {
+                foreach (var oldFnG in stateContainer.functionList.FindAll(x => x.groupIDNr.Value == parentIDNr))
+                {
+                    oldFnG.groupIDNr.Value = "";
+                    oldFnG.groupType.Value = "";
+                    oldFnG.groupActive.Value = "";
+                    oldFnG.group = null;
+                }
+            }
+            if (stateContainer.selectedMulti.Count == 1)
+            {
+                stateContainer.fnGroups.RemoveChild(group);
+                stateContainer.selectedFunction!.groupIDNr.Value = "";
+                stateContainer.selectedFunction.groupType.Value = "";
+                stateContainer.selectedFunction.groupActive.Value = "";
+                group = null;
+            }
+            else
+            {
+                group.SelectSingleNode("@active")!.Value = "";
+                group.SelectSingleNode("FunctionIDNr")!.InnerText = parentIDNr;
+                group.SelectSingleNode("CHILD")!.InnerText = string.Join("|", stateContainer.selectedMulti.Skip(1));
+
+                var parentFn = stateContainer.functionList.Find(x => x.IDNr == parentIDNr);
+                parentFn!.groupIDNr.Value = parentIDNr;
+            }
+            stateContainer.selectedMulti = new List<string>();
+            stateContainer.selectedFn = parentIDNr;
+            stateContainer.selectedFunction!.group = group;
+            refreshParent.InvokeAsync();
+        }
+    }
+}

@@ -1,0 +1,63 @@
+﻿@inject StateContainer stateContainer
+
+<div id="myVariables" class="">
+    <div class="d-flex">
+        <div class="var-variables">
+            <div class="sticky-top bg-white p-0 pl-1 align-items-center">
+                variables
+            </div>
+            <div class="modal-var-body">
+                @if (stateContainer.selectedFunction is not null)
+                {
+                    foreach (var data in stateContainer.selectedFunction.getVariables())
+                    {
+                        <div title="@data.Value[1]">@data.Key</div>
+                    }
+                }
+            </div>
+        </div>
+        <div class="var-functions">
+            <div class="sticky-top bg-white p-0 pl-1 align-items-center">
+                functions
+            </div>
+            <div class="modal-var-body">
+				<div title="Conditional statement in three parts:&#10;[IF] ? [THEN] : [ELSE]"> ?  : </div>
+                <div title="Logical operator AND">&&</div>
+                <div title="Logical operator OR">||</div>
+                <div title="Logical operator NOT">!</div>
+                <div title="Comparison operator Equals">&#61;</div>
+                <div title="Comparison operator Less Than">&lt;</div>
+                <div title="Comparison operator Greater Than">&gt;</div>
+                <div title="Comparison operator Less Than or Equal">&lt;=</div>
+                <div title="Comparison operator Greater Than or Equal">&gt;=</div>
+                <div title="Comparison operator Not Equal">&lt;&gt;</div>
+                <div title="Comparison operator Not Equal">!=</div>
+                <div title="Absolute Value for the number specified">abs()</div>
+                <div title="Returns the Integer part of a number">int()</div>
+                <div title="Rounds the value of the parameter up or down to the nearest integer">round()</div>
+                <div title="Rounds the value of the parameter, p, up or down to the nearest decimal place indicated by d, round(p,d)">round(,)</div>
+                <div title="Rounds the value up to the nearest integer">ceiling()</div>
+                <div title="Rounds the value down to the nearest integer">floor()</div>
+                <div title="Returns the Minimum of two numbers by min(a,b)">min(,)</div>
+                <div title="Returns the Maximum of two numbers by max(a,b)">max(,)</div>
+                <div title=@("Returns a pseudo-random double precision floating-point number n, where 0 <= n < 1\nSpecify a range with rnd(a,b) where a = inlcusive lower bound and b = exlusive upper bound")>rnd()</div>
+                <div title=@("Returns a pseudo-random integer number n, where a <= n < b\nNot specifying a range using rnd() will return a random binary 0 or 1")>rndi(a,b)</div>
+                <div title="Returns a pseudo-random double precision floating-point number from a normal distribution with mean &mu; and standard deviation &sigma;">rnorm(&mu;,&sigma;)</div>
+                <div title="Returns a pseudo-random integer number from a normal distribution with mean &mu; and standard deviation &sigma;">rnormi(&mu;,&sigma;)</div>
+                <div title="Square Root of the specified number">sqrt()</div>
+                <div title="Exponentiation, the value of the preceeding number raised to the power of the following number">^</div>
+                <div title="The constant Pi">π</div>
+                <div title="Sine of the specified angle in Degrees">sin()</div>
+                <div title="Cosine of the specified angle in Degrees">cos()</div>
+                <div title="Tangent of the specified angle in Degrees">tan()</div>
+                <div title="Value of the base of the natural logarithm (e), to the power of the exponent specified in the parameter">exp()</div>
+                <div title="Natural Logarithm (base e) of the parameter">log()</div>
+                <div title="Lookup value from a CSV file by lookup(Row,Column)">lookup(,)</div>
+                <div title="Cross-reference value from a CSV file by xref(first column index name , column name of return value)">xref(,)</div>               
+                <div title="Call an external API by api(uri,parameters)">api()</div>
+                <div title="Execute custom code by execute(name)">execute()</div>
+            </div>
+        </div>
+    </div>
+    <p></p>
+</div>

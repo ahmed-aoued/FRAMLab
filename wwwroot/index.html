@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FRAM Model Visualiser</title>
+    <base href="/" />
+    <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="FMV_OG.styles.css" rel="stylesheet" />
+    <link rel="apple-touch-icon" sizes="512x512" href="FRAM_512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="FRAM_192.png" />
+    <link href="favicon.ico" rel="icon" type="image/x-icon" />
+    <link rel="SHORTCUT ICON" href="FRAM_512.png" />
+</head>
+
+<body>
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script type="text/javascript">
+        window.getDimensions = function () {
+            return {
+                width: window.innerWidth,
+                height: window.innerHeight
+            };
+        };
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js"></script>
+    <script src="SaveFile.js"></script>
+    <script src="OpenFile.js"></script>
+    <script type="text/javascript">
+        function focusInput(id) {
+            document.getElementById(id).focus();
+        }
+    </script>
+    <script type="text/javascript">
+        function clearInput(id) {
+            document.getElementById(id).value = '';
+        }
+    </script>
+    <script type="text/javascript">
+        function setInput(id, text) {
+            document.getElementById(id).value = text;
+        }
+    </script>
+    <script type="text/javascript">
+        function getHTML(id) {
+            return document.getElementById(id).outerHTML;
+        }
+    </script>
+    <script type="text/javascript">
+        function getFocusElement() {
+            return document.activeElement.id;
+        }
+    </script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>
