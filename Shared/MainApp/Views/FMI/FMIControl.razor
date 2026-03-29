@@ -15,13 +15,13 @@
     </div>
 </div>
 <div class="navbar p-0">
-    <div class="d-flex align-items-center w-100 text-FMI" title=@Loc["FMI_DELAY"] tabindex="26"><span class="btn-FMIs oi oi-timer unselectable"></span><input id="fmiCycleDelayNeuron" name="fmiCycleDelayNeuron" class="w-100" type="range" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" /><span class="unselectable">&nbsp;@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s"))</span></div>
+    <div class="d-flex align-items-center w-100 text-FMI" title=@Loc["FMI_DELAY"] tabindex="26"><span class="btn-FMIs oi oi-timer unselectable"></span><input id="fmiCycleDelay" name="fmiCycleDelay" class="w-100" type="range" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" /><span class="unselectable">&nbsp;@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s"))</span></div>
 </div>
 @if (stateContainer.showKeys != "")
 {
     <div class="navbar p-0 pt-2 pb-2">
         <div>
-            <input id="fmiStepTotalNeuron" name="fmiStepTotalNeuron" type="number" min="0" class="fmi-cycle oi" title=@cycleTooltip() tabindex="26" @bind=stepTOTAL />
+            <input id="fmiStepTotal" name="fmiStepTotal" type="number" min="0" class="fmi-cycle oi" title=@cycleTooltip() tabindex="26" @bind=stepTOTAL />
             <button type="button" class="btn btn-FMI oi oi-arrow-circle-top" title="Move up" tabindex="26" @onclick=bKey_MoveUp></button>
             <button type="button" class="btn btn-FMI oi oi-arrow-circle-bottom" title="Move down" tabindex="26" @onclick=bKey_MoveDown></button>
         </div>
@@ -34,293 +34,346 @@
         </div>
     </div>
     <div class="navbar p-0">
-        <div>
-            <button class="btn btn-menu btn-textp" title="Human" @onclick=@((e) => addHOT("Human"))>H</button>
-            <button class="btn btn-menu btn-textp" title="Organisational" @onclick=@((e) => addHOT("Organisational"))>O</button>
-            <button class="btn btn-menu btn-textp" title="Technological" @onclick=@((e) => addHOT("Technological"))>T</button>
-            <button class="btn btn-menu btn-textp" title="Default or undefined" @onclick=@((e) => addHOT("AI"))>AI</button>
-        </div>
+        <div></div>
         <div class="float-right">
+            <div class="fmi-mode-wrap" title="Active FMI preset model">
+                <span class="fmi-mode-label">Mode</span>
+                <select id="fmiModeSelect" name="fmiModeSelect" class="fmi-mode-badge" value="@normalizedMode()" @onchange="changeActiveMode">
+                    <option value="BASIC">Basic</option>
+                    <option value="BBN">BBN</option>
+                    <option value="LOPA">LOPA</option>
+                    <option value="NEURON">Neuron</option>
+                </select>
+            </div>
+            <div class=@showExtension()>
+                @foreach (var option in @listTypes())
+                {
+                    <div class="fmi-text unselectable" @onclick=@((e) => SelectExtension(e, option.Name))>@option.Name</div>
+                }
+            </div>
             <button class="btn btn-menu oi oi-briefcase" title="switch sandbox" @onclick=changetypeFMIControl />
         </div>
     </div>
-    if (stateContainer.selectedFn != "-1")
+    @if (stateContainer.selectedFn == "-1")
+    {
+        foreach (var key in stateContainer.metaDataKeys.Keys)
+        {
+            <div class="navbar p-0">
+                <input name=@($"metaKey-{key}") class="fmi-key" type="text" value="@key" @onfocus=@((e) => highlightKey(e, key)) readonly />
+            </div>
+        }
+    } 
+    else
     {
         if (stateContainer.selectedFunction?.metadata is not null)
         {
-            <hr class="mt-2 mb-2" />
-            var FunctionType = "";
-            foreach (var KeyName in pKeys) //\u00C0-\u02FF\u0370-\u04FF^0-9\u00D7\u00F7\u037E
+            @if (IsVariantMode)
             {
-                var keyValue = stateContainer.selectedFunction.metadata.Find(x => x[0] == KeyName);
-                if (keyValue is not null)
-                {
-                    <div class="navbar p-0">
-                        <div class="d-flex">
-                            <input id=@($"Key_{keyValue[0]}") class="fmi-key" type="text" value=@(keyValue[0].Replace("_"," ")) spellcheck="false" />
-                            <select name=@($"neuron-{keyValue[0]}") class="fmi-text" value="@keyValue[1]" @onchange=@((e) => valueCheckChange(e, keyValue))>
-                                @if (KeyName == "Function_Type")
-                                {
-                                    FunctionType = keyValue[1];
-                                    foreach (var option in pOptions[KeyName])
-                                    {
-                                        <option value=@option[2] title=@option[1] hidden=@(option[3]=="hidden")>@option[0]</option>
-                                    }
-                                } else
-                                {
-                                    foreach (var option in pOptions[$"{KeyName}|{FunctionType}"])
-                                    {
-                                        <option value=@option[2] title=@option[1] hidden=@(option[3]=="hidden")>@option[0]</option>
-                                    }
-                                }
-                            </select>
-                        </div>         
+                <div class="navbar p-0 pb-1">
+                    <div class="d-flex w-100 align-items-center">
+                        <span class="fmi-text pr-2">@Mode</span>
+                        <button type="button" class="btn btn-menu btn-textp" title="Human" @onclick=@(() => ApplyModePreset("Human"))>H</button>
+                        <button type="button" class="btn btn-menu btn-textp" title="Organisational" @onclick=@(() => ApplyModePreset("Organisational"))>O</button>
+                        <button type="button" class="btn btn-menu btn-textp" title="Technological" @onclick=@(() => ApplyModePreset("Technological"))>T</button>
+                        <button type="button" class="btn btn-menu btn-textp" title="Default" @onclick=@(() => ApplyModePreset("Default"))>@DefaultPresetButtonText()</button>
                     </div>
-                }
+                </div>
             }
-@*             if (stateContainer.selectedFunction.FunctionType != "2")
+            foreach (var keyValue in stateContainer.selectedFunction.metadata) //\u00C0-\u02FF\u0370-\u04FF^0-9\u00D7\u00F7\u037E
             {
-                <hr class="mt-2 mb-2" />
-                foreach (var KeyNameCPt in pKeysCPt)
+                <div class="navbar p-0">
+                    <div class="d-flex">
+                        <input id=@($"Key_{keyValue[0]}") class="fmi-key" type="text" pattern="[A-Z][A-Za-z0-9_]*" @onchange=@((e) => keyCheckChange(e, keyValue[0])) @oninput=@((e) => checkValidKey(e, $"Key_{keyValue[0]}")) @onfocusout=@((e) => setLastKey(e, $"{keyValue[0]}")) value="@keyValue[0]" spellcheck="false" />
+                        <input name=@($"metaValue-{keyValue[0]}") class="w-50" type="text" value="@keyValue[1]" disabled="@equationCheck(keyValue[2])" @onchange=@((e) => valueCheckChange(e, keyValue)) spellcheck="false" />
+                    </div>
+                    <div class="d-flex">
+                        <input id=@($"eqCheck_{keyValue[0]}") class="m-0 ml-2" type="checkbox" checked="@equationCheck(keyValue[2])" @onchange=@((e) => eqCheckChange(e, keyValue[0])) />
+                        <label for=@($"eqCheck_{keyValue[0]}") class="btn p-1"><i>f(x)=</i></label>
+                        <textarea name=@($"metaEquation-{keyValue[0]}") class="fmi-equation" value="@keyValue[3]" disabled="@(!equationCheck(keyValue[2]))" @onchange=@((e) => equationCheckChange(e, keyValue)) spellcheck="false"
+                        @onfocusin=@((e) => variablesUpdateShow(e, keyValue[0])) />
+                    </div>
+                </div>
+                @if (stateContainer.showVariables == keyValue[0])
                 {
-                    var keyValueCPt = stateContainer.selectedFunction.metadata.Find(x => x[0] == KeyNameCPt[0]);
-                    if (keyValueCPt is not null)
-                    {
-                        <div class="navbar p-0">
-                            <div class="d-flex">
-                                <input id=@($"Key_{keyValueCPt[0]}") class="fmi-key" type="text" value=@(keyValueCPt[0].Replace("_"," ")) spellcheck="false" title=@KeyNameCPt[1] />
-                                <select name=@($"neuronCPt-{keyValueCPt[0]}") class="fmi-text" value="@keyValueCPt[1]" @onchange=@((e) => valueCheckChange(e, keyValueCPt))>
-                                    @foreach (var option in pOptions["On_Time"])
-                                    {
-                                        <option value=@option[2] title=@option[1] hidden=@(option[3]=="hidden") >@option[0]</option>
-                                    }
-                                </select>
-                            </div>
-                        </div>
-                    }
-                }
-                <hr class="mt-2 mb-2" />
-                foreach (var KeyNameCPp in pKeysCPp)
-                {
-                    var keyValueCPp = stateContainer.selectedFunction.metadata.Find(x => x[0] == KeyNameCPp[0]);
-                    if (keyValueCPp is not null)
-                    {
-                        <div class="navbar p-0">
-                            <div class="d-flex">
-                                <input id=@($"Key_{keyValueCPp[0]}") class="fmi-key" type="text" value=@(keyValueCPp[0].Replace("_"," ")) spellcheck="false" title=@KeyNameCPp[1]>
-                                <select name=@($"neuronCPp-{keyValueCPp[0]}") class="fmi-text" value="@keyValueCPp[1]" @onchange=@((e) => valueCheckChange(e, keyValueCPp))>
-                                    @foreach (var option in pOptions["Precise"])
-                                    {
-                                        <option value=@option[2] title=@option[1] hidden=@(option[3]=="hidden") >@option[0]</option>
-                                    }
-                                </select>
-                            </div>
-                        </div>
-                    }
+                    <FMIVariables></FMIVariables>
                 }
             }
- *@        }
+        }
+        <div class="navbar p-0 pb-2">
+            <div class="d-flex">
+                <input id="New_Key" class="fmi-key" type="text" title="Key names must start with a capital letter and only contain letters, numbers, _ or |" pattern="[A-Z][A-Za-z0-9_]*" @onchange=addNewMetadata @oninput=@((e) => checkValidKey(e, "New_Key")) spellcheck="false" placeholder="New_Key0" />
+                <input name="newMetaValue" class="w-50" type="text" value="" disabled />
+            </div>
+        </div>
     }
 }
-
 
 @code {
     [Parameter]
     public EventCallback refreshParent { get; set; }
+    [Parameter]
+    public string Mode { get; set; } = "Basic";
 
     private List<Coupling> activeAspectsArray = new List<Coupling>();
     private List<Coupling> toActivateAspectsArray = new List<Coupling>();
     private List<string> trackExitFunctions = new List<string>();
-    private List<string[]> dataRows = new List<string[]>();
-    private Dictionary<string, string> dataKeys = new Dictionary<string, string>();
+    //private List<string[]> dataRows = new List<string[]>();
+    //private Dictionary<string, string> dataKeys = new Dictionary<string, string>();
     private int? stepTOTAL = null;
     private bool isPlaying = false;
     private Random rnd = new Random();
     private bool gotoKey = false;
     private int trackHighlights = 0;
-    private List<string> pKeys = new List<string> { "Function_Type", "Effectiveness", "Tolerability" };
-    // private List<string[]> pKeysCPt = new List<string[]> 
-    // { 
-    //     new string[2] { "CP_CtRt_On_Time", $"Conditional Probability that the Function will be On Time, {System.Environment.NewLine}given that all the required Controls and Resources are On Time" }, 
-    //     new string[2] { "CP_CtRf_On_Time", $"Conditional Probability that the Function will be On Time, {System.Environment.NewLine}given that only the required Controls are On Time, but not the required Resources" },
-    //     new string[2] { "CP_CfRt_On_Time", $"Conditional Probability that the Function will be On Time, {System.Environment.NewLine}given that only the required Resources are On Time, but not the required Controls" },
-    //     new string[2] { "CP_CfRf_On_Time", $"Conditional Probability that the Function will be On Time, {System.Environment.NewLine}given that neither the required Controls nor the required Resources are On Time" }
-    // };
-    // private List<string[]> pKeysCPp = new List<string[]> 
-    // {
-    //     new string[2] { "CP_CtRt_Precise", $"Conditional Probability that the Function will be Precise, {System.Environment.NewLine}given that all the required Controls and Resources are Precise" },
-    //     new string[2] { "CP_CtRf_Precise", $"Conditional Probability that the Function will be Precise, {System.Environment.NewLine}given that only the required Controls are Precise, but not the required Resources" },
-    //     new string[2] { "CP_CfRt_Precise", $"Conditional Probability that the Function will be Precise, {System.Environment.NewLine}given that only the required Resources are Precise, but not the required Controls" },
-    //     new string[2] { "CP_CfRf_Precise", $"Conditional Probability that the Function will be Precise, {System.Environment.NewLine}given that neither the required Controls nor the required Resources are Precise" }
-    // };
-    private Dictionary<string, List<string[]>> pOptions = new Dictionary<string, List<string[]>>()
+    private string showSelect = "";
+    private string normalizedMode()
     {
-        {"Function_Type", new List<string[]> { 
-            new string[4] { "", "Default or undefined", "", "" },
-            new string[4] { "Human", "Sources of variability are very many, large amplitude, high likelihood but also responsive", "Human", "" },
-            new string[4] { "Organisational", "Sources of variability are many, cultural, large applitude, but low likelihood", "Organisational", "" },
-            new string[4] { "Technological", "Sources of variability are few, well known and low likelihood", "Technological", "" },
-            new string[4] { "AI", "Sources of variability can be unpredictable but usually low likelihood", "AI", "" }
-        }},
-        {"Effectiveness|", new List<string[]> {
-            new string[4] { "Default", "0.99", "0.99", "" }
-        }},
-        {"Effectiveness|Human", new List<string[]> {
-            new string[4] { "Strategic", "0.999 to 0.9999", "0.999", "" },
-            new string[4] { "Tactical", "0.99 to 0.999", "0.99", "" },
-            new string[4] { "Opportunistic", "0.9 to 0.99", "0.9", "" },
-            new string[4] { "Scrambled", "< 0.9", "0.7", "" }
-        }},
-        {"Effectiveness|Organisational", new List<string[]> {
-            new string[4] { "Good", "0.999 to 0.9999", "0.999", "" },
-            new string[4] { "Poor", "0.99 to 0.999", "0.99", "" }
-        }},
-        {"Effectiveness|Technological", new List<string[]> {
-            new string[4] { "Default", "0.99999 to 0.9999999", "0.99999", "" }
-        }},
-        {"Effectiveness|AI", new List<string[]> {
-            new string[4] { "Default", "0.9999 to 0.99999", "0.9999", "" }
-        }},
-        {"Tolerability|", new List<string[]> {
-            new string[4] { "Default", "0.75", "0.75", "" }
-        }},
-        {"Tolerability|Human", new List<string[]> {
-            new string[4] { "Strategic", "0.8 to 0.9", "0.8", "" },
-            new string[4] { "Tactical", "0.75 to 0.9", "0.75", "" },
-            new string[4] { "Opportunistic", "0.7 to 0.8", "0.7", "" },
-            new string[4] { "Scrambled", "0.5", "0.5", "" }
-        }},
-        {"Tolerability|Organisational", new List<string[]> {
-            new string[4] { "Good", "0.8 to 0.9", "0.8", "" },
-            new string[4] { "Poor", "0.7 to 0.8", "0.7", "" }
-        }},
-        {"Tolerability|Technological", new List<string[]> {
-            new string[4] { "Default", "0.99 to 0.999", "0.99", "" }
-        }},
-        {"Tolerability|AI", new List<string[]> {
-            new string[4] { "Default", "0.9 to 0.99", "0.9", "" }
-        }}
-    };
-    private void changetypeFMIControl()
+        return (Mode ?? "Basic").Trim().ToUpperInvariant();
+    }
+    private bool IsVariantMode => normalizedMode() != "BASIC";
+    private string DefaultPresetButtonText()
     {
-        stateContainer.showKeysSetting = typeof(FMIControl);
+        return normalizedMode() switch
+        {
+            "LOPA" => "AI",
+            "NEURON" => "AI",
+            _ => "X"
+        };
+    }
+    private List<Type> listTypes()
+    {
+        var tempAssembly = AppDomain.CurrentDomain.GetAssemblies().First(x => x.FullName?.StartsWith("FMV_OG,") == true); // Type.GetType("FMV_OG.Shared"); //.GetMembers();
+        var tempTypes = tempAssembly.GetTypes().Where(x => x.Name.StartsWith("FMIControl_"));
+        return tempTypes.ToList();
+    } 
+    private string showExtension()
+    {
+        return $"fmi-select{showSelect}";
+    }
+    private void SelectExtension(MouseEventArgs e, string option)
+    {
+        stateContainer.showKeysSetting = listTypes().FirstOrDefault(x => x.Name == option);
         refreshParent.InvokeAsync();
     }
-    private void addHOT(string HOT)
+    private void changeActiveMode(ChangeEventArgs e)
     {
-        var isFirst = false;
-        foreach (var ID in stateContainer.selectedMulti)
+        var selectedMode = e.Value?.ToString()?.Trim().ToUpperInvariant() ?? "BASIC";
+        Type? targetType = selectedMode switch
         {
-            var function = stateContainer.functionList.Find(x => x.IDNr == ID);
-            if (function is not null)
-            {
-                addHOT2(function, HOT);
-            }
+            "BBN" => listTypes().FirstOrDefault(x => x.Name == nameof(FMIControl_BBN)),
+            "LOPA" => listTypes().FirstOrDefault(x => x.Name == nameof(FMIControl_LOPA)),
+            "NEURON" => listTypes().FirstOrDefault(x => x.Name == nameof(FMIControl_Neuron)),
+            _ => typeof(FMIControl)
+        };
+
+        if (targetType is null)
+        {
+            targetType = typeof(FMIControl);
         }
-        foreach (var fn in stateContainer.functionList.FindAll(x => !x.metadata.Exists(y => y[0] == "Function_Type")))
+
+        stateContainer.showKeysSetting = targetType;
+        refreshParent.InvokeAsync();
+    }
+    private void changetypeFMIControl()
+    {
+        showSelect = showSelect == "" ? " show" : "";
+    }
+    private void ApplyModePreset(string profile)
+    {
+        if (stateContainer.selectedFunction is null)
         {
-            addHOT2(fn, "");
-            isFirst = true;
+            return;
         }
-        if (isFirst)
+
+        var selectedFunction = stateContainer.selectedFunction;
+        stateContainer.updateUndo();
+
+        var isBackground = selectedFunction.FunctionType == "2";
+        var normalizedProfile = profile;
+        if (normalizedProfile == "Default")
         {
-            var setDisplay = "Effectiveness";
-            for (var i = 1; i <= 6; i++)
-            {
-                stateContainer.initialDisplaySetup($"colour_{i}0", "0", (i < 3));
-                stateContainer.initialDisplaySetup($"colour_{i}1", "", (i < 3));
-                stateContainer.initialDisplaySetup($"colour_{i}2", "0.5", (i < 3));
-                stateContainer.initialDisplaySetup($"colour_{i}3", "", (i < 3));
-                stateContainer.initialDisplaySetup($"colour_{i}4", "1", (i < 3));
-                stateContainer.initialDisplaySetup($"tracer_{i}", setDisplay, true);
-                stateContainer.initialDisplaySetup($"c_{i}0_value", "#FF8D0A", (i < 3));
-                stateContainer.initialDisplaySetup($"c_{i}2_value", "#FCFF33", (i < 3));
-                stateContainer.initialDisplaySetup($"c_{i}4_value", "#2A8DEA", (i < 3));
-                stateContainer.checkDisplayValues(i.ToString());
-                if (i == 1) { setDisplay = "Tolerability"; } else { setDisplay = ""; }
-            }
+            normalizedProfile = normalizedMode() == "LOPA" || normalizedMode() == "NEURON" ? "AI" : "";
+        }
+
+        ensureMeta(selectedFunction, "Function_Type", normalizedProfile, "", "");
+
+        switch (normalizedMode())
+        {
+            case "BBN":
+                applyBbnPreset(selectedFunction, normalizedProfile, isBackground);
+                break;
+            case "LOPA":
+                applyLopaPreset(selectedFunction, normalizedProfile, isBackground);
+                break;
+            case "NEURON":
+                applyNeuronPreset(selectedFunction, normalizedProfile, isBackground);
+                break;
+            default:
+                return;
+        }
+
+        stateContainer.metaIsDirty = true;
+        refreshParent.InvokeAsync();
+    }
+    private void applyBbnPreset(Function selectedFunction, string profile, bool isBackground)
+    {
+        switch (profile)
+        {
+            case "Human":
+                ensureMeta(selectedFunction, "CP_CtRt_On_Time", "0.95", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_On_Time", "0.5", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_On_Time", "0.75", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_On_Time", "0.25", "", "");
+                ensureMeta(selectedFunction, "CP_CtRt_Precise", "0.95", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_Precise", "0.5", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_Precise", "0.5", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_Precise", "0.05", "", "");
+                ensureMeta(selectedFunction, "On_Time", "0.75", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                ensureMeta(selectedFunction, "Precise", "0.5", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                break;
+            case "Organisational":
+                ensureMeta(selectedFunction, "CP_CtRt_On_Time", "0.95", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_On_Time", "0.5", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_On_Time", "0.5", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_On_Time", "0.05", "", "");
+                ensureMeta(selectedFunction, "CP_CtRt_Precise", "0.75", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_Precise", "0.25", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_Precise", "0.25", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_Precise", "0.05", "", "");
+                ensureMeta(selectedFunction, "On_Time", "0.75", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                ensureMeta(selectedFunction, "Precise", "0.25", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                break;
+            case "Technological":
+                ensureMeta(selectedFunction, "CP_CtRt_On_Time", "0.95", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_On_Time", "0.05", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_On_Time", "0.25", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_On_Time", "0.05", "", "");
+                ensureMeta(selectedFunction, "CP_CtRt_Precise", "0.95", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_Precise", "0.05", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_Precise", "0.25", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_Precise", "0.05", "", "");
+                ensureMeta(selectedFunction, "On_Time", "0.95", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                ensureMeta(selectedFunction, "Precise", "0.95", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                break;
+            default:
+                ensureMeta(selectedFunction, "CP_CtRt_On_Time", "1", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_On_Time", "0", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_On_Time", "0", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_On_Time", "0", "", "");
+                ensureMeta(selectedFunction, "CP_CtRt_Precise", "1", "", "");
+                ensureMeta(selectedFunction, "CP_CtRf_Precise", "0", "", "");
+                ensureMeta(selectedFunction, "CP_CfRt_Precise", "0", "", "");
+                ensureMeta(selectedFunction, "CP_CfRf_Precise", "0", "", "");
+                ensureMeta(selectedFunction, "On_Time", "1", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                ensureMeta(selectedFunction, "Precise", "1", isBackground ? "" : "true", isBackground ? "" : "Execute(PBBN)");
+                break;
+        }
+
+        ensureMeta(selectedFunction, "Variable", "", isBackground ? "" : "true", isBackground ? "" : "(On_Time<=0.5 || Precise<=0.5)?1:0");
+    }
+    private void applyLopaPreset(Function selectedFunction, string profile, bool isBackground)
+    {
+        var pfd = profile switch
+        {
+            "Human" => "0.01",
+            "Organisational" => "0.003",
+            "Technological" => "0.0001",
+            "AI" => "0.001",
+            _ => "0"
+        };
+
+        ensureMeta(selectedFunction, "PFD", pfd, "", "");
+        ensureMeta(selectedFunction, "Psd", "", "true", "1-PFD");
+        ensureMeta(selectedFunction, "Pso", "", "true", isBackground ? "1*Psd" : "Aprd_Pso*Psd");
+        ensureMeta(selectedFunction, "Pfd2", "", "true", "1-Pso");
+    }
+    private void applyNeuronPreset(Function selectedFunction, string profile, bool isBackground)
+    {
+        var effectiveness = profile switch
+        {
+            "Human" => "0.99",
+            "Organisational" => "0.99",
+            "Technological" => "0.99999",
+            "AI" => "0.9999",
+            _ => "0.99"
+        };
+
+        var tolerability = profile switch
+        {
+            "Human" => "0.75",
+            "Organisational" => "0.75",
+            "Technological" => "0.99",
+            "AI" => "0.9",
+            _ => "0.75"
+        };
+
+        ensureMeta(selectedFunction, "Effectiveness", effectiveness, "", "");
+        ensureMeta(selectedFunction, "Tolerability", tolerability, "", "");
+        ensureMeta(selectedFunction, "Activate", "1", isBackground ? "" : "true", isBackground ? "" : "Amin_Effectiveness>=Tolerability?1:0");
+        ensureMeta(selectedFunction, "Variable", "", isBackground ? "" : "true", isBackground ? "" : "Effectiveness<0.99?1:0");
+    }
+    private void ensureMeta(Function fn, string key, string value, string active, string equation)
+    {
+        var getMeta = fn.metadata;
+        var existing = getMeta.Find(x => x[0] == key);
+        if (existing is null)
+        {
+            existing = new string[] { key, value, active, equation, value };
+            getMeta.Add(existing);
+        }
+        else
+        {
+            existing[1] = value;
+            existing[2] = active;
+            existing[3] = equation;
+            existing[4] = value;
+        }
+
+        if (!stateContainer.metaDataKeys.ContainsKey(key))
+        {
+            stateContainer.metaDataKeys.Add(key, "");
+        }
+        stateContainer.metaDataKeys[key] = value;
+        ensureMetadataColumns(key);
+        updateMetadataRow(fn, key, value, active, equation);
+    }
+    private void ensureMetadataColumns(string key)
+    {
+        if (!stateContainer.metadataDS.Tables.Contains("Metadata"))
+        {
+            return;
+        }
+
+        var cols = stateContainer.metadataDS.Tables["Metadata"]!.Columns;
+        if (!cols.Contains(key))
+        {
+            cols.Add(new DataColumn(key, typeof(string)));
+        }
+        if (!cols.Contains($"{key}-active"))
+        {
+            cols.Add(new DataColumn($"{key}-active", typeof(string)));
+        }
+        if (!cols.Contains($"{key}-equation"))
+        {
+            cols.Add(new DataColumn($"{key}-equation", typeof(string)));
         }
     }
-    private void addHOT2(Function function, string HOT)
+    private void updateMetadataRow(Function fn, string key, string value, string active, string equation)
     {
-        //metadata: [0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute, [4]=default value
-        var getMeta = function.metadata;
-        var isBG = (function.isInput == "false");
-        if (getMeta is not null)
+        if (!stateContainer.metadataDS.Tables.Contains("Metadata"))
         {
-            addPKeys("Function_Type", HOT);
-            switch (HOT)
-            {
-                case "":
-                    {
-                        addPKeys("Effectiveness", "0.99", "", ""); 
-                        addPKeys("Tolerability", "0.75", "", "");
-                        addPKeys("Activate", "1", isBG ? "" : "true", isBG ? "" : "Amin_Effectiveness>=Tolerability?1:0");
-                        addPKeys("Variable", "", isBG ? "" : "true", isBG ? "" : "Effectiveness<0.99?1:0");
-                        break;
-                    }
-                case "Human":
-                    {
-                        addPKeys("Effectiveness", "0.99", "", "");
-                        addPKeys("Tolerability", "0.75", "", "");
-                        addPKeys("Activate", "1", isBG ? "" : "true", isBG ? "" : "Amin_Effectiveness>=Tolerability?1:0");
-                        addPKeys("Variable", "", isBG ? "" : "true", isBG ? "" : "Effectiveness<0.99?1:0");
-                        break;
-                    }
-                case "Organisational":
-                    {
-                        addPKeys("Effectiveness", "0.99", "", "");
-                        addPKeys("Tolerability", "0.7", "", "");
-                        addPKeys("Activate", "1", isBG ? "" : "true", isBG ? "" : "Amin_Effectiveness>=Tolerability?1:0");
-                        addPKeys("Variable", "", isBG ? "" : "true", isBG ? "" : "Effectiveness<0.99?1:0");
-                        break;  
-                    }
-                case "Technological":
-                    {
-                        addPKeys("Effectiveness", "0.99999", "", "");
-                        addPKeys("Tolerability", "0.99", "", "");
-                        addPKeys("Activate", "1", isBG ? "" : "true", isBG ? "" : "Amin_Effectiveness>=Tolerability?1:0");
-                        addPKeys("Variable", "", isBG ? "" : "true", isBG ? "" : "Effectiveness<0.99?1:0");
-                        break;
-                    }
-                case "AI":
-                    {
-                        addPKeys("Effectiveness", "0.9999", "", "");
-                        addPKeys("Tolerability", "0.9", "", "");
-                        addPKeys("Activate", "1", isBG ? "" : "true", isBG ? "" : "Amin_Effectiveness>=Tolerability?1:0");
-                        addPKeys("Variable", "", isBG ? "" : "true", isBG ? "" : "Effectiveness<0.99?1:0");
-                        break;
-                    }
-            }
-            stateContainer.updateMetadata(function);
+            return;
         }
-        void addPKeys(string newKey, string value, string hasEq = "", string eq = "")
+
+        var table = stateContainer.metadataDS.Tables["Metadata"]!;
+        var row = table.Select($"IDNr = {fn.IDNr} and Cycle = -1").FirstOrDefault();
+        if (row is null)
         {
-            if (getMeta.Exists(x => x[0] == newKey))
-            {
-                var setMeta = getMeta.Find(x => x[0] == newKey);
-                setMeta![1] = value;
-                setMeta![2] = hasEq;
-                setMeta![3] = eq;
-                setMeta![4] = value;
-            }
-            else
-            {
-                getMeta.Add(new string[] { newKey, value, hasEq, eq, value });
-            }
-            stateContainer.metaIsDirty = true;
-            if (!stateContainer.metaDataKeys.ContainsKey(newKey))
-            {
-                stateContainer.metaDataKeys.Add(newKey, "");
-            }
-            var cols = stateContainer.metadataDS.Tables["Metadata"]?.Columns;
-            if (cols is not null && !cols.Contains(newKey))
-            {
-                cols.Add(new DataColumn(newKey, typeof(string)));
-                cols.Add(new DataColumn($"{newKey}-active", typeof(string)));
-                cols.Add(new DataColumn($"{newKey}-equation", typeof(string)));
-            }
+            return;
         }
+
+        row[key] = value;
+        row[$"{key}-active"] = active;
+        row[$"{key}-equation"] = equation;
     }
     private async void checkValidKey(ChangeEventArgs e, string keyName)
     {
@@ -353,8 +406,8 @@
     {
         var buffer = new byte[e.File.Size];
         await e.File.OpenReadStream(1050000).ReadAsync(buffer);
-        dataRows = new List<string[]>();
-        dataKeys = new Dictionary<string, string>();
+        stateContainer.dataRows = new List<string[]>();
+        stateContainer.dataKeys = new Dictionary<string, string>();
         int i = 0;
         int j = 0;
         using (StringReader sr = new StringReader(Encoding.UTF8.GetString(buffer)))
@@ -362,12 +415,12 @@
             string? line = null;
             while ((line = sr.ReadLine()) is not null)
             {
-                dataRows.Add(line.Split(","));
+                stateContainer.dataRows.Add(line.Split(","));
                 //previous for the lookup function, next loop for the xref function
-                var colsN = dataRows[i].Length;
+                var colsN = stateContainer.dataRows[i].Length;
                 for (j = 0; j < colsN; j++)
                 {
-                    dataKeys[$"{dataRows[i][0]},{dataRows[0][j]}"] = dataRows[i][j];
+                    stateContainer.dataKeys[$"{stateContainer.dataRows[i][0]},{stateContainer.dataRows[0][j]}"] = stateContainer.dataRows[i][j];
                     //Console.WriteLine($"{dataRows[i][0]},{dataRows[0][j]} = {dataKeys[dataRows[i][0] + "," + dataRows[0][j]]}");
                 }
                 i++;
@@ -398,7 +451,7 @@
                     }
                 }
             }
-            calcVariables(stateContainer.selectedFunction);
+            stateContainer.calcVariables(stateContainer.selectedFunction);
             //}
             // foreach (var Key in stateContainer.selectedFunction.getVariables().Keys)
             // {
@@ -450,7 +503,7 @@
                 }
             }
             await JSRuntime.InvokeVoidAsync("clearInput", "New_Key");
-        }
+        } 
         else
         {
             await JSRuntime.InvokeVoidAsync("clearInput", "New_Key");
@@ -508,10 +561,6 @@
             if (fnMD is not null && fnMD[getKeyMeta[0]] is not null)
             {
                 fnMD[getKeyMeta[0]] = getKeyMeta[1];
-            }
-            if (getKeyMeta[0] == "Function_Type")
-            {
-                addHOT(getKeyMeta[1]);
             }
         }
     }
@@ -599,7 +648,7 @@
         if (stateContainer.showKeys == "")
         {
             stateContainer.showKeys = nameof(stateContainer.showKeysSetting);
-        }
+        } 
         else
         {
             stateContainer.showKeys = "";
@@ -658,7 +707,7 @@
         {
             fn.resetAspects();
             fn.resetVariables();
-            fn.resetKvalues();
+            fn.resetKvalues(); 
             fn.toolTip = "";
             foreach (string[] mdKey in fn.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
             {
@@ -718,7 +767,7 @@
         if (isPlaying)
         {
             return "btn btn-FMIp oi oi-media-stop";
-        }
+        } 
         else
         {
             return "btn btn-FMIp oi oi-media-play";
@@ -889,7 +938,7 @@
                     checkOtoA += stateContainer.aspectsList.FindAll(x => x.IDName == hasOutput.IDName && x.Type != "Input").Count;
                 }
                 check3 = stateContainer.aspectsList.FindAll(x => x.FunctionIDNr == fnBG.IDNr && x.Type == "Input").Count;
-                if (check1 == 0)
+                if (check1 == 0) 
                 { //has only inputs or outputs (no other Aspects)
                     if (check3 == 0 && checkOtoI > 0) //is Entry function (has no Input and has at least 1 Output going to other function Input)
                     {
@@ -902,7 +951,7 @@
                         activateFunction(fnBG);
                         IProfile = $"Function <{fnBG.IDName}>:\n    Output: {(fnBG.profileFn == "" ? "0" : fnBG.profileFn)}\n{IProfile}";
                     }
-                    else if (check2 == 0 && check3 > 0) //is Exit function
+                    else if (check2 == 0 && check3 > 0) //is Exit function (no Output and at least 1 Input)
                     {
                         fnBG.fmiType = "Exit";
                         stateContainer.fmiMessage += $"Exit function <{fnBG.IDName}>\n";
@@ -911,8 +960,12 @@
                         trackExitFunctions.Add(fnBG.IDNr);
                         IProfileExit += $"Function <{fnBG.IDName}>:\n    Input: {(fnBG.profileI == "" ? "All" : fnBG.profileI)}{"        ".Substring(0, 8 - 3)}\n";
                     }
+                    else if (check2 == 0 && check3 == 0)
+                    { //No Aspects or Couplings at all - ignore
+                        fnBG.fmiType = "";
+                    }
                     else if (check2 == 0 || check3 == 0)
-                    { //other Background functions (not Entry or Exit)
+                    { //other Background functions (not Entry or Exit, such as an Output going to other Aspects that are not Inputs)
                         fnBG.fmiType = "Background";
                         ICycle0 += $"Background function <{fnBG.IDName}> has been activated\n";
                         //if (enableTheLab)
@@ -978,10 +1031,11 @@
                         {
                             //if (enableTheLab)
                             evaluate(fnBG2);
-                            if (activateFunction(fnBG2))
-                            {
-                                stateContainer.fmiMessage += $"Entry Function <{fnBG2.IDName}> has been activated\n";
-                            }
+                            activateFunction(fnBG2);
+                            // if (activateFunction(fnBG2))
+                            // {
+                            //     stateContainer.fmiMessage += $"Entry Function <{fnBG2.IDName}> has been activated\n";
+                            // }
                             foreach (var fnBGb in stateContainer.functionList.FindAll(x => x.fmiType == "Background"))
                             {
                                 evaluate(fnBGb);
@@ -999,15 +1053,44 @@
                     }
                     //CYCLE TEST
                 }
-                else //all other Functions that are not Entry and not Background (Exit not excluded)
+                else //all other Functions that are not Entry and not Background (Exit not excluded. In other words, they all have Inputs)
                 {
                     if (fnBG2.isActive())
                     {
                         //if (enableTheLab)
                         evaluate(fnBG2);
+                        if (!activateFunction(fnBG2))
+                        {
+                            var fnMDC2 = fnBG2.metadata.Find(x => x[0] == "Consume");
+                            if (fnMDC2 is not null)
+                            {
+                                var consumeAll = true;
+                                var consumeOnly = "";
+                                if (fnMDC2[1] == "0" || fnMDC2[1] == "false")
+                                {
+                                    consumeAll = false;
+                                    consumeOnly = "";
+                                }
+                                if (fnMDC2[1] != "1" && fnMDC2[1] != "true")
+                                {
+                                    consumeAll = false;
+                                    consumeOnly = fnMDC2[1];
+                                    foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == fnBG2.IDNr && !x.activated && x.toType == "I" && (consumeAll || consumeOnly.Contains(x.label))))
+                                    {//This is about forcing an Input to be consumed (but not if also part of repeating cycle?)
+                                        fnBG2.activeI.Remove(coupling.Name);
+                                        activeAspectsArray.Remove(coupling);
+                                        fnBG2.removeVariable($"{coupling.toType}{coupling.outputFn}_");
+                                        coupling.fmiHighlight = "";
+                                    }
+                                }
+                            }
+                        }
+                        /*
                         var canActivate2 = true;
                         var activateAll2 = true;
                         var activateOnly = "";
+                        var consumeAll2 = true;
+                        var consumeOnly = "";
                         var fnMD2 = fnBG2.metadata.Find(x => x[0] == "Activate");
                         if (fnMD2 is not null)
                         {
@@ -1019,6 +1102,19 @@
                             {
                                 activateAll2 = false;
                                 activateOnly = fnMD2[1];
+                            }
+                        }
+                        var fnMDC2 = fnBG2.metadata.Find(x => x[0] == "Consume");
+                        if (fnMDC2 is not null)
+                        {
+                            if (fnMDC2[1] != "1" && fnMDC2[1] != "true")
+                            {
+                                consumeAll2 = false;
+                                consumeOnly = fnMDC2[1];
+                                if (!canActivate2)
+                                {
+
+                                }
                             }
                         }
                         var fnMDv2 = fnBG2.metadata.Find(x => x[0] == "Variable");
@@ -1039,17 +1135,15 @@
                         if (canActivate2)
                         {
                             fnBG2.wasActive = true;
+                            trackHighlights += 1;
+                            fnBG2.fmiHighlight = $"{fnBG2.fmiType.ToLower()}-fill";
                             //check group
                             if (fnBG2.fmiType != "Exit")
                             {
-                                fnBG2.fmiHighlight = "entry-fill";
-                                trackHighlights += 1;
                                 stateContainer.fmiMessage += $"Function <{fnBG2.IDName}> has been activated\n";
                             }
                             else
                             {
-                                fnBG2.fmiHighlight = "exit-fill";
-                                trackHighlights += 1;
                                 trackExitFunctions.Remove(fnBG2.IDNr);
                                 stateContainer.fmiMessage += $"Exit function <{fnBG2.IDName}> has been activated\n";
                             }
@@ -1086,14 +1180,12 @@
                         {
                             fnBG2.fmiHighlight = "hold-fill";
                         }
+                        */
                     }
                     else
                     {
-                        //if (fnBG2.fmiType != "Exit" || trackExitFunctions.Count > 0)
-                        //{
                         //check for group?
                         fnBG2.fmiHighlight = "";
-                        //}
                     }
                 }
             }
@@ -1114,10 +1206,17 @@
                 returnString = "End";
             }
         }
-        activeAspectsArray.AddRange(toActivateAspectsArray);
+        //activeAspectsArray.AddRange(toActivateAspectsArray);
+        foreach (var item in toActivateAspectsArray)
+        {
+            if (!activeAspectsArray.Contains(item))
+            {
+                activeAspectsArray.Add(item);
+            }
+        }
         if (trackHighlights == 0)
         {
-            stateContainer.fmiMessage += "No functions were activated during this cycle.\n";
+            stateContainer.fmiMessage += "No functions were activated during this cycle.\n"; 
             if (!stepTOTAL.HasValue)
             {
                 //bFMI.enabled = false;
@@ -1131,6 +1230,7 @@
     {
         var canActivate = true;
         var activateAll = true;
+        var activateOnly = "";
         var fnMD = fnBG.metadata.Find(x => x[0] == "Activate");
         if (fnMD is not null)
         {
@@ -1141,6 +1241,22 @@
             if (fnMD[1] != "1" && fnMD[1] != "true")
             {
                 activateAll = false;
+                activateOnly = fnMD[1];
+            }
+        }
+        var fnMDv2 = fnBG.metadata.Find(x => x[0] == "Variable");
+        if (fnMDv2 is not null && fnBG.FunctionType != "2")
+        {
+            stateContainer.updateUndo();
+            if (fnMDv2[1] == "1" || fnMDv2[1] == "true")
+            {
+                fnBG.FunctionType = "1";
+                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fnBG.IDNr}]/FunctionType")!.InnerText = "1";
+            }
+            else
+            {
+                fnBG.FunctionType = "0";
+                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={fnBG.IDNr}]/FunctionType")!.InnerText = "0";
             }
         }
         if (canActivate)
@@ -1150,6 +1266,7 @@
             fnBG.fmiHighlight = $"{fnBG.fmiType.ToLower()}-fill";
             if (fnBG.fmiType == "Entry")
             {
+                stateContainer.fmiMessage += $"Entry Function <{fnBG.IDName}> has been activated\n";
                 foreach (var coupling in stateContainer.couplingList.FindAll(x => x.outputFn == fnBG.IDNr && (activateAll || fnMD![1].Contains(x.label))))
                 {
                     if (!toActivateAspectsArray.Contains(coupling))
@@ -1187,6 +1304,63 @@
                     }
                 }
             }
+            else
+            {
+                var holdAll = false;
+                var holdOnly = "";
+                var fnMDH = fnBG.metadata.Find(x => x[0] == "Hold");
+                if (fnMDH is not null)
+                {
+                    holdAll = true;
+                    if (fnMDH[1] == "0" || fnMDH[1] == "false")
+                    {
+                        holdAll = false;
+                    }
+                    if (fnMDH[1] != "1" && fnMDH[1] != "true")
+                    {
+                        holdAll = false;
+                        holdOnly = fnMDH[1];
+                    }
+                }
+                if (fnBG.fmiType != "Exit")
+                {
+                    fnBG.fmiHighlight = "entry-fill";
+                    stateContainer.fmiMessage += $"Function <{fnBG.IDName}> has been activated\n";
+                }
+                else
+                {
+                    trackExitFunctions.Remove(fnBG.IDNr);
+                    stateContainer.fmiMessage += $"Exit function <{fnBG.IDName}> has been activated\n";
+                }
+                foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == fnBG.IDNr && !x.activated && !holdAll && !holdOnly.Contains(x.label)))
+                {//This is about clearing the Aspects that were consumed, but not if also part of repeating cycle, and not if explicitly on Hold
+                    if (stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn)?.fmiType != "Background")
+                    {
+                        switch (coupling.toType)
+                        {
+                            case "I": fnBG.activeI.Remove(coupling.Name); break;
+                            case "P": fnBG.activeP.Remove(coupling.Name); break;
+                            case "R": fnBG.activeR.Remove(coupling.Name); break;
+                            case "C": fnBG.activeC.Remove(coupling.Name); break;
+                            case "T": fnBG.activeT.Remove(coupling.Name); break;
+                        }
+                        activeAspectsArray.Remove(coupling);
+                        //Console.WriteLine("=====================");
+                        //Console.WriteLine($"Coupling: {coupling.Name}, {coupling.toType}{coupling.outputFn}_");
+                        //Console.WriteLine($"Function: {fnBG2.IDNr}, {fnBG2.IDName}");
+                        //Console.WriteLine("=====================");
+                        fnBG.removeVariable($"{coupling.toType}{coupling.outputFn}_");
+                    }
+                    coupling.fmiHighlight = "";
+                }
+                foreach (var coupling in stateContainer.couplingList.FindAll(x => x.outputFn == fnBG.IDNr && x.outputFn != x.toFn && (activateAll || activateOnly.Contains(x.label))))
+                { //This activates the Outputs of the current Function, unless selectively not included in Activate
+                    if (!toActivateAspectsArray.Contains(coupling))
+                    {
+                        toActivateAspectsArray.Add(coupling);
+                    }
+                }
+            }
         }
         else
         {
@@ -1197,7 +1371,7 @@
     private void evaluate(Function iBG) //private async Task evaluate(Function iBG)
     {
         var showVariability = false;
-        calcVariables(iBG); //calculate the new variable values for the given function
+        stateContainer.calcVariables(iBG); //calculate the new variable values for the given function
         if (iBG.metadata is not null)
         {
             foreach (string[] md3Key in iBG.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
@@ -1219,12 +1393,24 @@
                         //This is an option to run custom code on a Function. The code is written in the Function.cs component. An example is 'returnTrue'
                         if (md3Key[3].StartsWith("execute("))
                         {
-                            var codeName = md3Key[3].Replace("execute(", "").Replace(")", "");
+                            var contentText = md3Key[3].Replace("execute(", "").Replace(")", "");
+                            var contentArray = contentText.Split(",");
+                            var codeName = contentArray[0];
                             var method = iBG.GetType().GetMethod(codeName);
                             if (method is not null)
                             {
-                                md3Key[1] = method.Invoke(iBG, new object[] { md3Key[0] })?.ToString() ?? "STOP";
+                                contentArray[0] = md3Key[0];
+                                md3Key[1] = method.Invoke(iBG, new object[] { contentArray } )?.ToString() ?? "STOP";
                             }
+                        }
+                        else if (md3Key[3].StartsWith("array("))
+                        {
+                            var content = $"{md3Key[0]},{md3Key[3].Replace("array(", "").Replace(")", "")}".Split(",");
+                            //var method = iBG.GetType().GetMethod("array");
+                            //if (method is not null)
+                            //{
+                            md3Key[1] = iBG.array(content);
+                            //}
                         }
                         //=======================================
                         //This is an option to call an external API
@@ -1265,7 +1451,7 @@
                         //=======================================
                         else
                         {
-                            md3Key[1] = eval(md3Key[3], iBG.getVariables());
+                            md3Key[1] = stateContainer.eval(md3Key[3], iBG.getVariables());
                         }
                     }
                     iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] });
@@ -1351,568 +1537,4 @@
             }
         }
     }
-    private void calcVariables(Function iBG)
-    {
-        //iBG.metadata.Exists(key => key[2] == "true" && key[3].Contains(""))
-        //Console.WriteLine($"===========================");
-        //Console.WriteLine($"calcVariables_Function: {iBG.IDNr};{iBG.IDName}");
-        iBG.newVariable("Cycle", new string[] { stateContainer.cycleFMI.ToString(), "The FMI Cycle count" });
-        foreach (var mdKeyValue in stateContainer.metaDataKeys)
-        {
-            var mdKey = mdKeyValue.Key;
-            var mdValue = mdKeyValue.Value;
-            //GLOBAL!!!
-            if (mdKey.StartsWith("Global_"))
-            {
-                iBG.newVariable(mdKey, new string[] { mdValue, mdValue });
-            }
-            //Console.WriteLine($"  - key: {mdKey}");
-            double Isum = 0;
-            double In = 0;
-            double Imin = double.NaN;
-            double Imax = 0;
-            double Iprd = double.NaN;
-            double Psum = 0;
-            double Pn = 0;
-            double Pmin = double.NaN;
-            double Pmax = 0;
-            double Pprd = double.NaN;
-            double Rsum = 0;
-            double Rn = 0;
-            double Rmin = double.NaN;
-            double Rmax = 0;
-            double Rprd = double.NaN;
-            double Csum = 0;
-            double Cn = 0;
-            double Cmin = double.NaN;
-            double Cmax = 0;
-            double Cprd = double.NaN;
-            double Tsum = 0;
-            double Tn = 0;
-            double Tmin = double.NaN;
-            double Tmax = 0;
-            double Tprd = double.NaN;
-            double Amin = double.NaN;
-            double Amax = double.NaN;
-            double Aprd = double.NaN;
-            foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == iBG.IDNr && x.fmiHighlight != "")) //activeAspectsArray.FindAll(x => x.toFn == iBG.IDNr)
-            {   //we are only taking metadata from active couplings, that are joined to the aspects (not output) of the Function being evaluated
-                //However, we also need to inlcude couplings from Background Functions, that are always present but not flagged as 'active', so use the FMI highlighting.
-                //Console.WriteLine($"    - coupling: [{coupling.Name}]");
-                var outFn = stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn);
-                var fnMD = outFn?.getVariable(mdKey);
-                if (fnMD is null && outFn?.metadata.Find(x => x[0] == mdKey) is not null)
-                { //how to handle empty aspect variables? Aggregate as zero or ignore?
-                  //Console.WriteLine($"METADATA: {mdKey}");
-                    fnMD = new string[] { "0", "0" }; //this adds missing aspects as zero data, if the upstream function has the corresponding Key name
-                }
-                if (fnMD is not null) // && !string.IsNullOrEmpty(fnMD[1]))
-                {
-                    //Console.WriteLine($"    - key-value: {fnMD[0]} | {fnMD[1]}");
-                    var fnMDString = fnMD[0]; //fnMD[1]
-                    double fnMDValue = 0;
-                    if (!double.TryParse(string.IsNullOrEmpty(fnMDString) ? "0" : fnMDString, CultureInfo.InvariantCulture, out fnMDValue)) //how to handle empty aspect variables? Aggregate as zero or ignore?
-                    {
-                        if (fnMDString.ToLower() == "true") fnMDValue = 1;
-                    }
-                    switch (coupling.toType)
-                    {
-                        case "I":
-                            {
-                                In++;
-                                Isum += fnMDValue;
-                                Imin = double.IsNaN(Imin) ? fnMDValue : Math.Min(Imin, fnMDValue);
-                                Imax = Math.Max(Imax, fnMDValue);
-                                Iprd = double.IsNaN(Iprd) ? fnMDValue : Iprd * fnMDValue;
-                                break;
-                            }
-                        case "P":
-                            {
-                                Pn++;
-                                Psum += fnMDValue;
-                                Pmin = double.IsNaN(Pmin) ? fnMDValue : Math.Min(Pmin, fnMDValue);
-                                Pmax = Math.Max(Pmax, fnMDValue);
-                                Pprd = double.IsNaN(Pprd) ? fnMDValue : Pprd * fnMDValue;
-                                break;
-                            }
-                        case "R":
-                            {
-                                Rn++;
-                                Rsum += fnMDValue;
-                                Rmin = double.IsNaN(Rmin) ? fnMDValue : Math.Min(Rmin, fnMDValue);
-                                Rmax = Math.Max(Rmax, fnMDValue);
-                                Rprd = double.IsNaN(Rprd) ? fnMDValue : Rprd * fnMDValue;
-                                break;
-                            }
-                        case "C":
-                            {
-                                Cn++;
-                                Csum += fnMDValue;
-                                Cmin = double.IsNaN(Cmin) ? fnMDValue : Math.Min(Cmin, fnMDValue);
-                                Cmax = Math.Max(Cmax, fnMDValue);
-                                Cprd = double.IsNaN(Cprd) ? fnMDValue : Cprd * fnMDValue;
-                                break;
-                            }
-                        case "T":
-                            {
-                                Tn++;
-                                Tsum += fnMDValue;
-                                Tmin = double.IsNaN(Tmin) ? fnMDValue : Math.Min(Tmin, fnMDValue);
-                                Tmax = Math.Max(Tmax, fnMDValue);
-                                Tprd = double.IsNaN(Tprd) ? fnMDValue : Tprd * fnMDValue;
-                                break;
-                            }
-                    }
-                }
-            }
-            if (In > 0)
-            {
-                iBG.newVariable($"In_{mdKey}", new string[] { In.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Inputs" });
-                iBG.newVariable($"Isum_{mdKey}", new string[] { Isum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Inputs" });
-                iBG.newVariable($"Iavg_{mdKey}", new string[] { (Isum / In).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Inputs" });
-                iBG.newVariable($"Imin_{mdKey}", new string[] { Imin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Inputs" });
-                iBG.newVariable($"Imax_{mdKey}", new string[] { Imax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Inputs" });
-                iBG.newVariable($"Iprd_{mdKey}", new string[] { Iprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Inputs" });
-                Amin = Imin;
-                Amax = Imax;
-                Aprd = Iprd;
-            }
-            if (Pn > 0)
-            {
-                iBG.newVariable($"Pn_{mdKey}", new string[] { Pn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Preconditions" });
-                iBG.newVariable($"Psum_{mdKey}", new string[] { Psum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Preconditions" });
-                iBG.newVariable($"Pavg_{mdKey}", new string[] { (Psum / Pn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Preconditions" });
-                iBG.newVariable($"Pmin_{mdKey}", new string[] { Pmin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Preconditions" });
-                iBG.newVariable($"Pmax_{mdKey}", new string[] { Pmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Preconditions" });
-                iBG.newVariable($"Pprd_{mdKey}", new string[] { Pprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Preconditions" });
-                Amin = double.IsNaN(Amin) ? Pmin : Math.Min(Amin, Pmin);
-                Amax = double.IsNaN(Amax) ? Pmax : Math.Max(Amax, Pmax);
-                Aprd = double.IsNaN(Aprd) ? Pprd : Aprd * Pprd;
-            }
-            if (Rn > 0)
-            {
-                iBG.newVariable($"Rn_{mdKey}", new string[] { Rn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Resources" });
-                iBG.newVariable($"Rsum_{mdKey}", new string[] { Rsum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Resources" });
-                iBG.newVariable($"Ravg_{mdKey}", new string[] { (Rsum / Rn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Resources" });
-                iBG.newVariable($"Rmin_{mdKey}", new string[] { Rmin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Resources" });
-                iBG.newVariable($"Rmax_{mdKey}", new string[] { Rmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Resources" });
-                iBG.newVariable($"Rprd_{mdKey}", new string[] { Rprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Resources" });
-                Amin = double.IsNaN(Amin) ? Rmin : Math.Min(Amin, Rmin);
-                Amax = double.IsNaN(Amax) ? Rmax : Math.Max(Amax, Rmax);
-                Aprd = double.IsNaN(Aprd) ? Rprd : Aprd * Rprd;
-            }
-            if (Cn > 0)
-            {
-                iBG.newVariable($"Cn_{mdKey}", new string[] { Cn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Controls" });
-                iBG.newVariable($"Csum_{mdKey}", new string[] { Csum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Controls" });
-                iBG.newVariable($"Cavg_{mdKey}", new string[] { (Csum / Cn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Controls" });
-                iBG.newVariable($"Cmin_{mdKey}", new string[] { Cmin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Controls" });
-                iBG.newVariable($"Cmax_{mdKey}", new string[] { Cmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Controls" });
-                iBG.newVariable($"Cprd_{mdKey}", new string[] { Cprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Controls" });
-                Amin = double.IsNaN(Amin) ? Cmin : Math.Min(Amin, Cmin);
-                Amax = double.IsNaN(Amax) ? Cmax : Math.Max(Amax, Cmax);
-                Aprd = double.IsNaN(Aprd) ? Cprd : Aprd * Cprd;
-            }
-            if (Tn > 0)
-            {
-                iBG.newVariable($"Tn_{mdKey}", new string[] { Tn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Times" });
-                iBG.newVariable($"Tsum_{mdKey}", new string[] { Tsum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Times" });
-                iBG.newVariable($"Tavg_{mdKey}", new string[] { (Tsum / Tn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Times" });
-                iBG.newVariable($"Tmin_{mdKey}", new string[] { Tmin.ToString(CultureInfo.InvariantCulture), "Minimum of {mdKey} from Times" });
-                iBG.newVariable($"Tmax_{mdKey}", new string[] { Tmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Times" });
-                iBG.newVariable($"Tprd_{mdKey}", new string[] { Tprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Times" });
-                Amin = double.IsNaN(Amin) ? Tmin : Math.Min(Amin, Tmin);
-                Amax = double.IsNaN(Amax) ? Tmax : Math.Max(Amax, Tmax);
-                Aprd = double.IsNaN(Aprd) ? Tprd : Aprd * Tprd;
-            }
-            if (In + Pn + Rn + Cn + Tn > 0)
-            {
-                iBG.newVariable($"An_{mdKey}", new string[] { (In + Pn + Rn + Cn + Tn).ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from All Aspects" });
-                iBG.newVariable($"Asum_{mdKey}", new string[] { (Isum + Psum + Rsum + Csum + Tsum).ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from All Aspects" });
-                iBG.newVariable($"Aavg_{mdKey}", new string[] { ((Isum + Psum + Rsum + Csum + Tsum) / (In + Pn + Rn + Cn + Tn)).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from All Aspects" });
-                iBG.newVariable($"Amin_{mdKey}", new string[] { Amin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from All Aspects" });
-                iBG.newVariable($"Amax_{mdKey}", new string[] { Amax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from All Aspects" });
-                iBG.newVariable($"Aprd_{mdKey}", new string[] { Aprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from All Aspects" });
-            }
-            // if (mdKey == "Effectiveness") //Just used for troubleshooting
-            // {
-            //     Console.WriteLine($"  - An_{mdKey}: {(In + Pn + Rn + Cn + Tn)}");
-            //     Console.WriteLine($"  - Asum_{mdKey}: {(Isum + Psum + Rsum + Csum + Tsum)}");
-            //     Console.WriteLine($"  - Aavg_{mdKey}: {(Isum + Psum + Rsum + Csum + Tsum) / (In + Pn + Rn + Cn + Tn)}");
-            //     Console.WriteLine($"  - Amin_{mdKey}: {Amin}");
-            //     Console.WriteLine($"  - Amax_{mdKey}: {Amax}");
-            //     Console.WriteLine($"  - Aprd_{mdKey}: {Aprd}");
-            // }
-        }
-    }
-    private string eval(string str, Dictionary<string, string[]> variables)
-    {
-        int pos = -1;
-        char ch;
-        void nextChar()
-        {
-            ch = (++pos < str.Length) ? str[pos] : '`';
-        }
-        bool eat(char charToEat)
-        {
-            while (char.IsWhiteSpace(ch)) nextChar();
-            if (ch == charToEat)
-            {
-                nextChar();
-                return true;
-            }
-            return false;
-        }
-        string parse()
-        {
-            nextChar();
-            string x = parseExpression();
-            //Console.WriteLine($"str: {str}; Length: {str.Length}; pos: {pos}");
-            //Console.WriteLine($"x: {x}");
-            if (pos < str.Length)
-            {
-                return "NaN";
-            }
-            return x;
-        }
-        // Grammar:
-        // expression = term | expression `+` term | expression `-` term
-        // term = factor | term `*` factor | term `/` factor
-        // factor = `+` factor | `-` factor | `(` expression `)`
-        //
-        string parseExpression()
-        {
-            string x = parseTerm();
-            for (; ; )
-            {
-                if (eat('+'))
-                {
-                    x = (double.Parse(x, CultureInfo.InvariantCulture) + double.Parse(parseTerm(), CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture); // addition
-                }
-                else if (eat('-'))
-                {
-                    x = (double.Parse(x, CultureInfo.InvariantCulture) - double.Parse(parseTerm(), CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture); // subtraction
-                }
-                else if (eat('?'))
-                { // conditionals. Grammer: if ? then : else | [if?then:else]
-                    if (double.Parse(x, CultureInfo.InvariantCulture) > 0)
-                    {
-                        str = str.Substring(pos, str.IndexOf(':') - pos);
-                    }
-                    else
-                    {
-                        str = str.Substring(str.IndexOf(':') + 1);
-                    }
-                    pos = -1;
-                    nextChar();
-                    if (eat('"'))
-                    {
-                        int startPos = pos;
-                        while (ch != '"' && pos < str.Length) nextChar();
-                        string subText = str.Substring(startPos, pos - startPos);
-                        pos = str.Length;
-                        return subText;
-                    }
-                    return parseExpression();
-                }
-                else if (eat('&'))
-                { // boolean AND
-                    eat('&');
-                    bool tA = double.Parse(parseTerm(), CultureInfo.InvariantCulture) > 0;
-                    x = double.Parse(x, CultureInfo.InvariantCulture) > 0 && tA ? "1" : "0";
-                    //return x;
-                }
-                else if (eat('|'))
-                { // boolean OR
-                    eat('|');
-                    bool tO = double.Parse(parseTerm(), CultureInfo.InvariantCulture) > 0;
-                    x = double.Parse(x, CultureInfo.InvariantCulture) > 0 || tO ? "1" : "0";
-                    //return x;
-                }
-                else return x;
-            }
-        }
-        string parseTerm()
-        {
-            string x = parseFactor();
-            for (; ; )
-            {
-                if (eat('*'))
-                {
-                    x = (double.Parse(x, CultureInfo.InvariantCulture) * double.Parse(parseFactor(), CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture); // multiplication
-                }
-                else if (eat('/'))
-                {
-                    x = (double.Parse(x, CultureInfo.InvariantCulture) / double.Parse(parseFactor(), CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture); // division
-                }
-                else return x;
-            }
-        }
-        string parseFactor()
-        {
-            if (eat('+')) return parseFactor(); // unary plus
-            if (eat('-')) return '-' + parseFactor(); // unary minus
-            if (eat('!')) return double.Parse(parseFactor(), CultureInfo.InvariantCulture) > 0 ? "0" : "1"; // unary NOT
-            string x;
-            int startPos = pos;
-            if (eat('"'))
-            {
-                startPos = pos;
-                while (ch != '"' && pos < str.Length) nextChar();
-                string subText = str.Substring(startPos, pos - startPos);
-                x = subText;
-                eat('"');
-            }
-            else if (eat('('))
-            { // parentheses
-                x = parseExpression();
-                eat(')');
-            }
-            else if (eat('π'))
-            {
-                x = Math.PI.ToString(CultureInfo.InvariantCulture); //Pi
-            }
-            else if ((ch >= '0' && ch <= '9') || ch == '.')
-            { // numbers
-                while ((ch >= '0' && ch <= '9') || ch == '.') nextChar();
-                x = str.Substring(startPos, pos - startPos);
-            }
-            else if (ch >= 'a' && ch <= 'z')
-            { // functions (must start with lowercase letter)
-                while ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_') nextChar();
-                string func = str.Substring(startPos, pos - startPos);
-                if (func == "lookup")
-                {
-                    if (dataRows.Count <= 0) return "NaN";
-                    if (!eat('(')) return "NaN";
-                    int row = int.Parse(parseExpression());
-                    //Console.WriteLine($" - row: {row}");
-                    if (!eat(',')) return "NaN";
-                    int col = int.Parse(parseExpression());
-                    //Console.WriteLine($" - col: {col}");
-                    if (!eat(')')) return "NaN";
-                    if (row >= dataRows.Count) return "NaN";
-                    if (col >= dataRows[row].Length) return "NaN";
-                    x = dataRows[row][col];
-                }
-                else if (func == "xref")
-                {
-                    if (dataKeys.Count <= 0) return "NaN";
-                    if (!eat('(')) return "NaN";
-                    string key = parseExpression();
-                    if (!eat(',')) return "NaN";
-                    string value = parseExpression();
-                    if (!eat(')')) return "NaN";
-                    key = $"{key},{value}";
-                    if (!dataKeys.ContainsKey(key)) return "NaN";
-                    x = dataKeys[key];
-                }
-                else if (func.StartsWith("rnorm"))
-                {
-                    if (!eat('(')) return "NaN";
-                    double mu = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (!eat(',')) return "NaN";
-                    double sigma = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (!eat(')')) return "NaN";
-                    var epsilon = Double.MinValue;
-                    var u = rnd.NextDouble();
-                    while (u <= epsilon)
-                    {
-                        u = rnd.NextDouble();
-                    }
-                    var v = rnd.NextDouble();
-                    var rnorm = sigma * (Math.Sqrt(-2.0 * Math.Log(u)) * Math.Sin(2.0 * Math.PI * v)) + mu;
-                    if (func == "rnormi")
-                    {
-                        x = Convert.ToInt32(rnorm).ToString(CultureInfo.InvariantCulture);
-                    }
-                    else
-                    {
-                        x = rnorm.ToString(CultureInfo.InvariantCulture);
-                    }
-                }
-                else if (func == "rnd")
-                {
-                    if (!eat('(')) return "NaN";
-                    double rangeFrom = 0.0;
-                    double rangeTo = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (eat(','))
-                    {
-                        rangeFrom = rangeTo;
-                        rangeTo = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    }
-                    if (!eat(')')) return "NaN";
-                    var epsilon = Double.MinValue;
-                    var u = rnd.NextDouble();
-                    while (u <= epsilon)
-                    {
-                        u = rnd.NextDouble();
-                    }
-                    if (double.IsNaN(rangeFrom) || double.IsNaN(rangeTo))
-                    {
-                        x = u.ToString(CultureInfo.InvariantCulture);
-                    }
-                    else
-                    {
-                        x = (u * (rangeTo - rangeFrom) + rangeFrom).ToString(CultureInfo.InvariantCulture);
-                    }
-                }
-                else if (func == "rndi")
-                {
-                    if (!eat('(')) return "NaN";
-                    int rangeFrom = 0;
-                    int rangeTo = 2;
-                    string exp = parseExpression();
-                    int.TryParse(exp == "NaN" ? "2" : exp, CultureInfo.InvariantCulture, out rangeTo);
-                    if (eat(','))
-                    {
-                        rangeFrom = 0;
-                        int.TryParse(exp == "NaN" ? "0" : exp, CultureInfo.InvariantCulture, out rangeFrom);
-                        rangeTo = 2;
-                        exp = parseExpression();
-                        int.TryParse(exp == "NaN" ? "2" : exp, CultureInfo.InvariantCulture, out rangeTo);
-                    }
-                    if (!eat(')')) return "NaN";
-                    x = rnd.Next(rangeFrom, rangeTo).ToString(CultureInfo.InvariantCulture);
-                }
-                else if (func == "min")
-                {
-                    if (!eat('(')) return "NaN";
-                    double a = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (!eat(',')) return "NaN";
-                    double b = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (!eat(')')) return "NaN";
-                    x = Math.Min(a, b).ToString(CultureInfo.InvariantCulture);
-                }
-                else if (func == "max")
-                {
-                    if (!eat('(')) return "NaN";
-                    double a = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (!eat(',')) return "NaN";
-                    double b = double.Parse(parseExpression(), CultureInfo.InvariantCulture);
-                    if (!eat(')')) return "NaN";
-                    x = Math.Max(a, b).ToString(CultureInfo.InvariantCulture);
-                }
-                else if (func == "api")
-                {
-                    return "NaN"; //api function should be handled at the higher evaluate() level
-                }
-                else if (func == "round")
-                {
-                    if (!eat('(')) return "NaN";
-                    x = parseExpression();
-                    if (!eat(','))
-                    {
-                        x = Math.Round(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    }
-                    else
-                    {
-                        double f = Math.Pow(10, double.Parse(parseExpression(), CultureInfo.InvariantCulture));
-                        x = (Math.Round(double.Parse(x, CultureInfo.InvariantCulture) * f) / f).ToString(CultureInfo.InvariantCulture);
-                    }
-                    if (!eat(')')) return "NaN";
-                }
-                else
-                {
-                    x = parseFactor();
-                    if (func == "sqrt") x = Math.Sqrt(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "sin") x = Math.Sin(double.Parse(x, CultureInfo.InvariantCulture) * Math.PI / 180).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "cos") x = Math.Cos(double.Parse(x, CultureInfo.InvariantCulture) * Math.PI / 180).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "tan") x = Math.Tan(double.Parse(x, CultureInfo.InvariantCulture) * Math.PI / 180).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "abs") x = Math.Abs(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "exp") x = Math.Exp(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "log") x = Math.Log(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    //else if (func == "round") x = Math.Round(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "ceiling") x = Math.Ceiling(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "floor") x = Math.Floor(double.Parse(x, CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
-                    else if (func == "int") x = x.Split(".")[0]; // int.Parse(x, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
-                    else x = func;
-                }
-            }
-            else if (ch >= 'A' && ch <= 'Z')
-            { // variables - must start with Capital Letter
-                while ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || ch == '_') nextChar();
-                string variable = str.Substring(startPos, pos - startPos);
-                x = variables.ContainsKey(variable) ? variables[variable][0] : "0";
-                if (string.IsNullOrEmpty(x)) x = "0";
-            }
-            else
-            {
-                return "NaN";
-            }
-            if (eat('^')) x = Math.Pow(double.Parse(x, CultureInfo.InvariantCulture), double.Parse(parseFactor(), CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture); // exponentiation
-            else if (eat('π')) x = (double.Parse(x, CultureInfo.InvariantCulture) * Math.PI).ToString(CultureInfo.InvariantCulture); // if Pi follows a number directly
-            else if (eat('='))
-            { // comparison operations
-                eat('=');
-                double isNumberE;
-                if (double.TryParse(x, CultureInfo.InvariantCulture, out isNumberE))
-                {
-                    x = isNumberE == double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                }
-                else
-                {
-                    x = x == parseFactor() ? "1" : "0";
-                }
-            }
-            else if (eat('<'))
-            {
-                double isNumberL;
-                if (double.TryParse(x, CultureInfo.InvariantCulture, out isNumberL))
-                {
-                    if (eat('=')) x = isNumberL <= double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                    else if (eat('>')) x = isNumberL != double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                    else x = isNumberL < double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                }
-                else
-                {
-                    int compareL = x.CompareTo(parseFactor());
-                    if (eat('=')) x = compareL <= 0 ? "1" : "0";
-                    else if (eat('>')) x = compareL != 0 ? "1" : "0";
-                    else x = compareL < 0 ? "1" : "0";
-                }
-            }
-            else if (eat('>'))
-            {
-                double isNumberG;
-                if (double.TryParse(x, CultureInfo.InvariantCulture, out isNumberG))
-                {
-                    if (eat('<'))
-                    {
-                        bool tX = double.Parse(parseFactor(), CultureInfo.InvariantCulture) > 0;
-                        x = (isNumberG > 0 || tX) && !(isNumberG > 0 && tX) ? "1" : "0";
-                    }
-                    else if (eat('=')) x = isNumberG >= double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                    else x = isNumberG > double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                }
-                else
-                {
-                    int compareG = x.CompareTo(parseFactor());
-                    if (eat('=')) x = compareG >= 0 ? "1" : "0";
-                    else x = compareG > 0 ? "1" : "0";
-                }
-            }
-            else if (eat('!') && eat('='))
-            {
-                double isNumberN;
-                if (double.TryParse(x, CultureInfo.InvariantCulture, out isNumberN))
-                {
-                    x = isNumberN != double.Parse(parseFactor(), CultureInfo.InvariantCulture) ? "1" : "0";
-                }
-                else
-                {
-                    int compareN = x.CompareTo(parseFactor());
-                    x = compareN != 0 ? "1" : "0";
-                }
-            }
-            return x == null ? "NaN" : x;
-        }
-        return parse();
-    }
-    // inject HttpClient Http
-    // private async Task<string> requestAPI(HttpRequestMessage requestMessage)
-    // {
-    //     var reply = await Http.SendAsync(requestMessage);
-    //     return await reply.Content.ReadAsStringAsync();
-    // }
 }

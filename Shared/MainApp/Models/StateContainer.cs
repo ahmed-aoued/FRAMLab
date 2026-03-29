@@ -1,4 +1,5 @@
 ﻿using FMV_OG.Shared;
+using FMV_OG.Shared.MainApp.Views.FMI;
 using Microsoft.AspNetCore.Components;
 using System.Data;
 using System.Globalization;
@@ -20,7 +21,7 @@ namespace FMV_OG.Shared
         public bool showAspects = false;
         public bool showFMIProfile = false;
         public bool showMetadata = false;
-        public Type? showKeysSetting = Type.GetType("FMV_OG.Shared.FMIControl"); // original = typeof(FMIControl); Use for alternative analysis
+        public Type? showKeysSetting = typeof(FMIControl);
         public bool showMetaDetail = false; //If false, this hides the -active and -equation columns in the Metadata table view - This data is now displayed in the Tooltip, so keep false
         public string showKeys = "";
         public string lastKey = "";

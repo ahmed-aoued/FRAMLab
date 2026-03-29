@@ -122,3 +122,29 @@
         color: #fff;
         background-color: dimgrey;
     }
+
+.fmi-mode-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-right: 0.4rem;
+}
+
+.fmi-mode-label {
+    font-size: 0.72rem;
+    color: dimgrey;
+    user-select: none;
+}
+
+.fmi-mode-badge {
+    height: 1.6rem;
+    min-width: 4.8rem;
+    max-width: 6.5rem;
+    border: 1px solid #c7c7c7;
+    border-radius: 0.35rem;
+    background: #ffffff;
+    color: #3f3f3f;
+    font-size: 0.72rem;
+    padding: 0 0.35rem;
+    line-height: 1.2;
+}
