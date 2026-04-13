@@ -45,13 +45,6 @@
                     <option value="NEURON">Neuron</option>
                 </select>
             </div>
-            <div class=@showExtension()>
-                @foreach (var option in @listTypes())
-                {
-                    <div class="fmi-text unselectable" @onclick=@((e) => SelectExtension(e, option.Name))>@option.Name</div>
-                }
-            </div>
-            <button class="btn btn-menu oi oi-briefcase" title="switch sandbox" @onclick=changetypeFMIControl />
         </div>
     </div>
     @if (stateContainer.selectedFn == "-1")
@@ -124,7 +117,6 @@
     private Random rnd = new Random();
     private bool gotoKey = false;
     private int trackHighlights = 0;
-    private string showSelect = "";
     private string normalizedMode()
     {
         return (Mode ?? "Basic").Trim().ToUpperInvariant();
@@ -139,43 +131,17 @@
             _ => "X"
         };
     }
-    private List<Type> listTypes()
-    {
-        var tempAssembly = AppDomain.CurrentDomain.GetAssemblies().First(x => x.FullName?.StartsWith("FMV_OG,") == true); // Type.GetType("FMV_OG.Shared"); //.GetMembers();
-        var tempTypes = tempAssembly.GetTypes().Where(x => x.Name.StartsWith("FMIControl_"));
-        return tempTypes.ToList();
-    } 
-    private string showExtension()
-    {
-        return $"fmi-select{showSelect}";
-    }
-    private void SelectExtension(MouseEventArgs e, string option)
-    {
-        stateContainer.showKeysSetting = listTypes().FirstOrDefault(x => x.Name == option);
-        refreshParent.InvokeAsync();
-    }
     private void changeActiveMode(ChangeEventArgs e)
     {
         var selectedMode = e.Value?.ToString()?.Trim().ToUpperInvariant() ?? "BASIC";
-        Type? targetType = selectedMode switch
+        stateContainer.activeMode = selectedMode switch
         {
-            "BBN" => listTypes().FirstOrDefault(x => x.Name == nameof(FMIControl_BBN)),
-            "LOPA" => listTypes().FirstOrDefault(x => x.Name == nameof(FMIControl_LOPA)),
-            "NEURON" => listTypes().FirstOrDefault(x => x.Name == nameof(FMIControl_Neuron)),
-            _ => typeof(FMIControl)
+            "BBN" => "BBN",
+            "LOPA" => "LOPA",
+            "NEURON" => "NEURON",
+            _ => "Basic"
         };
-
-        if (targetType is null)
-        {
-            targetType = typeof(FMIControl);
-        }
-
-        stateContainer.showKeysSetting = targetType;
         refreshParent.InvokeAsync();
-    }
-    private void changetypeFMIControl()
-    {
-        showSelect = showSelect == "" ? " show" : "";
     }
     private void ApplyModePreset(string profile)
     {
@@ -647,7 +613,7 @@
     {
         if (stateContainer.showKeys == "")
         {
-            stateContainer.showKeys = nameof(stateContainer.showKeysSetting);
+            stateContainer.showKeys = nameof(stateContainer.activeMode);
         } 
         else
         {

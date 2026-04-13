@@ -79,28 +79,16 @@
     font-family: 'PT Sans Caption', sans-serif;
 }
 .fmi-text {
-    color: black;
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-    background-color: white;
+    width: 50%;
+    font-size: smaller;
+    font-family: 'PT Sans Caption', sans-serif;
 }
-    .fmi-text:hover {
-        background-color: #ddd;
-    }
-.fmi-select {
-    display: none;
-    position: absolute;
-    left: 0;
-    background-color: #f1f1f1;
-    min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    z-index: 1;
+.btn-textp {
+    font-family: 'PT Sans Caption', sans-serif;
+    font-size: x-large;
+    font-weight: 800;
+    line-height: 20px;
 }
-.show {
-    display: block;
-}
-
 .btn-menu {
     color: dimgrey;
     background-color: #F1F3F4;
