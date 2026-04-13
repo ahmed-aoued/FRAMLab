@@ -1,5 +1,4 @@
 ﻿using FMV_OG.Shared.MainApp.Services;
-using FMV_OG.Shared.MainApp.Views.FMI;
 using System.Data;
 using System.Globalization;
 using System.Xml;
@@ -37,7 +36,7 @@ namespace FMV_OG.Shared
         public bool showAspects = false;
         public bool showFMIProfile = false;
         public bool showMetadata = false;
-        public Type? showKeysSetting = typeof(FMIControl);
+        public string activeMode = "Basic";
         public bool showMetaDetail = false; //If false, this hides the -active and -equation columns in the Metadata table view - This data is now displayed in the Tooltip, so keep false
         public string showKeys = "";
         public string lastKey = "";
@@ -207,6 +206,8 @@ namespace FMV_OG.Shared
         public bool isDisabled { get; set; } = true;
         public List<Aspect> aspectsList { get; set; } = new List<Aspect>();
         public List<Aspect> outputsList { get; set; } = new List<Aspect>();
+        public List<Agent> agentList { get; set; } = new List<Agent>();
+        public List<Level> levelList { get; set; } = new List<Level>();
         public bool showModal { get; set; } = false;
         public bool showColorPicker { get; set; } = false;
         public bool showFMIPopup { get; set; } = false;
@@ -399,11 +400,145 @@ namespace FMV_OG.Shared
         {
             return expressionEvaluator.Eval(str, variables, dataRows, dataKeys);
         }
-        // inject HttpClient Http
-        // private async Task<string> requestAPI(HttpRequestMessage requestMessage)
-        // {
-        //     var reply = await Http.SendAsync(requestMessage);
-        //     return await reply.Content.ReadAsStringAsync();
-        // }
+        // ── Agents ──────────────────────────────────────────────
+        public XmlNode EnsureAgentsRoot()
+        {
+            if (projectData_Undo[0].SelectSingleNode("//FM/Agents") is not XmlNode root)
+            {
+                root = projectData_Undo[0].CreateElement("Agents");
+                projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(root);
+            }
+            return root;
+        }
+
+        public Agent CreateAgent(string name, string agentType = "")
+        {
+            updateUndo();
+            var agentsRoot = EnsureAgentsRoot();
+            int nextId = NextId("//FM/Agents/Agent/IDNr");
+            var node = projectData_Undo[0].CreateElement("Agent");
+            AppendChildElement(node, "IDNr", nextId.ToString());
+            AppendChildElement(node, "Name", name);
+            AppendChildElement(node, "AgentType", agentType);
+            agentsRoot.AppendChild(node);
+            var agent = new Agent(node);
+            agentList.Add(agent);
+            return agent;
+        }
+
+        public void RemoveAgent(string agentId)
+        {
+            updateUndo();
+            var node = projectData_Undo[0].SelectSingleNode($"//FM/Agents/Agent[IDNr=\"{agentId}\"]");
+            node?.ParentNode?.RemoveChild(node);
+            agentList.RemoveAll(a => a.IDNr == agentId);
+            // clear from any assigned functions
+            foreach (var fn in functionList.Where(f => f.AgentId == agentId))
+            {
+                fn.AgentId = "";
+                SyncFunctionAttribute(fn, "agentId", "");
+            }
+        }
+
+        public void AssignAgentToFunction(Function function, string agentId)
+        {
+            updateUndo();
+            function.AgentId = agentId;
+            SyncFunctionAttribute(function, "agentId", agentId);
+        }
+
+        public void ClearAgentFromFunction(Function function)
+        {
+            updateUndo();
+            function.AgentId = "";
+            SyncFunctionAttribute(function, "agentId", "");
+        }
+
+        // ── Levels ─────────────────────────────────────────────
+        public XmlNode EnsureLevelsRoot()
+        {
+            if (projectData_Undo[0].SelectSingleNode("//FM/Levels") is not XmlNode root)
+            {
+                root = projectData_Undo[0].CreateElement("Levels");
+                projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(root);
+            }
+            return root;
+        }
+
+        public Level CreateLevel(string name, int hierarchy = 0)
+        {
+            updateUndo();
+            var levelsRoot = EnsureLevelsRoot();
+            int nextId = NextId("//FM/Levels/Level/IDNr");
+            var node = projectData_Undo[0].CreateElement("Level");
+            AppendChildElement(node, "IDNr", nextId.ToString());
+            AppendChildElement(node, "Name", name);
+            AppendChildElement(node, "Hierarchy", hierarchy.ToString());
+            levelsRoot.AppendChild(node);
+            var level = new Level(node);
+            levelList.Add(level);
+            return level;
+        }
+
+        public void RemoveLevel(string levelId)
+        {
+            updateUndo();
+            var node = projectData_Undo[0].SelectSingleNode($"//FM/Levels/Level[IDNr=\"{levelId}\"]");
+            node?.ParentNode?.RemoveChild(node);
+            levelList.RemoveAll(l => l.IDNr == levelId);
+            foreach (var fn in functionList.Where(f => f.LevelId == levelId))
+            {
+                fn.LevelId = "";
+                SyncFunctionAttribute(fn, "levelId", "");
+            }
+        }
+
+        public void AssignLevelToFunction(Function function, string levelId)
+        {
+            updateUndo();
+            function.LevelId = levelId;
+            SyncFunctionAttribute(function, "levelId", levelId);
+        }
+
+        public void ClearLevelFromFunction(Function function)
+        {
+            updateUndo();
+            function.LevelId = "";
+            SyncFunctionAttribute(function, "levelId", "");
+        }
+
+        // ── Shared XML helpers ─────────────────────────────────
+        private void SyncFunctionAttribute(Function function, string attrName, string value)
+        {
+            var fnNode = projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={function.IDNr}]");
+            if (fnNode is null) return;
+            if (fnNode.Attributes![attrName] is null)
+            {
+                fnNode.Attributes.Append(projectData_Undo[0].CreateAttribute(attrName));
+            }
+            fnNode.Attributes[attrName]!.Value = value;
+        }
+
+        private int NextId(string xpath)
+        {
+            int next = 0;
+            var nodes = projectData_Undo[0].SelectNodes(xpath);
+            if (nodes is not null)
+            {
+                foreach (XmlNode n in nodes)
+                {
+                    if (int.TryParse(n.InnerText, out var v))
+                        next = Math.Max(next, v + 1);
+                }
+            }
+            return next;
+        }
+
+        private void AppendChildElement(XmlNode parent, string name, string value)
+        {
+            var el = projectData_Undo[0].CreateElement(name);
+            el.InnerText = value;
+            parent.AppendChild(el);
+        }
     }
 }

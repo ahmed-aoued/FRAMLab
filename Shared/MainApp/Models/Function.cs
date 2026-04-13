@@ -51,6 +51,8 @@ namespace FMV_OG.Shared
                     this.metadata.Add(new string[] { key.Name, key.InnerText, key.Attributes["active"]?.Value ?? "", key.Attributes["equation"]?.Value ?? "", key.InnerText });
                 }
             }
+            this.AgentId = fn.SelectSingleNode("@agentId")?.Value ?? "";
+            this.LevelId = fn.SelectSingleNode("@levelId")?.Value ?? "";
             this.Description = fn.SelectSingleNode("Description")?.InnerText ?? "";
         }
         public List<string[]> metadata { get; set; }
@@ -74,6 +76,8 @@ namespace FMV_OG.Shared
         public List<string> totalR { get; set; } = new List<string>();
         public List<string> totalC { get; set; } = new List<string>();
         public List<string> totalT { get; set; } = new List<string>();
+        public string AgentId { get; set; } = "";
+        public string LevelId { get; set; } = "";
         public bool wasActive { get; set; } = false;
         public string profileFn { get; set; }
         public string profileI { get; set; }

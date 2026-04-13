@@ -486,6 +486,24 @@
             stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement("Groups"));
         }
         stateContainer.fnGroups = stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Groups");
+        // Load Agents
+        stateContainer.agentList = new List<Agent>();
+        if (stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Agents") is not null)
+        {
+            foreach (XmlNode agentNode in stateContainer.projectData_Undo[0].SelectNodes("//FM/Agents/Agent")!)
+            {
+                stateContainer.agentList.Add(new Agent(agentNode));
+            }
+        }
+        // Load Levels
+        stateContainer.levelList = new List<Level>();
+        if (stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Levels") is not null)
+        {
+            foreach (XmlNode levelNode in stateContainer.projectData_Undo[0].SelectNodes("//FM/Levels/Level")!)
+            {
+                stateContainer.levelList.Add(new Level(levelNode));
+            }
+        }
         if (stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects") == null)
         {
             stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement("Aspects"));

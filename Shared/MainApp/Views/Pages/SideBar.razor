@@ -7,9 +7,8 @@
     <div class="v-panel pr-2">
         @if (stateContainer.showKeys != "")
         {
-            Dictionary<string, object> parameters = new Dictionary<string, object> { ["refreshParent"] = EventCallback.Factory.Create(this, updateAll) };
             <hr class="mt-0 mb-0" />
-            <DynamicComponent Type=@stateContainer.showKeysSetting Parameters=@parameters />
+            <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
             <hr class="mt-2 mb-2" />
         }
         <div class="d-flex pt-2 pb-0">
@@ -219,15 +218,80 @@
             }
         }
         <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button class="btn btn-menu btn-textp" title="Agent" tabindex="33" @onclick=ToggleAgentPanel>A</button>
+            </div>
+            @if (showAgentPanel && stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null)
+            {
+                @if (!string.IsNullOrEmpty(stateContainer.selectedFunction.AgentId))
+                {
+                    var agent = stateContainer.agentList.Find(a => a.IDNr == stateContainer.selectedFunction!.AgentId);
+                    <div class="d-flex align-items-center">
+                        <span class="text-truncate">@(agent?.Name ?? stateContainer.selectedFunction.AgentId)</span>
+                        <button class="btn btn-link text-danger p-0 ml-1" title="Remove agent" @onclick=ClearAgent><span>&times;</span></button>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center mb-1">
+                        <select class="form-control form-control-sm" @bind="selectedAgentId">
+                            <option value="">-- select --</option>
+                            @foreach (var a in stateContainer.agentList)
+                            {
+                                <option value="@a.IDNr">@a.Name</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary oi oi-check ml-1" title="Assign" disabled="@(string.IsNullOrEmpty(selectedAgentId))" @onclick=AssignAgent></button>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <input type="text" class="form-control form-control-sm" placeholder="New agent name" @bind="newAgentName" />
+                        <button class="btn btn-sm btn-outline-primary oi oi-plus ml-1" title="Create & assign" disabled="@(string.IsNullOrWhiteSpace(newAgentName))" @onclick=CreateAndAssignAgent></button>
+                    </div>
+                }
+            }
+        </div>
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button class="btn btn-menu btn-textp" title="Level" tabindex="34" @onclick=ToggleLevelPanel>L</button>
+            </div>
+            @if (showLevelPanel && stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null)
+            {
+                @if (!string.IsNullOrEmpty(stateContainer.selectedFunction.LevelId))
+                {
+                    var level = stateContainer.levelList.Find(l => l.IDNr == stateContainer.selectedFunction!.LevelId);
+                    <div class="d-flex align-items-center">
+                        <span class="text-truncate">@(level?.Name ?? stateContainer.selectedFunction.LevelId)</span>
+                        <button class="btn btn-link text-danger p-0 ml-1" title="Remove level" @onclick=ClearLevel><span>&times;</span></button>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center mb-1">
+                        <select class="form-control form-control-sm" @bind="selectedLevelId">
+                            <option value="">-- select --</option>
+                            @foreach (var l in stateContainer.levelList)
+                            {
+                                <option value="@l.IDNr">@l.Name</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary oi oi-check ml-1" title="Assign" disabled="@(string.IsNullOrEmpty(selectedLevelId))" @onclick=AssignLevel></button>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <input type="text" class="form-control form-control-sm" placeholder="New level name" @bind="newLevelName" />
+                        <button class="btn btn-sm btn-outline-primary oi oi-plus ml-1" title="Create & assign" disabled="@(string.IsNullOrWhiteSpace(newLevelName))" @onclick=CreateAndAssignLevel></button>
+                    </div>
+                }
+            }
+        </div>
+        <div class="d-flex pt-2">
             <button class="btn btn-half btn-half-s" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
             <button class="btn btn-half btn-half-l" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
             <button class="btn btn-menu oi oi-brush ml-1" title=@Loc["FN_COLOUR"] tabindex="25" @onclick="ModalColor" @onkeyup="ModalKey"></button>
         </div>
         @if (stateContainer.showKeys == "")
         {
-            Dictionary<string, object> parameters = new Dictionary<string, object> { ["refreshParent"] = EventCallback.Factory.Create(this, updateAll) };
             <hr class="mt-2 mb-0" />
-            <DynamicComponent Type=@stateContainer.showKeysSetting Parameters=@parameters />
+            <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
         }
     </div>
 </div>
@@ -250,6 +314,61 @@
     private string focusCheck = "";
     private string oldZoomText = "";
     private string descriptionClass = "fmi-descS";
+
+    // Agent / Level assignment state
+    private bool showAgentPanel = true;
+    private bool showLevelPanel = true;
+    private string selectedAgentId = "";
+    private string selectedLevelId = "";
+    private string newAgentName = "";
+    private string newLevelName = "";
+
+    private void ToggleAgentPanel() => showAgentPanel = !showAgentPanel;
+    private void ToggleLevelPanel() => showLevelPanel = !showLevelPanel;
+
+    private void AssignAgent()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrEmpty(selectedAgentId)) return;
+        stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, selectedAgentId);
+        selectedAgentId = "";
+        refreshParent.InvokeAsync();
+    }
+    private void ClearAgent()
+    {
+        if (stateContainer.selectedFunction is null) return;
+        stateContainer.ClearAgentFromFunction(stateContainer.selectedFunction);
+        refreshParent.InvokeAsync();
+    }
+    private void CreateAndAssignAgent()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrWhiteSpace(newAgentName)) return;
+        var agent = stateContainer.CreateAgent(newAgentName.Trim());
+        stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, agent.IDNr);
+        newAgentName = "";
+        refreshParent.InvokeAsync();
+    }
+
+    private void AssignLevel()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrEmpty(selectedLevelId)) return;
+        stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, selectedLevelId);
+        selectedLevelId = "";
+        refreshParent.InvokeAsync();
+    }
+    private void ClearLevel()
+    {
+        if (stateContainer.selectedFunction is null) return;
+        stateContainer.ClearLevelFromFunction(stateContainer.selectedFunction);
+        refreshParent.InvokeAsync();
+    }
+    private void CreateAndAssignLevel()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrWhiteSpace(newLevelName)) return;
+        var level = stateContainer.CreateLevel(newLevelName.Trim());
+        stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, level.IDNr);
+        newLevelName = "";
+        refreshParent.InvokeAsync();
+    }
 
     protected void updateAll()
     {
