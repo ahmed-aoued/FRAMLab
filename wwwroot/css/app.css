@@ -278,6 +278,19 @@ text {
     overflow-y: scroll;
     height: 100%;
 }
+.sidebar .entity-panel {
+    flex: 1;
+}
+.sidebar .entity-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+.sidebar .entity-action-btn {
+    margin-top: 0.25rem;
+    margin-left: 0;
+    width: 100%;
+}
 .sidebar-sticky {
     position: relative;
     top: 0;

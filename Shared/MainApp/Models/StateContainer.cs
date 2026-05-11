@@ -36,6 +36,7 @@ namespace FMV_OG.Shared
         public bool showAspects = false;
         public bool showFMIProfile = false;
         public bool showMetadata = false;
+        public string rightPanel { get; set; } = "";
         public string activeMode = "Basic";
         public bool showMetaDetail = false; //If false, this hides the -active and -equation columns in the Metadata table view - This data is now displayed in the Tooltip, so keep false
         public string showKeys = "";

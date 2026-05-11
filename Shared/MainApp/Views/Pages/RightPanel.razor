@@ -1,0 +1,108 @@
+@inject StateContainer stateContainer
+
+<div class="right-panel">
+    <div class="right-panel-header">
+        <span class="right-panel-title">@PanelTitle()</span>
+        <button class="btn btn-menu oi oi-x" title="Close" @onclick=Close></button>
+    </div>
+    <div class="right-panel-body">
+        @if (stateContainer.rightPanel == "agents-levels")
+        {
+            <div class="right-panel-section">
+                <div class="right-panel-section-header">
+                    <strong>Agents</strong>
+                </div>
+                @foreach (var agent in stateContainer.agentList)
+                {
+                    <div class="right-panel-item">
+                        <span class="right-panel-item-label text-truncate">@agent.Name</span>
+                        <small class="text-muted">@agent.AgentType</small>
+                        <button class="btn btn-link text-danger p-0 ml-auto" title="Delete agent"
+                                @onclick="@(() => DeleteAgent(agent))">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </div>
+                }
+                <div class="right-panel-add">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" @bind="newAgentName" />
+                    <input type="text" class="form-control form-control-sm mt-1" placeholder="Type (optional)" @bind="newAgentType" />
+                    <button class="btn btn-sm btn-outline-primary mt-1 w-100" disabled="@(string.IsNullOrWhiteSpace(newAgentName))" @onclick=AddAgent>Add agent</button>
+                </div>
+            </div>
+
+            <div class="right-panel-section">
+                <div class="right-panel-section-header">
+                    <strong>Levels</strong>
+                </div>
+                @foreach (var level in stateContainer.levelList)
+                {
+                    <div class="right-panel-item">
+                        <span class="right-panel-item-label text-truncate">@level.Name</span>
+                        <small class="text-muted">H: @level.Hierarchy</small>
+                        <button class="btn btn-link text-danger p-0 ml-auto" title="Delete level"
+                                @onclick="@(() => DeleteLevel(level))">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </div>
+                }
+                <div class="right-panel-add">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" @bind="newLevelName" />
+                    <input type="number" class="form-control form-control-sm mt-1" placeholder="Hierarchy (0, 1, 2...)" @bind="newLevelHierarchy" />
+                    <button class="btn btn-sm btn-outline-primary mt-1 w-100" disabled="@(string.IsNullOrWhiteSpace(newLevelName))" @onclick=AddLevel>Add level</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback refreshParent { get; set; }
+
+    private string newAgentName = "";
+    private string newAgentType = "";
+    private string newLevelName = "";
+    private int newLevelHierarchy = 0;
+
+    private string PanelTitle() => stateContainer.rightPanel switch
+    {
+        "agents-levels" => "Agents & Levels",
+        _ => ""
+    };
+
+    private void Close()
+    {
+        stateContainer.rightPanel = "";
+        refreshParent.InvokeAsync();
+    }
+
+    private void AddAgent()
+    {
+        if (string.IsNullOrWhiteSpace(newAgentName)) return;
+        stateContainer.CreateAgent(newAgentName.Trim(), newAgentType.Trim());
+        newAgentName = "";
+        newAgentType = "";
+        refreshParent.InvokeAsync();
+    }
+
+    private void DeleteAgent(Agent agent)
+    {
+        stateContainer.RemoveAgent(agent.IDNr);
+        refreshParent.InvokeAsync();
+    }
+
+    private void AddLevel()
+    {
+        if (string.IsNullOrWhiteSpace(newLevelName)) return;
+        stateContainer.CreateLevel(newLevelName.Trim(), newLevelHierarchy);
+        newLevelName = "";
+        newLevelHierarchy = 0;
+        refreshParent.InvokeAsync();
+    }
+
+    private void DeleteLevel(Level level)
+    {
+        stateContainer.RemoveLevel(level.IDNr);
+        refreshParent.InvokeAsync();
+    }
+}
