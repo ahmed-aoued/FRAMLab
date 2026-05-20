@@ -1,0 +1,57 @@
+@using FMV_OG.Shared.MainApp.Models
+@inject AgentLevelService agentLevelService
+@inject StateContainer stateContainer
+
+@if (stateContainer.AgentsLevelsViewActive)
+{
+    <g class="agents-levels-table">
+        @foreach (var cell in agentLevelService.TableCells)
+        {
+            <AgentsLevelsTableCell Cell="cell"
+                                   ShouldMeasure="cell.ShouldMeasure"
+                                   OnMeasured="OnCellMeasured" />
+        }
+        @foreach (var row in agentLevelService.TableRows)
+        {
+            <rect x="@agentLevelService.TablePadding"
+                  y="@(row.LabelY - row.Height / 2)"
+                  width="@agentLevelService.RowHeaderWidth"
+                  height="@row.Height"
+                  fill="#FFFFFF"
+                  stroke="#DADADA" />
+            <foreignObject x="@agentLevelService.TablePadding"
+                           y="@(row.LabelY - row.Height / 2)"
+                           width="@agentLevelService.RowHeaderWidth"
+                           height="@row.Height">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:flex-end;height:100%;padding-right:8px;font-size:12px;color:#444444;">
+                    @row.LevelName
+                </div>
+            </foreignObject>
+        }
+        @foreach (var column in agentLevelService.TableColumns)
+        {
+            <rect x="@(column.LabelX - column.Width / 2)"
+                  y="@agentLevelService.TablePadding"
+                  width="@column.Width"
+                  height="@agentLevelService.ColumnHeaderHeight"
+                  fill="#FFFFFF"
+                  stroke="#DADADA" />
+            <foreignObject x="@(column.LabelX - column.Width / 2)"
+                           y="@agentLevelService.TablePadding"
+                           width="@column.Width"
+                           height="@agentLevelService.ColumnHeaderHeight">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;height:100%;padding:0 6px;font-size:12px;color:#444444;">
+                    @column.AgentName
+                </div>
+            </foreignObject>
+        }
+    </g>
+}
+
+@code {
+    private Task OnCellMeasured(TableCellMeasurement measurement)
+    {
+        agentLevelService.UpdateTableCellMeasurement(measurement);
+        return Task.CompletedTask;
+    }
+}

@@ -11,6 +11,8 @@ namespace FMV_OG.Shared
         private readonly IFMIDisplayConfigService fmiDisplayConfigService;
         private readonly IMetadataService metadataService;
         private readonly IUndoService undoService;
+        private readonly AgentLevelService agentLevelService;
+        private bool _agentsLevelsViewActive;
         private readonly IProjectDocumentService projectDocumentService;
 
         public StateContainer(
@@ -18,13 +20,16 @@ namespace FMV_OG.Shared
             IFMIDisplayConfigService fmiDisplayConfigService,
             IMetadataService metadataService,
             IUndoService undoService,
-            IProjectDocumentService projectDocumentService)
+            IProjectDocumentService projectDocumentService,
+            AgentLevelService agentLevelService)
         {
             this.expressionEvaluator = expressionEvaluator;
             this.fmiDisplayConfigService = fmiDisplayConfigService;
             this.metadataService = metadataService;
             this.undoService = undoService;
             this.projectDocumentService = projectDocumentService;
+            this.agentLevelService = agentLevelService;
+            this.agentLevelService.Bind(this);
         }
 
         //Done
@@ -173,6 +178,11 @@ namespace FMV_OG.Shared
                 }
             }
         }
+        public bool AgentsLevelsViewActive
+        {
+            get => _agentsLevelsViewActive;
+            set => _agentsLevelsViewActive = value;
+        }
         public string touchAction { get; set; } = "auto";
         public int newFnStyle { get; set; } = 0;
         public int spreadsheetVisible { get; set; } = 0;
@@ -289,6 +299,17 @@ namespace FMV_OG.Shared
         public void updateFnXY(double x, double y, string? sFn = null)
         {
             projectDocumentService.UpdateFunctionXY(projectData_Undo[0], _selectedFn, x, y, sFn);
+        }
+        public void ToggleAgentsLevelsView()
+        {
+            if (_agentsLevelsViewActive)
+            {
+                agentLevelService.RestoreAgentsLevelsView();
+            }
+            else
+            {
+                agentLevelService.ApplyAgentsLevelsView();
+            }
         }
         public void updateAspectXY(double x, double y, string directionX, string directionY)
         {
@@ -507,6 +528,9 @@ namespace FMV_OG.Shared
             function.LevelId = "";
             SyncFunctionAttribute(function, "levelId", "");
         }
+
+
+        
 
         // ── Shared XML helpers ─────────────────────────────────
         private void SyncFunctionAttribute(Function function, string attrName, string value)

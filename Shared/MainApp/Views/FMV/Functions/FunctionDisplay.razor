@@ -1,7 +1,7 @@
 ﻿@inject StateContainer stateContainer
 @inject IConfiguration render
 
-@foreach (Function function in stateContainer.functionList.FindAll(x => !stateContainer.selectedMulti.Contains(x.IDNr))) //if (function != null)
+@foreach (Function function in DisplayFunctions.Where(x => !stateContainer.selectedMulti.Contains(x.IDNr))) //if (function != null)
 //This is for all functions not highlighted.
 {
     if (function.groupActive.Value == "true")
@@ -382,7 +382,12 @@
     private bool isFnColor = false;
 
     [Parameter]
+    public IEnumerable<Function>? Functions { get; set; }
+
+    [Parameter]
     public EventCallback refreshParent { get; set; }
+
+    private IEnumerable<Function> DisplayFunctions => Functions ?? stateContainer.functionList;
 
     public void UpdateState()
     {

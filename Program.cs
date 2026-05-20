@@ -17,6 +17,8 @@ builder.Services.AddSingleton<IExpressionEvaluator, ExpressionEvaluator>();
 builder.Services.AddSingleton<IFMIDisplayConfigService, FMIDisplayConfigService>();
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
 builder.Services.AddSingleton<IProjectDocumentService, ProjectDocumentService>();
+builder.Services.AddSingleton<AgentLevelService>();
+builder.Services.AddScoped<SvgUtilsInterop>();
 
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddSingleton<StateContainer>();
