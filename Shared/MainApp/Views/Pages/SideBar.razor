@@ -221,7 +221,7 @@
             <div class="d-flex flex-column align-items-start pt-1">
                 <button class="btn btn-menu btn-textp" title="Assign Agent" tabindex="33" @onclick=ToggleAgentPanel>A</button>
             </div>
-            <div class="flex-grow-1 pl-2">
+            <div class="flex-grow-1 pl-1 pt-2">
                 @if (showAgentPanel)
                 {
                     if (stateContainer.agentList.Count == 0)
@@ -244,7 +244,7 @@
                     }
                     else
                     {
-                        <div class="input-group input-group-sm mb-1 assignment-select">
+                        <div class="input-group input-group-sm assignment-select">
                             <select class="form-control" @bind="selectedAgentId">
                                 <option value="">Select agent</option>
                                 @foreach (var agent in stateContainer.agentList)
@@ -253,7 +253,7 @@
                                 }
                             </select>
                             <div class="input-group-append">
-                                <button class="btn btn-outline-secondary oi oi-plus" type="button" title="Add agent to function" @onclick=AssignAgent disabled="@(string.IsNullOrEmpty(selectedAgentId))"></button>
+                                <button class="btn btn-outline-secondary oi oi-plus d-flex align-items-center" type="button" title="Add agent to function" @onclick=AssignAgent disabled="@(string.IsNullOrEmpty(selectedAgentId))"></button>
                             </div>
                         </div>
                     }
@@ -264,7 +264,7 @@
             <div class="d-flex flex-column align-items-start pt-1">
                 <button class="btn btn-menu btn-textp" title="Assign Level" tabindex="34" @onclick=ToggleLevelPanel>L</button>
             </div>
-            <div class="flex-grow-1 pl-2">
+            <div class="flex-grow-1 pl-1 pt-2">
                 @if (showLevelPanel)
                 {
                     if (stateContainer.levelList.Count == 0)

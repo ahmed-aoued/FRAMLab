@@ -28,6 +28,9 @@ namespace FMV_OG.Shared.MainApp.Services
         private List<string>? _agentsLevelsOriginalOrder;
         private int _tableCellColumnCapacity = 1;
         private int _tableCellRowCapacity = 1;
+        private Dictionary<string, (string levelId, string agentId)> _lastFunctionAssignments = new();
+        private int _lastAgentCount;
+        private int _lastLevelCount;
 
         public AgentLevelService(IConfiguration renderConfig)
         {
@@ -43,6 +46,38 @@ namespace FMV_OG.Shared.MainApp.Services
         public IReadOnlyList<TableColumnLayout> TableColumns => _tableColumns;
         public IReadOnlyList<TableCellLayout> TableCells => _tableCells;
         public IReadOnlyDictionary<(string levelId, string agentId), List<Function>> TableCellFunctions => _tableCellFunctions;
+
+        public bool RefreshLayoutIfChanged()
+        {
+            var state = EnsureState();
+            if (!state.AgentsLevelsViewActive) return false;
+
+            bool changed = state.functionList.Count != _lastFunctionAssignments.Count ||
+                           state.agentList.Count != _lastAgentCount ||
+                           state.levelList.Count != _lastLevelCount;
+
+            if (!changed)
+            {
+                foreach (var fn in state.functionList)
+                {
+                    if (!_lastFunctionAssignments.TryGetValue(fn.IDNr, out var assignment) ||
+                        assignment.levelId != NormalizeLevelKey(fn.LevelId) ||
+                        assignment.agentId != NormalizeAgentKey(fn.AgentId))
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            if (changed)
+            {
+                RebuildAgentsLevelsTableLayout();
+                return true;
+            }
+            return false;
+        }
+
         public double TablePadding => DefaultTablePadding;
         public double RowHeaderWidth => DefaultRowHeaderWidth;
         public double ColumnHeaderHeight => DefaultColumnHeaderHeight;
@@ -262,6 +297,9 @@ namespace FMV_OG.Shared.MainApp.Services
             _tableColumns.Clear();
             _tableCells.Clear();
             _tableCellFunctions.Clear();
+            _lastFunctionAssignments.Clear();
+            _lastAgentCount = state.agentList.Count;
+            _lastLevelCount = state.levelList.Count;
 
             var levelLookup = state.levelList.ToDictionary(l => l.IDNr);
             var agentLookup = state.agentList.ToDictionary(a => a.IDNr);
@@ -294,6 +332,7 @@ namespace FMV_OG.Shared.MainApp.Services
                 var levelKey = NormalizeLevelKey(GetPrimaryLevelKey(function, levelLookup));
                 var agentKey = NormalizeAgentKey(GetPrimaryAgentKey(function, agentLookup));
                 var key = (levelKey, agentKey);
+                _lastFunctionAssignments[function.IDNr] = (levelKey, agentKey);
                 if (!_tableCellFunctions.TryGetValue(key, out var bucket))
                 {
                     bucket = new List<Function>();

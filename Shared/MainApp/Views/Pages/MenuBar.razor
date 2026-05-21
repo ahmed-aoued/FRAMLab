@@ -2,6 +2,7 @@
 @inject IJSRuntime JSRuntime
 @inject BrowserService Service
 @inject StateContainer stateContainer
+@inject AgentLevelService agentLevelService
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
 <!-- here -->
@@ -251,8 +252,18 @@
     }
     public async Task Recover()
     {
-        await localStorage.SetItemAsync("isBackup", true);
-        await Restore();
+        if (stateContainer.AgentsLevelsViewActive)
+        {
+            if (agentLevelService.RefreshLayoutIfChanged())
+            {
+                await refreshParent.InvokeAsync();
+            }
+        }
+        else
+        {
+            await localStorage.SetItemAsync("isBackup", true);
+            await Restore();
+        }
     }
     private void ShowInfo()
     {
