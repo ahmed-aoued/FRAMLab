@@ -195,6 +195,11 @@ namespace FMV_OG.Shared.MainApp.Services
         private void ApplyLayoutSnapshot(LayoutSnapshot snapshot)
         {
             var state = EnsureState();
+            state.viewWidth = snapshot.ViewWidth;
+            state.viewHeight = snapshot.ViewHeight;
+            state.canvasWidth = snapshot.CanvasWidth;
+            state.canvasHeight = snapshot.CanvasHeight;
+
             foreach (var dto in snapshot.Couplings)
             {
                 var coupling = state.couplingList.FirstOrDefault(c => c.Name == dto.Name);
@@ -250,6 +255,10 @@ namespace FMV_OG.Shared.MainApp.Services
             {
                 Version = LayoutSnapshot.LatestVersion,
                 SavedAt = DateTime.UtcNow,
+                ViewWidth = state.viewWidth,
+                ViewHeight = state.viewHeight,
+                CanvasWidth = state.canvasWidth,
+                CanvasHeight = state.canvasHeight,
                 Functions = state.functionList.Select(fn => new LayoutFunctionDto
                 {
                     Id = fn.IDNr,

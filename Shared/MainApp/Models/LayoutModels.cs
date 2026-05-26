@@ -57,6 +57,10 @@ namespace FMV_OG.Shared.MainApp.Models
         public const int LatestVersion = 1;
         public int Version { get; set; } = LatestVersion;
         public DateTime SavedAt { get; set; } = DateTime.UtcNow;
+        public double ViewWidth { get; set; }
+        public double ViewHeight { get; set; }
+        public double CanvasWidth { get; set; }
+        public double CanvasHeight { get; set; }
         public List<LayoutFunctionDto> Functions { get; set; } = new();
         public List<LayoutAspectDto> Aspects { get; set; } = new();
         public List<LayoutCouplingDto> Couplings { get; set; } = new();
