@@ -34,7 +34,7 @@
 }
 <MenuBar refreshParent="refreshParent" onInputFileChange="OnInputFileChange" fileIsLoaded="FileIsLoaded" />
 <SideBar refreshParent="refreshParent" newFunction="NewFunction" nextFn="NextFn" />
-<div id="mainWindow" class="main" @onkeyup=NextFn tabindex="0">
+<div id="mainWindow" class="main" @onkeyup=NextFn @onkeydown=OnKeyDown tabindex="0">
     @if (stateContainer.spreadsheetVisible > 0)
     {
         <div class="main-visualiser @(stateContainer.spreadsheetVisible==1?"main-half-s":"")">
@@ -905,6 +905,199 @@
                 //Console.WriteLine($"Code:{e.Code}  |  Key:{e.Key}");
             }
         }
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Repeat || !stateContainer.fileLoaded)
+        {
+            return;
+        }
+
+        if ((e.CtrlKey || e.MetaKey) && e.Code == "KeyD")
+        {
+            DuplicateSelectedFunctions();
+            return;
+        }
+
+        if (e.Key == "Delete" || (e.CtrlKey && (e.Key == "Enter" || e.Code == "Enter" || e.Code == "NumpadEnter")) || (e.CtrlKey && (e.Key == "Backspace" || e.Code == "Backspace")))
+        {
+            DeleteSelectedFunctions();
+        }
+    }
+
+    private void DuplicateSelectedFunctions()
+    {
+        if (!stateContainer.fileLoaded)
+        {
+            return;
+        }
+
+        var selectedIds = stateContainer.selectedMulti.Count > 0
+            ? stateContainer.selectedMulti.ToList()
+            : (stateContainer.selectedFn != "-1" ? new List<string> { stateContainer.selectedFn } : new List<string>());
+
+        if (selectedIds.Count == 0)
+        {
+            stateContainer.debugOutput = "Select at least one function to duplicate.";
+            return;
+        }
+
+        if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction?.IDName == "")
+        {
+            stateContainer.defaultFnLabel();
+        }
+
+        stateContainer.updateUndo();
+        var doc = stateContainer.projectData_Undo[0];
+        var functionsRoot = doc.SelectSingleNode("//FM/Functions");
+        if (functionsRoot is null)
+        {
+            return;
+        }
+
+        var nextId = GetNextFunctionId(doc);
+        var createdIds = new List<string>();
+        var offsetBase = 40.0;
+        foreach (var id in selectedIds)
+        {
+            var fnNode = doc.SelectSingleNode($"//FM/Functions/Function[IDNr=\"{id}\"]");
+            if (fnNode is null)
+            {
+                continue;
+            }
+
+            var clone = fnNode.CloneNode(true);
+            var newId = nextId.ToString();
+            nextId += 1;
+            clone.SelectSingleNode("IDNr")!.InnerText = newId;
+            ResetGroupAttributes(clone);
+            OffsetFunctionPosition(clone, offsetBase * (createdIds.Count + 1));
+            functionsRoot.AppendChild(clone);
+
+            var newFunction = new Function(clone);
+            stateContainer.functionList.Add(newFunction);
+            createdIds.Add(newId);
+
+            stateContainer.viewWidth = Math.Max(stateContainer.viewWidth, newFunction.x + 120);
+            stateContainer.viewHeight = Math.Max(stateContainer.viewHeight, newFunction.y + 120);
+        }
+
+        if (createdIds.Count > 0)
+        {
+            stateContainer.selectedMulti = createdIds;
+            stateContainer.selectedFn = createdIds[0];
+            stateContainer.fnName = stateContainer.selectedFunction?.IDName ?? "";
+            stateContainer.isDisabled = false;
+        }
+
+        if (stateContainer.AgentsLevelsViewActive)
+        {
+            agentLevelService.RefreshLayoutIfChanged();
+        }
+        StateHasChanged();
+    }
+
+    private void DeleteSelectedFunctions()
+    {
+        if (!stateContainer.fileLoaded)
+        {
+            return;
+        }
+
+        var selectedIds = stateContainer.selectedMulti.Count > 0
+            ? stateContainer.selectedMulti.ToList()
+            : (stateContainer.selectedFn != "-1" ? new List<string> { stateContainer.selectedFn } : new List<string>());
+
+        if (selectedIds.Count == 0)
+        {
+            stateContainer.debugOutput = "Select at least one function to delete.";
+            return;
+        }
+
+        var deleted = 0;
+        foreach (var id in selectedIds)
+        {
+            stateContainer.selectedFn = id;
+            var beforeCount = stateContainer.functionList.Count;
+            stateContainer.deleteFn();
+            if (stateContainer.functionList.Count < beforeCount)
+            {
+                deleted += 1;
+            }
+        }
+
+        stateContainer.selectedMulti = new List<string>();
+        stateContainer.selectedFn = "-1";
+
+        if (stateContainer.AgentsLevelsViewActive)
+        {
+            agentLevelService.RefreshLayoutIfChanged();
+        }
+
+        if (deleted == 0)
+        {
+            stateContainer.debugOutput = "Selected functions could not be deleted (connected aspects exist).";
+        }
+        StateHasChanged();
+    }
+
+    private int GetNextFunctionId(XmlDocument doc)
+    {
+        var next = 0;
+        var nodes = doc.SelectNodes("//FM/Functions/Function/IDNr");
+        if (nodes is not null)
+        {
+            foreach (XmlNode node in nodes)
+            {
+                if (int.TryParse(node.InnerText, out var value))
+                {
+                    next = Math.Max(next, value + 1);
+                }
+            }
+        }
+        return next;
+    }
+
+    private void ResetGroupAttributes(XmlNode functionNode)
+    {
+        var attributes = new[] { "groupType", "groupIDNr", "groupActive", "groupX", "groupY" };
+        foreach (var attribute in attributes)
+        {
+            if (functionNode.Attributes?[attribute] is not null)
+            {
+                functionNode.Attributes[attribute]!.Value = "";
+            }
+        }
+    }
+
+    private void OffsetFunctionPosition(XmlNode functionNode, double offset)
+    {
+        if (functionNode.Attributes?["x"] is not null)
+        {
+            functionNode.Attributes["x"]!.Value = OffsetValue(functionNode.Attributes["x"]!.Value, offset);
+        }
+        if (functionNode.Attributes?["y"] is not null)
+        {
+            functionNode.Attributes["y"]!.Value = OffsetValue(functionNode.Attributes["y"]!.Value, offset);
+        }
+        if (functionNode.Attributes?["groupX"] is not null)
+        {
+            functionNode.Attributes["groupX"]!.Value = OffsetValue(functionNode.Attributes["groupX"]!.Value, offset);
+        }
+        if (functionNode.Attributes?["groupY"] is not null)
+        {
+            functionNode.Attributes["groupY"]!.Value = OffsetValue(functionNode.Attributes["groupY"]!.Value, offset);
+        }
+    }
+
+    private string OffsetValue(string value, double offset)
+    {
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return (parsed + offset).ToString("0.##", CultureInfo.InvariantCulture);
+        }
+        return value;
     }
     private async Task Restore()
     {
