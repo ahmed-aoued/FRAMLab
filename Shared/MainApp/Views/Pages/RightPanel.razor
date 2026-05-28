@@ -1,56 +1,82 @@
 @inject StateContainer stateContainer
 
-<div class="right-panel">
-    <div class="right-panel-header">
-        <span class="right-panel-title">@PanelTitle()</span>
-        <button class="btn btn-menu oi oi-x" title="Close" @onclick=Close></button>
-    </div>
-    <div class="right-panel-body">
+<div class="right-sidebar">
+    <div class="v-panel pr-2">
+        <div class="d-flex align-items-center justify-content-between pb-2">
+            <strong>@PanelTitle()</strong>
+            <button class="btn btn-menu oi oi-x" title="Close" @onclick=Close></button>
+        </div>
+
+        <div class="right-menu-tabs mb-2">
+            <button class="btn btn-half @(stateContainer.rightPanel == "agents-levels" ? "active" : "")"
+                    title="Agents & Levels"
+                    @onclick="@(() => OpenPanel("agents-levels"))">
+                AL
+            </button>
+        </div>
+
         @if (stateContainer.rightPanel == "agents-levels")
         {
-            <div class="right-panel-section">
-                <div class="right-panel-section-header">
-                    <strong>Agents</strong>
-                </div>
-                @foreach (var agent in stateContainer.agentList)
-                {
-                    <div class="right-panel-item">
-                        <span class="right-panel-item-label text-truncate">@agent.Name</span>
-                        <small class="text-muted">@agent.AgentType</small>
-                        <button class="btn btn-link text-danger p-0 ml-auto" title="Delete agent"
-                                @onclick="@(() => DeleteAgent(agent))">
-                            <span class="oi oi-trash"></span>
-                        </button>
+            <hr class="mt-0 mb-2" />
+            <strong>Agents</strong>
+            @if (stateContainer.agentList.Count == 0)
+            {
+                <small class="text-muted d-block mt-1 mb-2">No agents created.</small>
+            }
+            @foreach (var agent in stateContainer.agentList)
+            {
+                <div class="right-sidebar-row">
+                    <input type="color"
+                           class="entity-color-input"
+                           title="Agent color"
+                           value="@ColorValue(agent.Color)"
+                           @onchange="@((e) => ChangeAgentColor(agent, e))" />
+                    <div class="right-sidebar-row-text">
+                        <span class="text-truncate">@agent.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(agent.AgentType))
+                        {
+                            <small class="text-muted">@agent.AgentType</small>
+                        }
                     </div>
-                }
-                <div class="right-panel-add">
-                    <input type="text" class="form-control form-control-sm" placeholder="Name" @bind="newAgentName" />
-                    <input type="text" class="form-control form-control-sm mt-1" placeholder="Type (optional)" @bind="newAgentType" />
-                    <button class="btn btn-sm btn-outline-primary mt-1 w-100" disabled="@(string.IsNullOrWhiteSpace(newAgentName))" @onclick=AddAgent>Add agent</button>
+                    <button class="btn btn-link text-danger p-0" title="Delete agent"
+                            @onclick="@(() => DeleteAgent(agent))">
+                        <span class="oi oi-trash"></span>
+                    </button>
                 </div>
-            </div>
+            }
+            <input type="text" class="form-control form-control-sm mt-2" placeholder="Agent name" @bind="newAgentName" />
+            <input type="text" class="form-control form-control-sm mt-1" placeholder="Type (optional)" @bind="newAgentType" />
+            <input type="color" class="form-control form-control-sm mt-1 entity-color-input-wide" title="New agent color" @bind="newAgentColor" />
+            <button class="btn btn-sm btn-outline-secondary mt-1 w-100" disabled="@(string.IsNullOrWhiteSpace(newAgentName))" @onclick=AddAgent>Add agent</button>
 
-            <div class="right-panel-section">
-                <div class="right-panel-section-header">
-                    <strong>Levels</strong>
-                </div>
-                @foreach (var level in stateContainer.levelList)
-                {
-                    <div class="right-panel-item">
-                        <span class="right-panel-item-label text-truncate">@level.Name</span>
-                        <small class="text-muted">H: @level.Hierarchy</small>
-                        <button class="btn btn-link text-danger p-0 ml-auto" title="Delete level"
-                                @onclick="@(() => DeleteLevel(level))">
-                            <span class="oi oi-trash"></span>
-                        </button>
+            <hr class="mt-3 mb-2" />
+            <strong>Levels</strong>
+            @if (stateContainer.levelList.Count == 0)
+            {
+                <small class="text-muted d-block mt-1 mb-2">No levels created.</small>
+            }
+            @foreach (var level in stateContainer.levelList.OrderBy(l => l.Hierarchy).ThenBy(l => l.Name))
+            {
+                <div class="right-sidebar-row">
+                    <input type="color"
+                           class="entity-color-input"
+                           title="Level color"
+                           value="@ColorValue(level.Color)"
+                           @onchange="@((e) => ChangeLevelColor(level, e))" />
+                    <div class="right-sidebar-row-text">
+                        <span class="text-truncate">@level.Name</span>
+                        <small class="text-muted">Hierarchy @level.Hierarchy</small>
                     </div>
-                }
-                <div class="right-panel-add">
-                    <input type="text" class="form-control form-control-sm" placeholder="Name" @bind="newLevelName" />
-                    <input type="number" class="form-control form-control-sm mt-1" placeholder="Hierarchy (0, 1, 2...)" @bind="newLevelHierarchy" />
-                    <button class="btn btn-sm btn-outline-primary mt-1 w-100" disabled="@(string.IsNullOrWhiteSpace(newLevelName))" @onclick=AddLevel>Add level</button>
+                    <button class="btn btn-link text-danger p-0" title="Delete level"
+                            @onclick="@(() => DeleteLevel(level))">
+                        <span class="oi oi-trash"></span>
+                    </button>
                 </div>
-            </div>
+            }
+            <input type="text" class="form-control form-control-sm mt-2" placeholder="Level name" @bind="newLevelName" />
+            <input type="number" class="form-control form-control-sm mt-1" placeholder="Hierarchy" @bind="newLevelHierarchy" />
+            <input type="color" class="form-control form-control-sm mt-1 entity-color-input-wide" title="New level color" @bind="newLevelColor" />
+            <button class="btn btn-sm btn-outline-secondary mt-1 w-100" disabled="@(string.IsNullOrWhiteSpace(newLevelName))" @onclick=AddLevel>Add level</button>
         }
     </div>
 </div>
@@ -61,14 +87,22 @@
 
     private string newAgentName = "";
     private string newAgentType = "";
+    private string newAgentColor = "#F3F3F3";
     private string newLevelName = "";
     private int newLevelHierarchy = 0;
+    private string newLevelColor = "#F3F3F3";
 
     private string PanelTitle() => stateContainer.rightPanel switch
     {
         "agents-levels" => "Agents & Levels",
         _ => ""
     };
+
+    private void OpenPanel(string panel)
+    {
+        stateContainer.rightPanel = panel;
+        refreshParent.InvokeAsync();
+    }
 
     private void Close()
     {
@@ -79,9 +113,10 @@
     private void AddAgent()
     {
         if (string.IsNullOrWhiteSpace(newAgentName)) return;
-        stateContainer.CreateAgent(newAgentName.Trim(), newAgentType.Trim());
+        stateContainer.CreateAgent(newAgentName.Trim(), newAgentType.Trim(), newAgentColor);
         newAgentName = "";
         newAgentType = "";
+        newAgentColor = "#F3F3F3";
         refreshParent.InvokeAsync();
     }
 
@@ -94,9 +129,10 @@
     private void AddLevel()
     {
         if (string.IsNullOrWhiteSpace(newLevelName)) return;
-        stateContainer.CreateLevel(newLevelName.Trim(), newLevelHierarchy);
+        stateContainer.CreateLevel(newLevelName.Trim(), newLevelHierarchy, newLevelColor);
         newLevelName = "";
         newLevelHierarchy = 0;
+        newLevelColor = "#F3F3F3";
         refreshParent.InvokeAsync();
     }
 
@@ -104,5 +140,28 @@
     {
         stateContainer.RemoveLevel(level.IDNr);
         refreshParent.InvokeAsync();
+    }
+
+    private void ChangeAgentColor(Agent agent, ChangeEventArgs e)
+    {
+        stateContainer.UpdateAgentColor(agent, ColorValue(e.Value?.ToString()));
+        refreshParent.InvokeAsync();
+    }
+
+    private void ChangeLevelColor(Level level, ChangeEventArgs e)
+    {
+        stateContainer.UpdateLevelColor(level, ColorValue(e.Value?.ToString()));
+        refreshParent.InvokeAsync();
+    }
+
+    private static string ColorValue(string? color)
+    {
+        if (!string.IsNullOrWhiteSpace(color) &&
+            color.StartsWith("#") &&
+            color.Length == 7)
+        {
+            return color;
+        }
+        return "#F3F3F3";
     }
 }

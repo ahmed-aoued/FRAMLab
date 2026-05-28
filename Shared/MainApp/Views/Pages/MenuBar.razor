@@ -56,6 +56,7 @@
         <button class="btn btn-menu" title="Agents & Levels" @onclick=ToggleAgentsLevelsView>AL</button>
         <button class="btn btn-menu oi oi-reload" title=@Loc["RELOAD"] @onclick=Recover></button>
         <button class="btn btn-menu oi oi-info" title=@Loc["INFO_TOOLTIP"] @onclick=ShowInfo></button>
+        <button class="btn btn-menu oi oi-menu @(stateContainer.rightPanel == "agents-levels" ? "active" : "")" title="Manage agents and levels" @onclick=ToggleAgentsLevelsPanel></button>
     </div>
 </div>
 
@@ -79,6 +80,11 @@
     private void ToggleAgentsLevelsView()
     {
         stateContainer.ToggleAgentsLevelsView();
+        refreshParent.InvokeAsync();
+    }
+    private void ToggleAgentsLevelsPanel()
+    {
+        stateContainer.rightPanel = stateContainer.rightPanel == "agents-levels" ? "" : "agents-levels";
         refreshParent.InvokeAsync();
     }
     public async void OnFileSave()

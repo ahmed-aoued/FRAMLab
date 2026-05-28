@@ -433,7 +433,7 @@ namespace FMV_OG.Shared
             return root;
         }
 
-        public Agent CreateAgent(string name, string agentType = "")
+        public Agent CreateAgent(string name, string agentType = "", string color = "")
         {
             updateUndo();
             var agentsRoot = EnsureAgentsRoot();
@@ -442,10 +442,28 @@ namespace FMV_OG.Shared
             AppendChildElement(node, "IDNr", nextId.ToString());
             AppendChildElement(node, "Name", name);
             AppendChildElement(node, "AgentType", agentType);
+            AppendChildElement(node, "Color", color);
             agentsRoot.AppendChild(node);
             var agent = new Agent(node);
             agentList.Add(agent);
             return agent;
+        }
+
+        public void UpdateAgentColor(Agent agent, string color)
+        {
+            updateUndo();
+            agent.Color = color;
+            var node = projectData_Undo[0].SelectSingleNode($"//FM/Agents/Agent[IDNr=\"{agent.IDNr}\"]");
+            if (node is null) return;
+            var colorNode = node.SelectSingleNode("Color");
+            if (colorNode is null)
+            {
+                AppendChildElement(node, "Color", color);
+            }
+            else
+            {
+                colorNode.InnerText = color;
+            }
         }
 
         public void RemoveAgent(string agentId)
@@ -487,12 +505,18 @@ namespace FMV_OG.Shared
             return root;
         }
 
-        public Level CreateLevel(string name, int hierarchy = 0)
+        public Level CreateLevel(string name, int hierarchy = 0, string color = "")
         {
             updateUndo();
             var levelsRoot = EnsureLevelsRoot();
             int nextId = NextId("//FM/Levels/Level/IDNr");
             var node = projectData_Undo[0].CreateElement("Level");
+            if (!string.IsNullOrWhiteSpace(color))
+            {
+                var colorAttribute = projectData_Undo[0].CreateAttribute("color");
+                colorAttribute.Value = color;
+                node.Attributes!.Append(colorAttribute);
+            }
             AppendChildElement(node, "IDNr", nextId.ToString());
             AppendChildElement(node, "Name", name);
             AppendChildElement(node, "Hierarchy", hierarchy.ToString());
@@ -500,6 +524,22 @@ namespace FMV_OG.Shared
             var level = new Level(node);
             levelList.Add(level);
             return level;
+        }
+
+        public void UpdateLevelColor(Level level, string color)
+        {
+            updateUndo();
+            level.Color = color;
+            var node = projectData_Undo[0].SelectSingleNode($"//FM/Levels/Level[IDNr=\"{level.IDNr}\"]");
+            if (node is null) return;
+            var colorAttribute = node.Attributes?["color"];
+            if (colorAttribute is null)
+            {
+                colorAttribute = projectData_Undo[0].CreateAttribute("color");
+                node.Attributes!.Append(colorAttribute);
+            }
+            colorAttribute.Value = color;
+            agentLevelService.RefreshAgentsLevelsLayout();
         }
 
         public void RemoveLevel(string levelId)

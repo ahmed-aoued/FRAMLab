@@ -138,6 +138,11 @@ a, .btn-link {
         color: #fff;
         background-color: dimgrey;
     }
+    .btn-menu.active {
+        color: #fff;
+        background-color: dimgrey;
+        border-color: dimgrey;
+    }
 .btn-selection {
     color: #3f5f76;
     background-color: #EAF3F8;
@@ -319,6 +324,50 @@ text {
     margin-left: 0;
     width: 100%;
 }
+.right-sidebar {
+    width: 175px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 1020;
+    display: block;
+    background-color: #F1F3F4;
+    padding-top: 5rem;
+    padding-bottom: 1.5rem;
+    padding-left: 0.5rem;
+}
+.right-sidebar .v-panel {
+    overflow-y: scroll;
+    height: 100%;
+}
+.right-menu-tabs {
+    display: flex;
+    gap: 0.25rem;
+}
+.right-sidebar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+}
+.right-sidebar-row-text {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+.entity-color-input {
+    min-width: 1.75rem;
+    max-width: 1.75rem;
+    min-height: 1.75rem;
+    max-height: 1.75rem;
+    padding: 0.1rem;
+}
+.entity-color-input-wide {
+    width: 100%;
+    padding: 0.1rem;
+}
 .sidebar-sticky {
     position: relative;
     top: 0;
@@ -433,6 +482,9 @@ text {
     .sidebar {
         width: 200px;
     }
+    .right-sidebar {
+        width: 200px;
+    }
     .main-visualiser {
         width: calc(100vw - 200px);
     }
@@ -462,6 +514,10 @@ text {
         width: 225px;
         padding-top: 3rem;
     }
+    .right-sidebar {
+        width: 225px;
+        padding-top: 3rem;
+    }
     .main-visualiser {
         width: calc(100vw - 225px);
         height: calc(100vh - 3rem);
@@ -476,6 +532,9 @@ text {
 }
 @media (min-width: 992px) {
     .sidebar {
+        width: 250px;
+    }
+    .right-sidebar {
         width: 250px;
     }
     .main-visualiser {
@@ -493,6 +552,9 @@ text {
 }
 @media (min-width: 1200px) {
     .sidebar {
+        width: 275px;
+    }
+    .right-sidebar {
         width: 275px;
     }
     .main-visualiser {

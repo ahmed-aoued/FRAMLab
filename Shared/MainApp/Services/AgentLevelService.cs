@@ -78,6 +78,13 @@ namespace FMV_OG.Shared.MainApp.Services
             return false;
         }
 
+        public void RefreshAgentsLevelsLayout()
+        {
+            var state = EnsureState();
+            if (!state.AgentsLevelsViewActive) return;
+            RebuildAgentsLevelsTableLayout();
+        }
+
         public double TablePadding => DefaultTablePadding;
         public double RowHeaderWidth => DefaultRowHeaderWidth;
         public double ColumnHeaderHeight => DefaultColumnHeaderHeight;
@@ -313,12 +320,15 @@ namespace FMV_OG.Shared.MainApp.Services
             var levelLookup = state.levelList.ToDictionary(l => l.IDNr);
             var agentLookup = state.agentList.ToDictionary(a => a.IDNr);
 
-            var levelKeys = BuildOrderedLevelKeys(levelLookup);
+            var hasFunctionsWithoutLevel = state.functionList.Any(fn => string.IsNullOrWhiteSpace(GetPrimaryLevelKey(fn, levelLookup)));
+            var hasFunctionsWithoutAgent = state.functionList.Any(fn => string.IsNullOrWhiteSpace(GetPrimaryAgentKey(fn, agentLookup)));
+
+            var levelKeys = BuildOrderedLevelKeys(levelLookup, hasFunctionsWithoutLevel);
             if (levelKeys.Count == 0)
             {
                 levelKeys.Add(string.Empty);
             }
-            var agentKeys = BuildOrderedAgentKeys(agentLookup);
+            var agentKeys = BuildOrderedAgentKeys(agentLookup, hasFunctionsWithoutAgent);
             if (agentKeys.Count == 0)
             {
                 agentKeys.Add(string.Empty);
@@ -466,7 +476,7 @@ namespace FMV_OG.Shared.MainApp.Services
             }
         }
 
-        private List<string> BuildOrderedLevelKeys(IReadOnlyDictionary<string, Level> levelLookup)
+        private List<string> BuildOrderedLevelKeys(IReadOnlyDictionary<string, Level> levelLookup, bool includeUnassigned)
         {
             var ordered = levelLookup.Values
                 .OrderBy(l => l.Hierarchy)
@@ -474,18 +484,24 @@ namespace FMV_OG.Shared.MainApp.Services
                 .Select(l => l.IDNr)
                 .Where(id => !string.IsNullOrEmpty(id))
                 .ToList();
-            ordered.Insert(0, string.Empty);
+            if (includeUnassigned)
+            {
+                ordered.Add(string.Empty);
+            }
             return ordered.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private List<string> BuildOrderedAgentKeys(IReadOnlyDictionary<string, Agent> agentLookup)
+        private List<string> BuildOrderedAgentKeys(IReadOnlyDictionary<string, Agent> agentLookup, bool includeUnassigned)
         {
             var ordered = agentLookup.Values
                 .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(a => a.IDNr)
                 .Where(id => !string.IsNullOrEmpty(id))
                 .ToList();
-            ordered.Insert(0, string.Empty);
+            if (includeUnassigned)
+            {
+                ordered.Add(string.Empty);
+            }
             return ordered.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
@@ -495,7 +511,7 @@ namespace FMV_OG.Shared.MainApp.Services
             {
                 return (level.Hierarchy, level.Name ?? string.Empty);
             }
-            return (int.MinValue, string.Empty);
+            return (int.MaxValue, string.Empty);
         }
 
         private string GetAgentSortTuple(Function fn, IReadOnlyDictionary<string, Agent> agentLookup)
@@ -504,17 +520,25 @@ namespace FMV_OG.Shared.MainApp.Services
             {
                 return agent.Name ?? string.Empty;
             }
-            return string.Empty;
+            return "\uffff";
         }
 
         private string GetPrimaryLevelKey(Function function, IReadOnlyDictionary<string, Level> levelLookup)
         {
-            return function.LevelId ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(function.LevelId) && levelLookup.ContainsKey(function.LevelId))
+            {
+                return function.LevelId;
+            }
+            return string.Empty;
         }
 
         private string GetPrimaryAgentKey(Function function, IReadOnlyDictionary<string, Agent> agentLookup)
         {
-            return function.AgentId ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(function.AgentId) && agentLookup.ContainsKey(function.AgentId))
+            {
+                return function.AgentId;
+            }
+            return string.Empty;
         }
 
         private string NormalizeLevelKey(string? levelId)
