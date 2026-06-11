@@ -408,7 +408,9 @@
         itemF.Attributes.Append(fnY);
         stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Functions")!.AppendChild(itemF);
         stateContainer.CreateMetadataTable(itemF);
-        stateContainer.functionList.Add(new Function(itemF));
+        var newFn = new Function(itemF);
+        stateContainer.functionList.Add(newFn);
+        stateContainer.fmiFunctionAdded(newFn);
         stateContainer.selectedFn = maxFn.ToString();
         stateContainer.fnName = "";
         FocusElement("fnNameText");
@@ -556,6 +558,8 @@
                 stateContainer.levelList.Add(new Level(levelNode));
             }
         }
+        // Load the <FMI> section (typed variables) and initialise the FMI runtime state
+        stateContainer.initFmiRuntime();
         if (stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects") == null)
         {
             stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement("Aspects"));
@@ -985,6 +989,7 @@
 
             var newFunction = new Function(clone);
             stateContainer.functionList.Add(newFunction);
+            stateContainer.fmiFunctionAdded(newFunction);
             createdIds.Add(newId);
 
             stateContainer.viewWidth = Math.Max(stateContainer.viewWidth, newFunction.x + 120);

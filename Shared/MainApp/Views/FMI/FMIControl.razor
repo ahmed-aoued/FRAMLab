@@ -668,6 +668,7 @@
         stateContainer.selectedFn = "-1";
         stateContainer.selectedLabel = "";
         stateContainer.cycleFMI = -1;
+        stateContainer.fmiReset();
         stateContainer.fmiMessage = "";
         foreach (var fn in stateContainer.functionList)
         {
@@ -816,6 +817,7 @@
     private string bFMI_cycle() //private async Task<string> bFMI_cycle()
     {
         stateContainer.cycleFMI += 1;
+        stateContainer.fmiBeginCycle();
         var returnString = "error";
         var check1 = 0;
         var fmiError = false;
@@ -1190,6 +1192,7 @@
                 returnString = "End";
             }
         }
+        stateContainer.fmiEndCycle();
         return returnString;
     }
     private bool activateFunction(Function fnBG)
@@ -1337,105 +1340,15 @@
     private void evaluate(Function iBG) //private async Task evaluate(Function iBG)
     {
         var showVariability = false;
-        stateContainer.calcVariables(iBG); //calculate the new variable values for the given function
-        if (iBG.metadata is not null)
+        var result = stateContainer.fmiEvaluate(iBG); //CalcVariables + the metadata equation loop, moved into IFmiInterpreter
+        foreach (var (key, value) in result.EvaluatedKeys)
         {
-            foreach (string[] md3Key in iBG.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
+            for (var i = 1; i <= 6; i++)
             {
-                if (md3Key[1].Length > 0 || md3Key[3].Length > 0) //metadata key has a value or has an equation
+                if (stateContainer.displaySetup.ContainsKey($"tracer_{i}") && key == stateContainer.displaySetup[$"tracer_{i}"])
                 {
-                    if (md3Key[2] == "true") //it has an equation
-                    {
-                        if (md3Key[0].StartsWith("Global_"))
-                        {
-                            iBG.newVariable(md3Key[0], new string[] { stateContainer.metaDataKeys[md3Key[0]], stateContainer.metaDataKeys[md3Key[0]] });
-                        }
-                        else
-                        {
-                            iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] }); //if equation, update variable before, and again after, the eval
-                            stateContainer.metaDataKeys[md3Key[0]] = md3Key[1];
-                        }
-                        //=======================================
-                        //This is an option to run custom code on a Function. The code is written in the Function.cs component. An example is 'returnTrue'
-                        if (md3Key[3].StartsWith("execute("))
-                        {
-                            var contentText = md3Key[3].Replace("execute(", "").Replace(")", "");
-                            var contentArray = contentText.Split(",");
-                            var codeName = contentArray[0];
-                            var method = iBG.GetType().GetMethod(codeName);
-                            if (method is not null)
-                            {
-                                contentArray[0] = md3Key[0];
-                                md3Key[1] = method.Invoke(iBG, new object[] { contentArray } )?.ToString() ?? "STOP";
-                            }
-                        }
-                        else if (md3Key[3].StartsWith("array("))
-                        {
-                            var content = $"{md3Key[0]},{md3Key[3].Replace("array(", "").Replace(")", "")}".Split(",");
-                            //var method = iBG.GetType().GetMethod("array");
-                            //if (method is not null)
-                            //{
-                            md3Key[1] = iBG.array(content);
-                            //}
-                        }
-                        //=======================================
-                        //This is an option to call an external API
-                        // if (md3Key[3].StartsWith("api(")) //check for api use here, otherwise pass to equation eval function
-                        // {
-                        //     var apiExpression = md3Key[3].Replace("api(", "").Replace(")", "").Replace("\"", "").Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                        //     var jsonContent = "";
-                        //     var varCount = apiExpression.Length;
-                        //     var varParameters = $"?fnName={iBG.IDName}&keyName={md3Key[0]}";
-                        //     if (varCount > 1) //if more than one parameter in api() call, then build a query string, otherwise add all variables and data to the body content
-                        //     {
-                        //         for (var i = 1; i < varCount; i++)
-                        //         {
-                        //             varParameters += $"&{apiExpression[i]}={iBG.getVariable(apiExpression[i])?[0]??""}";
-                        //         }
-                        //         jsonContent = "";
-                        //     }
-                        //     else
-                        //     {
-                        //         jsonContent = JsonSerializer.Serialize(iBG.getVariables());
-                        //     }
-                        //     //Console.WriteLine(apiExpression[0]);
-                        //     var requestUrl = new Uri($"{apiExpression[0]}{varParameters}");
-                        //     var requestMessage = new HttpRequestMessage(HttpMethod.Post, requestUrl);
-                        //     requestMessage.Content = new StringContent(jsonContent);
-
-                        //     var reply = await Http.SendAsync(requestMessage);
-                        //     if (reply.StatusCode == HttpStatusCode.OK)
-                        //     {
-                        //         md3Key[1] = await reply.Content.ReadAsStringAsync();
-                        //     } else
-                        //     {
-                        //         md3Key[1] = reply?.ReasonPhrase??"NaN";
-                        //     }
-                        //     //Console.WriteLine(reply);
-                        //     //Console.WriteLine(md3Key[1]);
-                        // }
-                        //=======================================
-                        else
-                        {
-                            md3Key[1] = stateContainer.eval(md3Key[3], iBG.getVariables());
-                        }
-                    }
-                    iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] });
-                    stateContainer.metaDataKeys[md3Key[0]] = md3Key[1];
-
-                    var fnMD = stateContainer.metadataDS.Tables["Metadata"]!.Select($"IDNr = {iBG.IDNr} and Cycle = -1")[0];
-                    if (fnMD is not null && fnMD[md3Key[0]] is not null)
-                    {
-                        fnMD[md3Key[0]] = md3Key[1];
-                    }
-                    for (var i = 1; i <= 6; i++)
-                    {
-                        if (stateContainer.displaySetup.ContainsKey($"tracer_{i}") && md3Key[0] == stateContainer.displaySetup[$"tracer_{i}"])
-                        {
-                            stateContainer.updateKvalue(iBG, $"K{i}", md3Key[1]);
-                            showVariability = true;
-                        }
-                    }
+                    stateContainer.updateKvalue(iBG, $"K{i}", value);
+                    showVariability = true;
                 }
             }
         }

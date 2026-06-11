@@ -7,27 +7,30 @@ namespace FMV_OG.Shared
 {
     public class StateContainer
     {
-        private readonly IExpressionEvaluator expressionEvaluator;
         private readonly IFMIDisplayConfigService fmiDisplayConfigService;
         private readonly IMetadataService metadataService;
         private readonly IUndoService undoService;
         private readonly AgentLevelService agentLevelService;
         private bool _agentsLevelsViewActive;
         private readonly IProjectDocumentService projectDocumentService;
+        private readonly IFmiDefinitionService fmiDefinitionService;
+        private readonly IFmiInterpreter fmiInterpreter;
 
         public StateContainer(
-            IExpressionEvaluator expressionEvaluator,
             IFMIDisplayConfigService fmiDisplayConfigService,
             IMetadataService metadataService,
             IUndoService undoService,
             IProjectDocumentService projectDocumentService,
+            IFmiDefinitionService fmiDefinitionService,
+            IFmiInterpreter fmiInterpreter,
             AgentLevelService agentLevelService)
         {
-            this.expressionEvaluator = expressionEvaluator;
             this.fmiDisplayConfigService = fmiDisplayConfigService;
             this.metadataService = metadataService;
             this.undoService = undoService;
             this.projectDocumentService = projectDocumentService;
+            this.fmiDefinitionService = fmiDefinitionService;
+            this.fmiInterpreter = fmiInterpreter;
             this.agentLevelService = agentLevelService;
             this.agentLevelService.Bind(this);
         }
@@ -420,7 +423,65 @@ namespace FMV_OG.Shared
         }
         public string eval(string str, Dictionary<string, string[]> variables)
         {
-            return expressionEvaluator.Eval(str, variables, dataRows, dataKeys);
+            return fmiInterpreter.EvaluateExpression(str, variables, buildFmiContext());
+        }
+        // ── FMI runtime ─────────────────────────────────────────
+        public FmiRunState fmiRunState => fmiInterpreter.RunState;
+        public FmiModelDefinition fmiDefinition => fmiInterpreter.Definition;
+        private FmiEvaluationContext buildFmiContext()
+        {
+            return new FmiEvaluationContext
+            {
+                FunctionList = functionList,
+                CouplingList = couplingList,
+                Cycle = cycleFMI,
+                DataRows = dataRows,
+                DataKeys = dataKeys
+            };
+        }
+        public void initFmiRuntime()
+        {
+            fmiInterpreter.Initialize(fmiDefinitionService.Load(projectData_Undo[0]), functionList);
+            foreach (var diagnostic in fmiInterpreter.Definition.LoadDiagnostics)
+            {
+                Console.WriteLine($"FMI {diagnostic.Severity}: {diagnostic.Source}: {diagnostic.Message}");
+            }
+        }
+        public void fmiFunctionAdded(Function fn)
+        {
+            fmiInterpreter.OnFunctionAdded(fn);
+        }
+        public void fmiBeginCycle()
+        {
+            fmiInterpreter.BeginCycle(buildFmiContext());
+        }
+        public FmiEvaluationResult fmiEvaluate(Function fn)
+        {
+            return fmiInterpreter.EvaluateFunction(fn, buildFmiContext());
+        }
+        public void fmiEndCycle()
+        {
+            fmiInterpreter.EndCycle(buildFmiContext());
+        }
+        public void fmiReset()
+        {
+            fmiInterpreter.Reset(functionList);
+        }
+        public XmlNode EnsureFmiRoot()
+        {
+            return fmiDefinitionService.EnsureFmiRoot(projectData_Undo[0]);
+        }
+        public void UpsertFmiVariable(FmiVariableDefinition def)
+        {
+            updateUndo();
+            fmiDefinitionService.UpsertVariable(projectData_Undo[0], def);
+            initFmiRuntime();
+        }
+        public void RemoveFmiVariable(string name, string functionId)
+        {
+            updateUndo();
+            fmiDefinitionService.RemoveVariable(projectData_Undo[0], name, functionId);
+            initFmiRuntime();
         }
         // ── Agents ──────────────────────────────────────────────
         public XmlNode EnsureAgentsRoot()

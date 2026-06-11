@@ -9,6 +9,7 @@
     <EnableNETAnalyzers>False</EnableNETAnalyzers>
     <RunAnalyzersDuringLiveAnalysis>False</RunAnalyzersDuringLiveAnalysis>
     <RunAnalyzersDuringBuild>True</RunAnalyzersDuringBuild>
+    <DefaultItemExcludes>$(DefaultItemExcludes);publish/**</DefaultItemExcludes>
   </PropertyGroup>
 
 	<PropertyGroup>
