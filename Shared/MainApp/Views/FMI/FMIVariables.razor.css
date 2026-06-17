@@ -15,7 +15,7 @@
 }
 .var-variables {
     width: 67%;
-    border-right: 1px solid lightgrey;
+    border-right: 1px solid var(--line);
 }
 .var-functions {
     width: 33%;

@@ -1,114 +1,123 @@
-﻿.text-FMI {
+.text-FMI {
     font-size: smaller;
-    color: dimgrey
+    color: var(--muted);
 }
 .btn-FMI {
-    color: dimgrey;
-    background-color: #F1F3F4;
-    border-color: #F1F3F4;
+    color: var(--ink-soft);
+    background-color: var(--teal-50);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
     padding-left: 0.375rem;
     min-width: 2rem;
     min-height: 2rem;
     max-height: 2rem;
+    transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
     .btn-FMI:hover {
-        color: dimgrey;
-        background-color: #F1F3F4;
-        border-color: dimgrey;
+        color: var(--teal-800);
+        background-color: var(--teal-100);
+        border-color: var(--teal-300);
     }
     .btn-FMI:active {
         color: #fff;
-        background-color: dimgrey;
+        background-color: var(--teal-600);
+        border-color: var(--teal-600);
     }
 .btn-FMIs {
-    color: dimgrey;
-    background-color: #F1F3F4;
-    border-color: #F1F3F4;
+    color: var(--muted);
+    background-color: transparent;
+    border-color: transparent;
     padding-left: 0.375rem;
 }
 .btn-FMIp {
-    color: dimgrey;
-    background-color: #F1F3F4;
-    border-color: #F1F3F4;
+    color: var(--ink-soft);
+    background-color: var(--teal-50);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
     padding-left: 0.5rem;
     min-width: 2rem;
     min-height: 2rem;
     max-height: 2rem;
+    transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
     .btn-FMIp:hover {
-        color: dimgrey;
-        background-color: #F1F3F4;
-        border-color: dimgrey;
+        color: var(--teal-800);
+        background-color: var(--teal-100);
+        border-color: var(--teal-300);
     }
     .btn-FMIp:active {
         color: #fff;
-        background-color: dimgrey;
+        background-color: var(--teal-600);
+        border-color: var(--teal-600);
     }
 .fmi-key {
     text-align: left;
-    border-color: dimgrey;
     width: 70%;
-    border: 1pt solid dimgrey;
-    border-radius: .25rem;
-    background-color: #F1F3F4;
-    color: dimgrey;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface);
+    color: var(--ink);
     font-weight: 600;
+    transition: background-color var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
 }
     .fmi-key::placeholder {
-        color: #A1A3A4;
+        color: #9DB2B6;
     }
     .fmi-key:focus {
-        background-color: rgb(255, 216, 0, 0.5);
+        outline: none;
+        border-color: var(--teal-400);
+        box-shadow: 0 0 0 3px var(--focus-ring);
+        background-color: var(--teal-50);
     }
 .fmi-equation {
     height: 3rem;
     width: 100%;
     font-size: smaller;
-    font-family: 'PT Sans Caption', sans-serif;
+    font-family: 'Inter', 'PT Sans Caption', sans-serif;
 }
 .fmi-cycle {
     height: 2rem;
     text-align: center;
-    border-color: dimgrey;
     width: 3rem;
-    border: 1pt solid dimgrey;
-    border-radius: .25rem;
-    background-color: #F1F3F4;
-    color: dimgrey;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface);
+    color: var(--ink);
     font-size: smaller;
-    font-family: 'PT Sans Caption', sans-serif;
+    font-family: 'Inter', 'PT Sans Caption', sans-serif;
 }
 .fmi-text {
     width: 50%;
     font-size: smaller;
-    font-family: 'PT Sans Caption', sans-serif;
+    font-family: 'Inter', 'PT Sans Caption', sans-serif;
 }
 .btn-textp {
-    font-family: 'PT Sans Caption', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: x-large;
     font-weight: 800;
     line-height: 20px;
 }
 .btn-menu {
-    color: dimgrey;
-    background-color: #F1F3F4;
-    border-color: #F1F3F4;
+    color: var(--ink-soft);
+    background-color: var(--teal-50);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
     min-width: 2.8rem;
     max-width: 2.8rem;
     min-height: 2rem;
     max-height: 2rem;
     top: 0;
+    transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
-
     .btn-menu:hover {
-        color: dimgrey;
-        background-color: #F1F3F4;
-        border-color: dimgrey;
+        color: var(--teal-800);
+        background-color: var(--teal-100);
+        border-color: var(--teal-300);
     }
-
     .btn-menu:active {
         color: #fff;
-        background-color: dimgrey;
+        background-color: var(--teal-600);
+        border-color: var(--teal-600);
     }
 
 .fmi-mode-wrap {
@@ -120,7 +129,7 @@
 
 .fmi-mode-label {
     font-size: 0.72rem;
-    color: dimgrey;
+    color: var(--muted);
     user-select: none;
 }
 
@@ -128,11 +137,17 @@
     height: 1.6rem;
     min-width: 4.8rem;
     max-width: 6.5rem;
-    border: 1px solid #c7c7c7;
-    border-radius: 0.35rem;
-    background: #ffffff;
-    color: #3f3f3f;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
     font-size: 0.72rem;
     padding: 0 0.35rem;
     line-height: 1.2;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
+    .fmi-mode-badge:focus {
+        outline: none;
+        border-color: var(--teal-400);
+        box-shadow: 0 0 0 3px var(--focus-ring);
+    }

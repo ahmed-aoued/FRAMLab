@@ -2,7 +2,7 @@
 ::deep thead {
     position: sticky;
     top: 0;
-    background-color: rgb(180, 187, 195);
+    background-color: var(--teal-100);
     z-index: 1;
 }
     ::deep thead .show-properties {
@@ -21,7 +21,7 @@
         background-color: rgb(255, 216, 0, 0.75);
     }
 ::deep tbody {
-    border: thin solid grey;
+    border: thin solid var(--line-strong);
 }
 /* Assign default width to Function label column */ 
 ::deep thead .fn-idname {
@@ -42,13 +42,13 @@
 }
 ::deep th {
     font-weight: normal;
-    border: thin solid grey;
+    border: thin solid var(--line-strong);
     padding-left: 0.25rem;
     padding-right: 0.25rem;
     font-size: initial;
 }
 ::deep td {
-    border: thin solid grey;
+    border: thin solid var(--line);
     padding-left: 0.25rem;
     padding-right: 0.25rem;
     font-size: smaller;
@@ -90,26 +90,31 @@
     font-family: 'PT Sans Caption', sans-serif;
 }
 .search-box input {
-    border: thin solid grey;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    border: thin solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
     .search-box input:focus {
         outline: none;
+        border-color: var(--teal-400);
+        box-shadow: 0 0 0 3px var(--focus-ring);
     }
 label {
     gap: 0.5rem;
-    border: 1px solid #F1F3F4;
+    border: 1px solid var(--line);
     padding: 0 0.75rem;
     margin-left: 0.5rem;
     margin-bottom: 0;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-sm);
     display: inline-flex;
     align-items: center;
-    background: rgba(0,0,0,0.04);
+    background: var(--teal-50);
     cursor: pointer;
+    transition: border-color var(--t-fast), background-color var(--t-fast);
 }
     label:hover {
-        border: 1px solid dimgrey;
+        border: 1px solid var(--teal-400);
+        background: var(--teal-100);
     }
 .show-properties {
     background: rgb(253, 168, 112, 0.75);

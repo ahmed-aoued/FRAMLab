@@ -34,10 +34,6 @@
 }
 <MenuBar refreshParent="refreshParent" onInputFileChange="OnInputFileChange" fileIsLoaded="FileIsLoaded" />
 <SideBar refreshParent="refreshParent" newFunction="NewFunction" nextFn="NextFn" />
-@if (stateContainer.rightPanel != "")
-{
-    <RightPanel refreshParent="refreshParent" />
-}
 <div id="mainWindow" class="main" @onkeyup=NextFn @onkeydown=OnKeyDown tabindex="0">
     @if (stateContainer.spreadsheetVisible > 0)
     {
@@ -408,9 +404,7 @@
         itemF.Attributes.Append(fnY);
         stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Functions")!.AppendChild(itemF);
         stateContainer.CreateMetadataTable(itemF);
-        var newFn = new Function(itemF);
-        stateContainer.functionList.Add(newFn);
-        stateContainer.fmiFunctionAdded(newFn);
+        stateContainer.functionList.Add(new Function(itemF));
         stateContainer.selectedFn = maxFn.ToString();
         stateContainer.fnName = "";
         FocusElement("fnNameText");
@@ -558,8 +552,6 @@
                 stateContainer.levelList.Add(new Level(levelNode));
             }
         }
-        // Load the <FMI> section (typed variables) and initialise the FMI runtime state
-        stateContainer.initFmiRuntime();
         if (stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects") == null)
         {
             stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement("Aspects"));
@@ -814,10 +806,6 @@
         newFnY = 20;
         isNewModel = false;
         stateContainer.fileLoaded = true;
-        if (stateContainer.AgentsLevelsViewActive)
-        {
-            agentLevelService.ApplyAgentsLevelsView();
-        }
         stateContainer.debugOutput = "";
         //spreadsheet?.InitialState();
         FocusElement("openFileBtn");
@@ -989,7 +977,6 @@
 
             var newFunction = new Function(clone);
             stateContainer.functionList.Add(newFunction);
-            stateContainer.fmiFunctionAdded(newFunction);
             createdIds.Add(newId);
 
             stateContainer.viewWidth = Math.Max(stateContainer.viewWidth, newFunction.x + 120);

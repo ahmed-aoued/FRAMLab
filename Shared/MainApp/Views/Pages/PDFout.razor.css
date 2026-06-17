@@ -14,5 +14,5 @@
     padding: 0.25rem;
 }
 .td-title {
-    background-color: lightgrey;
+    background-color: var(--teal-100);
 }
