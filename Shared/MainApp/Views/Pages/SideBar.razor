@@ -772,6 +772,8 @@
 
     // Blur-Schutz für den Dreiecksknopf
     private readonly HashSet<string> pendingBlurIgnore = new();
+    // Schutz vor Löschung eines leeren Aspekts, solange eine Neuanlage im Gange ist
+    private readonly Dictionary<string, bool> pendingAspectCreation = new();
 
     private IEnumerable<string> GetExistingAspectNames(string type)
     {
@@ -925,7 +927,6 @@
         refreshParent.InvokeAsync();
     }
 
-    // Verarbeitet einen Klick auf den Dreiecksknopf, ohne versehentlich den Text zu leeren
     private async Task ButtonClick(string type, string id, ElementReference inputRef)
     {
         pendingBlurIgnore.Add($"{type}|{id}");
@@ -948,19 +949,16 @@
         StateHasChanged();
     }
 
-    // Verhindert das Löschen des leeren Aspekts, wenn der Blur durch den Dreiecksknopf ausgelöst wurde
     private async Task HandleBlur(string type, string id)
     {
-        if (pendingBlurIgnore.Contains($"{type}|{id}"))
+        if (pendingBlurIgnore.Contains($"{type}|{id}") || pendingAspectCreation.TryGetValue(type, out var val) && val)
         {
-            // Blur wurde durch den Knopf verursacht – nichts tun
             return;
         }
         AspectBlank(type, id);
         CloseDropdownDelayed();
     }
 
-    // existing methods unchanged ...
     private void ToggleAgentPanel() => showAgentPanel = !showAgentPanel;
     private void ToggleLevelPanel() => showLevelPanel = !showLevelPanel;
 
@@ -1209,6 +1207,14 @@
     {
         if (stateContainer.projectData_Undo[0] is not null && stateContainer.selectedFn != "-1")
         {
+            pendingAspectCreation[type] = true;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(300);
+                pendingAspectCreation[type] = false;
+                await InvokeAsync(StateHasChanged);
+            });
+
             setFocus = type;
             if (stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{type}s") == null)
                 stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement($"{type}s"));
