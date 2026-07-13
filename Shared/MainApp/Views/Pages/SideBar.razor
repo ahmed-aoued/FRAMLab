@@ -14,16 +14,29 @@
     }
     .aspect-input {
         flex: 1;
+        padding-right: 24px;      /* Platz für den Dropdown-Knopf */
     }
     .dropdown-btn {
-        flex: 0 0 auto;
-        background: none;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 22px;
+        height: 100%;
+        background: transparent;
         border: 1px solid #ccc;
         border-left: none;
-        padding: 0 4px;
+        padding: 0 2px;
+        font-size: 10px;
         cursor: pointer;
-        font-size: 12px;
-        background: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #555;
+        outline: none;
+        user-select: none;
+    }
+    .dropdown-btn:focus {
+        outline: none;
     }
     .suggestion-list {
         position: absolute;
@@ -115,9 +128,12 @@
                                @oninput="@(e => HandleAspectInput(e, "Output", aspect.IDNr))"
                                @onkeydown="@(e => HandleAspectKeyDown(e, "Output", aspect.IDNr))"
                                @onfocus="@(e => OpenDropdown("Output", aspect.IDNr))"
-                               @onblur="@(e => { AspectBlank("Output", aspect.IDNr); CloseDropdownDelayed(); })"
+                               @onblur="@(async () => await HandleBlur("Output", aspect.IDNr))"
                                @onchange="@(e => CommitAspect(e, "Output", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Output", aspect.IDNr))" type="button">▼</button>
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Output", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
                         @if (IsDropdownOpen("Output", aspect.IDNr))
                         {
                             <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Output", aspect.IDNr))">
@@ -155,9 +171,12 @@
                                    @oninput="@(e => HandleAspectInput(e, "Output", aspect.IDNr))"
                                    @onkeydown="@(e => HandleAspectKeyDown(e, "Output", aspect.IDNr))"
                                    @onfocus="@(e => OpenDropdown("Output", aspect.IDNr))"
-                                   @onblur="@(e => { AspectBlank("Output", aspect.IDNr); CloseDropdownDelayed(); })"
+                                   @onblur="@(async () => await HandleBlur("Output", aspect.IDNr))"
                                    @onchange="@(e => CommitAspect(e, "Output", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Output", aspect.IDNr))" type="button">▼</button>
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Output", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
                             @if (IsDropdownOpen("Output", aspect.IDNr))
                             {
                                 <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Output", aspect.IDNr))">
@@ -176,6 +195,7 @@
                 ListCount++;
             }
         }
+        <!-- Input -->
         <div class="d-flex pt-2">
             <div class="d-flex flex-column align-items-center">
                 <button id="newIButton" class="btn btn-menu btn-textp" title=@Loc["INPUT"] tabindex="8" @onclick="@((e) => NewAspect(e, "Input"))" @onkeyup=NextFn>I</button>
@@ -196,9 +216,12 @@
                                @oninput="@(e => HandleAspectInput(e, "Input", aspect.IDNr))"
                                @onkeydown="@(e => HandleAspectKeyDown(e, "Input", aspect.IDNr))"
                                @onfocus="@(e => OpenDropdown("Input", aspect.IDNr))"
-                               @onblur="@(e => { AspectBlank("Input", aspect.IDNr); CloseDropdownDelayed(); })"
+                               @onblur="@(async () => await HandleBlur("Input", aspect.IDNr))"
                                @onchange="@(e => CommitAspect(e, "Input", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Input", aspect.IDNr))" type="button">▼</button>
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Input", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
                         @if (IsDropdownOpen("Input", aspect.IDNr))
                         {
                             <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Input", aspect.IDNr))">
@@ -236,9 +259,12 @@
                                    @oninput="@(e => HandleAspectInput(e, "Input", aspect.IDNr))"
                                    @onkeydown="@(e => HandleAspectKeyDown(e, "Input", aspect.IDNr))"
                                    @onfocus="@(e => OpenDropdown("Input", aspect.IDNr))"
-                                   @onblur="@(e => { AspectBlank("Input", aspect.IDNr); CloseDropdownDelayed(); })"
+                                   @onblur="@(async () => await HandleBlur("Input", aspect.IDNr))"
                                    @onchange="@(e => CommitAspect(e, "Input", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Input", aspect.IDNr))" type="button">▼</button>
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Input", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
                             @if (IsDropdownOpen("Input", aspect.IDNr))
                             {
                                 <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Input", aspect.IDNr))">
@@ -278,9 +304,12 @@
                                @oninput="@(e => HandleAspectInput(e, "Precondition", aspect.IDNr))"
                                @onkeydown="@(e => HandleAspectKeyDown(e, "Precondition", aspect.IDNr))"
                                @onfocus="@(e => OpenDropdown("Precondition", aspect.IDNr))"
-                               @onblur="@(e => { AspectBlank("Precondition", aspect.IDNr); CloseDropdownDelayed(); })"
+                               @onblur="@(async () => await HandleBlur("Precondition", aspect.IDNr))"
                                @onchange="@(e => CommitAspect(e, "Precondition", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Precondition", aspect.IDNr))" type="button">▼</button>
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Precondition", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
                         @if (IsDropdownOpen("Precondition", aspect.IDNr))
                         {
                             <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Precondition", aspect.IDNr))">
@@ -318,9 +347,12 @@
                                    @oninput="@(e => HandleAspectInput(e, "Precondition", aspect.IDNr))"
                                    @onkeydown="@(e => HandleAspectKeyDown(e, "Precondition", aspect.IDNr))"
                                    @onfocus="@(e => OpenDropdown("Precondition", aspect.IDNr))"
-                                   @onblur="@(e => { AspectBlank("Precondition", aspect.IDNr); CloseDropdownDelayed(); })"
+                                   @onblur="@(async () => await HandleBlur("Precondition", aspect.IDNr))"
                                    @onchange="@(e => CommitAspect(e, "Precondition", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Precondition", aspect.IDNr))" type="button">▼</button>
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Precondition", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
                             @if (IsDropdownOpen("Precondition", aspect.IDNr))
                             {
                                 <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Precondition", aspect.IDNr))">
@@ -360,9 +392,12 @@
                                @oninput="@(e => HandleAspectInput(e, "Resource", aspect.IDNr))"
                                @onkeydown="@(e => HandleAspectKeyDown(e, "Resource", aspect.IDNr))"
                                @onfocus="@(e => OpenDropdown("Resource", aspect.IDNr))"
-                               @onblur="@(e => { AspectBlank("Resource", aspect.IDNr); CloseDropdownDelayed(); })"
+                               @onblur="@(async () => await HandleBlur("Resource", aspect.IDNr))"
                                @onchange="@(e => CommitAspect(e, "Resource", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Resource", aspect.IDNr))" type="button">▼</button>
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Resource", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
                         @if (IsDropdownOpen("Resource", aspect.IDNr))
                         {
                             <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Resource", aspect.IDNr))">
@@ -400,9 +435,12 @@
                                    @oninput="@(e => HandleAspectInput(e, "Resource", aspect.IDNr))"
                                    @onkeydown="@(e => HandleAspectKeyDown(e, "Resource", aspect.IDNr))"
                                    @onfocus="@(e => OpenDropdown("Resource", aspect.IDNr))"
-                                   @onblur="@(e => { AspectBlank("Resource", aspect.IDNr); CloseDropdownDelayed(); })"
+                                   @onblur="@(async () => await HandleBlur("Resource", aspect.IDNr))"
                                    @onchange="@(e => CommitAspect(e, "Resource", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Resource", aspect.IDNr))" type="button">▼</button>
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Resource", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
                             @if (IsDropdownOpen("Resource", aspect.IDNr))
                             {
                                 <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Resource", aspect.IDNr))">
@@ -442,9 +480,12 @@
                                @oninput="@(e => HandleAspectInput(e, "Control", aspect.IDNr))"
                                @onkeydown="@(e => HandleAspectKeyDown(e, "Control", aspect.IDNr))"
                                @onfocus="@(e => OpenDropdown("Control", aspect.IDNr))"
-                               @onblur="@(e => { AspectBlank("Control", aspect.IDNr); CloseDropdownDelayed(); })"
+                               @onblur="@(async () => await HandleBlur("Control", aspect.IDNr))"
                                @onchange="@(e => CommitAspect(e, "Control", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Control", aspect.IDNr))" type="button">▼</button>
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Control", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
                         @if (IsDropdownOpen("Control", aspect.IDNr))
                         {
                             <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Control", aspect.IDNr))">
@@ -482,9 +523,12 @@
                                    @oninput="@(e => HandleAspectInput(e, "Control", aspect.IDNr))"
                                    @onkeydown="@(e => HandleAspectKeyDown(e, "Control", aspect.IDNr))"
                                    @onfocus="@(e => OpenDropdown("Control", aspect.IDNr))"
-                                   @onblur="@(e => { AspectBlank("Control", aspect.IDNr); CloseDropdownDelayed(); })"
+                                   @onblur="@(async () => await HandleBlur("Control", aspect.IDNr))"
                                    @onchange="@(e => CommitAspect(e, "Control", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Control", aspect.IDNr))" type="button">▼</button>
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Control", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
                             @if (IsDropdownOpen("Control", aspect.IDNr))
                             {
                                 <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Control", aspect.IDNr))">
@@ -524,9 +568,12 @@
                                @oninput="@(e => HandleAspectInput(e, "Time", aspect.IDNr))"
                                @onkeydown="@(e => HandleAspectKeyDown(e, "Time", aspect.IDNr))"
                                @onfocus="@(e => OpenDropdown("Time", aspect.IDNr))"
-                               @onblur="@(e => { AspectBlank("Time", aspect.IDNr); CloseDropdownDelayed(); })"
+                               @onblur="@(async () => await HandleBlur("Time", aspect.IDNr))"
                                @onchange="@(e => CommitAspect(e, "Time", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Time", aspect.IDNr))" type="button">▼</button>
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Time", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
                         @if (IsDropdownOpen("Time", aspect.IDNr))
                         {
                             <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Time", aspect.IDNr))">
@@ -564,9 +611,12 @@
                                    @oninput="@(e => HandleAspectInput(e, "Time", aspect.IDNr))"
                                    @onkeydown="@(e => HandleAspectKeyDown(e, "Time", aspect.IDNr))"
                                    @onfocus="@(e => OpenDropdown("Time", aspect.IDNr))"
-                                   @onblur="@(e => { AspectBlank("Time", aspect.IDNr); CloseDropdownDelayed(); })"
+                                   @onblur="@(async () => await HandleBlur("Time", aspect.IDNr))"
                                    @onchange="@(e => CommitAspect(e, "Time", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1" @onclick="@(() => ToggleDropdown("Time", aspect.IDNr))" type="button">▼</button>
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Time", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
                             @if (IsDropdownOpen("Time", aspect.IDNr))
                             {
                                 <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Time", aspect.IDNr))">
@@ -585,7 +635,7 @@
                 ListCount++;
             }
         }
-        <!-- Agent / Level panels (unchanged) -->
+        <!-- Agent / Level panels unchanged -->
         <div class="d-flex pt-2">
             <div class="d-flex flex-column align-items-start pt-1">
                 <button class="btn btn-menu btn-textp" title="Assign Agent" tabindex="33" @onclick=ToggleAgentPanel>A</button>
@@ -672,7 +722,7 @@
                 }
             </div>
         </div>
-        <!-- Zoom and color buttons (unchanged) -->
+        <!-- Zoom and color buttons unchanged -->
         <div class="d-flex pt-2">
             <button class="btn btn-half btn-half-s" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
             <button class="btn btn-half btn-half-l" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
@@ -719,6 +769,9 @@
     private string aspectFilterText = "";
     private List<string> suggestionsActiveList = new();
     private int suggestionsActiveIndex = -1;
+
+    // Blur-Schutz für den Dreiecksknopf
+    private readonly HashSet<string> pendingBlurIgnore = new();
 
     private IEnumerable<string> GetExistingAspectNames(string type)
     {
@@ -811,7 +864,6 @@
                 }
                 else if (!string.IsNullOrWhiteSpace(aspectFilterText))
                 {
-                    // Commit freetext as new aspect
                     AspectChangeCommitt(aspectFilterText, id, type);
                     openDropdownType = "";
                     openDropdownId = "";
@@ -871,6 +923,41 @@
         }
         checkForBackground();
         refreshParent.InvokeAsync();
+    }
+
+    // Verarbeitet einen Klick auf den Dreiecksknopf, ohne versehentlich den Text zu leeren
+    private async Task ButtonClick(string type, string id, ElementReference inputRef)
+    {
+        pendingBlurIgnore.Add($"{type}|{id}");
+        await inputRef.FocusAsync();
+        if (IsDropdownOpen(type, id))
+        {
+            openDropdownType = "";
+            openDropdownId = "";
+        }
+        else
+        {
+            OpenDropdown(type, id);
+        }
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(200);
+            pendingBlurIgnore.Remove($"{type}|{id}");
+            await InvokeAsync(StateHasChanged);
+        });
+        StateHasChanged();
+    }
+
+    // Verhindert das Löschen des leeren Aspekts, wenn der Blur durch den Dreiecksknopf ausgelöst wurde
+    private async Task HandleBlur(string type, string id)
+    {
+        if (pendingBlurIgnore.Contains($"{type}|{id}"))
+        {
+            // Blur wurde durch den Knopf verursacht – nichts tun
+            return;
+        }
+        AspectBlank(type, id);
+        CloseDropdownDelayed();
     }
 
     // existing methods unchanged ...
