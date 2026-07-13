@@ -1,7 +1,8 @@
-﻿@inject IJSRuntime JSRuntime
+@inject IJSRuntime JSRuntime
 @inject StateContainer stateContainer
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
+@using System.Linq
 
 <div class="sidebar">
     <div class="v-panel pr-2">
@@ -32,10 +33,16 @@
             </div>
             @if (stateContainer.selectedFn != "-1")
             {
+                <datalist id="outputExistingOptions">
+                    @foreach (var existing in GetExistingAspectNames("Output"))
+                    {
+                        <option value="@existing"></option>
+                    }
+                </datalist>
                 GetNodesO = stateContainer.outputsList.FindAll(x => x.Type == "Output" && x.FunctionIDNr == stateContainer.selectedFn);
                 if (GetNodesO.Count > 0)
                 {
-                    <textarea name=@($"output-{GetNodesO[0].IDNr}") @ref=GetNodesO[0].elementReference tabindex="6" class=@(GetNodesO[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesO[0].IDName @onchange=@((e) => AspectChange(e, "Output", GetNodesO[0].IDNr)) @onblur=@(() => AspectBlank("Output", GetNodesO[0].IDNr)) />
+                    <input type="text" name=@($"output-{GetNodesO[0].IDNr}") list="outputExistingOptions" @ref=GetNodesO[0].elementReference tabindex="6" class=@(GetNodesO[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesO[0].IDName @onchange=@((e) => AspectChange(e, "Output", GetNodesO[0].IDNr)) @onblur=@(() => AspectBlank("Output", GetNodesO[0].IDNr)) />
                 }
             }
             else
@@ -51,7 +58,7 @@
                 if (ListCount > 0)
                 {
                     <div class="d-flex aspect-list">
-                        <textarea name=@($"output-{GetListO.IDNr}") @ref=GetListO.elementReference tabindex="7" class=@(GetListO.Orphan=="true"?"aspect-orphan":"") value=@GetListO.IDName @onchange=@((e) => AspectChange(e, "Output", GetListO.IDNr)) @onblur=@(() => AspectBlank("Output", GetListO.IDNr)) />
+                        <input type="text" name=@($"output-{GetListO.IDNr}") list="outputExistingOptions" @ref=GetListO.elementReference tabindex="7" class=@(GetListO.Orphan=="true"?"aspect-orphan":"") value=@GetListO.IDName @onchange=@((e) => AspectChange(e, "Output", GetListO.IDNr)) @onblur=@(() => AspectBlank("Output", GetListO.IDNr)) />
                     </div>
                 }
                 ListCount++;
@@ -64,10 +71,16 @@
             </div>
             @if (stateContainer.selectedFn != "-1")
             {
+                <datalist id="inputExistingOptions">
+                    @foreach (var existing in GetExistingAspectNames("Input"))
+                    {
+                        <option value="@existing"></option>
+                    }
+                </datalist>
                 GetNodesI = stateContainer.aspectsList.FindAll(x => x.Type == "Input" && x.FunctionIDNr == stateContainer.selectedFn);
                 if (GetNodesI.Count > 0)
                 {
-                    <textarea name=@($"input-{GetNodesI[0].IDNr}") @ref=GetNodesI[0].elementReference tabindex="9" class=@(GetNodesI[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesI[0].IDName @onchange=@((e) => AspectChange(e, "Input", GetNodesI[0].IDNr)) @onblur=@(() => AspectBlank("Input", GetNodesI[0].IDNr)) />
+                    <input type="text" name=@($"input-{GetNodesI[0].IDNr}") list="inputExistingOptions" @ref=GetNodesI[0].elementReference tabindex="9" class=@(GetNodesI[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesI[0].IDName @onchange=@((e) => AspectChange(e, "Input", GetNodesI[0].IDNr)) @onblur=@(() => AspectBlank("Input", GetNodesI[0].IDNr)) />
                 }
             }
             else
@@ -83,7 +96,7 @@
                 if (ListCount > 0)
                 {
                     <div class="d-flex aspect-list">
-                        <textarea name=@($"input-{GetListI.IDNr}") @ref=GetListI.elementReference tabindex="10" class=@(GetListI.Orphan=="true"?"aspect-orphan":"") value=@GetListI.IDName @onchange=@((e) => AspectChange(e, "Input", GetListI.IDNr)) @onblur=@(() => AspectBlank("Input", GetListI.IDNr)) />
+                        <input type="text" name=@($"input-{GetListI.IDNr}") list="inputExistingOptions" @ref=GetListI.elementReference tabindex="10" class=@(GetListI.Orphan=="true"?"aspect-orphan":"") value=@GetListI.IDName @onchange=@((e) => AspectChange(e, "Input", GetListI.IDNr)) @onblur=@(() => AspectBlank("Input", GetListI.IDNr)) />
                     </div>
                 }
                 ListCount++;
@@ -96,10 +109,16 @@
             </div>
             @if (stateContainer.selectedFn != "-1")
             {
+                <datalist id="preconditionExistingOptions">
+                    @foreach (var existing in GetExistingAspectNames("Precondition"))
+                    {
+                        <option value="@existing"></option>
+                    }
+                </datalist>
                 GetNodesP = stateContainer.aspectsList.FindAll(x => x.Type == "Precondition" && x.FunctionIDNr == stateContainer.selectedFn);
                 if (GetNodesP.Count > 0)
                 {
-                    <textarea name=@($"precondition-{GetNodesP[0].IDNr}") @ref=GetNodesP[0].elementReference tabindex="12" class=@(GetNodesP[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesP[0].IDName @onchange=@((e) => AspectChange(e, "Precondition", GetNodesP[0].IDNr)) @onblur=@(() => AspectBlank("Precondition", GetNodesP[0].IDNr)) />
+                    <input type="text" name=@($"precondition-{GetNodesP[0].IDNr}") list="preconditionExistingOptions" @ref=GetNodesP[0].elementReference tabindex="12" class=@(GetNodesP[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesP[0].IDName @onchange=@((e) => AspectChange(e, "Precondition", GetNodesP[0].IDNr)) @onblur=@(() => AspectBlank("Precondition", GetNodesP[0].IDNr)) />
                 }
             }
             else
@@ -115,7 +134,7 @@
                 if (ListCount > 0)
                 {
                     <div class="d-flex aspect-list">
-                        <textarea name=@($"precondition-{GetListP.IDNr}") @ref=GetListP.elementReference tabindex="13" class=@(GetListP.Orphan=="true"?"aspect-orphan":"") value=@GetListP.IDName @onchange=@((e) => AspectChange(e, "Precondition", GetListP.IDNr)) @onblur=@(() => AspectBlank("Precondition", GetListP.IDNr)) />
+                        <input type="text" name=@($"precondition-{GetListP.IDNr}") list="preconditionExistingOptions" @ref=GetListP.elementReference tabindex="13" class=@(GetListP.Orphan=="true"?"aspect-orphan":"") value=@GetListP.IDName @onchange=@((e) => AspectChange(e, "Precondition", GetListP.IDNr)) @onblur=@(() => AspectBlank("Precondition", GetListP.IDNr)) />
                     </div>
                 }
                 ListCount++;
@@ -128,10 +147,16 @@
             </div>
             @if (stateContainer.selectedFn != "-1")
             {
+                <datalist id="resourceExistingOptions">
+                    @foreach (var existing in GetExistingAspectNames("Resource"))
+                    {
+                        <option value="@existing"></option>
+                    }
+                </datalist>
                 GetNodesR = stateContainer.aspectsList.FindAll(x => x.Type == "Resource" && x.FunctionIDNr == stateContainer.selectedFn);
                 if (GetNodesR.Count > 0)
                 {
-                    <textarea name=@($"resource-{GetNodesR[0].IDNr}") @ref=GetNodesR[0].elementReference tabindex="15" class=@(GetNodesR[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesR[0].IDName @onchange=@((e) => AspectChange(e, "Resource", GetNodesR[0].IDNr)) @onblur=@(() => AspectBlank("Resource", GetNodesR[0].IDNr)) />
+                    <input type="text" name=@($"resource-{GetNodesR[0].IDNr}") list="resourceExistingOptions" @ref=GetNodesR[0].elementReference tabindex="15" class=@(GetNodesR[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesR[0].IDName @onchange=@((e) => AspectChange(e, "Resource", GetNodesR[0].IDNr)) @onblur=@(() => AspectBlank("Resource", GetNodesR[0].IDNr)) />
                 }
             }
             else
@@ -147,7 +172,7 @@
                 if (ListCount > 0)
                 {
                     <div class="d-flex aspect-list">
-                        <textarea name=@($"resource-{GetListR.IDNr}") @ref=GetListR.elementReference tabindex="16" class=@(GetListR.Orphan=="true"?"aspect-orphan":"") value=@GetListR.IDName @onchange=@((e) => AspectChange(e, "Resource", GetListR.IDNr)) @onblur=@(() => AspectBlank("Resource", GetListR.IDNr)) />
+                        <input type="text" name=@($"resource-{GetListR.IDNr}") list="resourceExistingOptions" @ref=GetListR.elementReference tabindex="16" class=@(GetListR.Orphan=="true"?"aspect-orphan":"") value=@GetListR.IDName @onchange=@((e) => AspectChange(e, "Resource", GetListR.IDNr)) @onblur=@(() => AspectBlank("Resource", GetListR.IDNr)) />
                     </div>
                 }
                 ListCount++;
@@ -160,10 +185,16 @@
             </div>
             @if (stateContainer.selectedFn != "-1")
             {
+                <datalist id="controlExistingOptions">
+                    @foreach (var existing in GetExistingAspectNames("Control"))
+                    {
+                        <option value="@existing"></option>
+                    }
+                </datalist>
                 GetNodesC = stateContainer.aspectsList.FindAll(x => x.Type == "Control" && x.FunctionIDNr == stateContainer.selectedFn);
                 if (GetNodesC.Count > 0)
                 {
-                    <textarea name=@($"control-{GetNodesC[0].IDNr}") @ref=GetNodesC[0].elementReference tabindex="18" class=@(GetNodesC[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesC[0].IDName @onchange=@((e) => AspectChange(e, "Control", GetNodesC[0].IDNr)) @onblur=@(() => AspectBlank("Control", GetNodesC[0].IDNr)) />
+                    <input type="text" name=@($"control-{GetNodesC[0].IDNr}") list="controlExistingOptions" @ref=GetNodesC[0].elementReference tabindex="18" class=@(GetNodesC[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesC[0].IDName @onchange=@((e) => AspectChange(e, "Control", GetNodesC[0].IDNr)) @onblur=@(() => AspectBlank("Control", GetNodesC[0].IDNr)) />
                 }
             }
             else
@@ -179,7 +210,7 @@
                 if (ListCount > 0)
                 {
                     <div class="d-flex aspect-list">
-                        <textarea name=@($"control-{GetListC.IDNr}") @ref=GetListC.elementReference tabindex="19" class=@(GetListC.Orphan=="true"?"aspect-orphan":"") value=@GetListC.IDName @onchange=@((e) => AspectChange(e, "Control", GetListC.IDNr)) @onblur=@(() => AspectBlank("Control", GetListC.IDNr)) />
+                        <input type="text" name=@($"control-{GetListC.IDNr}") list="controlExistingOptions" @ref=GetListC.elementReference tabindex="19" class=@(GetListC.Orphan=="true"?"aspect-orphan":"") value=@GetListC.IDName @onchange=@((e) => AspectChange(e, "Control", GetListC.IDNr)) @onblur=@(() => AspectBlank("Control", GetListC.IDNr)) />
                     </div>
                 }
                 ListCount++;
@@ -192,10 +223,16 @@
             </div>
             @if (stateContainer.selectedFn != "-1")
             {
+                <datalist id="timeExistingOptions">
+                    @foreach (var existing in GetExistingAspectNames("Time"))
+                    {
+                        <option value="@existing"></option>
+                    }
+                </datalist>
                 GetNodesT = stateContainer.aspectsList.FindAll(x => x.Type == "Time" && x.FunctionIDNr == stateContainer.selectedFn);
                 if (GetNodesT.Count > 0)
                 {
-                    <textarea name=@($"time-{GetNodesT[0].IDNr}") @ref=GetNodesT[0].elementReference tabindex="21" class=@(GetNodesT[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesT[0].IDName @onchange=@((e) => AspectChange(e, "Time", GetNodesT[0].IDNr)) @onblur=@(() => AspectBlank("Time", GetNodesT[0].IDNr)) />
+                    <input type="text" name=@($"time-{GetNodesT[0].IDNr}") list="timeExistingOptions" @ref=GetNodesT[0].elementReference tabindex="21" class=@(GetNodesT[0].Orphan=="true"?"aspect-orphan":"") value=@GetNodesT[0].IDName @onchange=@((e) => AspectChange(e, "Time", GetNodesT[0].IDNr)) @onblur=@(() => AspectBlank("Time", GetNodesT[0].IDNr)) />
                 }
             }
             else
@@ -211,7 +248,7 @@
                 if (ListCount > 0)
                 {
                     <div class="d-flex aspect-list">
-                        <textarea name=@($"time-{GetListT.IDNr}") @ref=GetListT.elementReference tabindex="22" class=@(GetListT.Orphan=="true"?"aspect-orphan":"") value=@GetListT.IDName @onchange=@((e) => AspectChange(e, "Time", GetListT.IDNr)) @onblur=@(() => AspectBlank("Time", GetListT.IDNr)) />
+                        <input type="text" name=@($"time-{GetListT.IDNr}") list="timeExistingOptions" @ref=GetListT.elementReference tabindex="22" class=@(GetListT.Orphan=="true"?"aspect-orphan":"") value=@GetListT.IDName @onchange=@((e) => AspectChange(e, "Time", GetListT.IDNr)) @onblur=@(() => AspectBlank("Time", GetListT.IDNr)) />
                     </div>
                 }
                 ListCount++;
@@ -342,6 +379,24 @@
     private string selectedLevelId = "";
     private string newAgentName = "";
     private string newLevelName = "";
+
+    private IEnumerable<string> GetExistingAspectNames(string type)
+    {
+        if (type == "Output")
+        {
+            return stateContainer.outputsList
+                .Where(o => !string.IsNullOrEmpty(o.IDName))
+                .Select(o => o.IDName)
+                .Distinct();
+        }
+        else
+        {
+            return stateContainer.aspectsList
+                .Where(a => a.Type == type && !string.IsNullOrEmpty(a.IDName))
+                .Select(a => a.IDName)
+                .Distinct();
+        }
+    }
 
     private void ToggleAgentPanel() => showAgentPanel = !showAgentPanel;
     private void ToggleLevelPanel() => showLevelPanel = !showLevelPanel;
