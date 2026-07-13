@@ -58,7 +58,7 @@
     border-color: red;
 }
 .profile-symbol-btn {
-    color: #fff !important;
+    color: #FFD700 !important;         /* Geänderte Schriftfarbe */
     background-color: #2c5282 !important;
     border: 1px solid #2c5282;
     font-weight: bold;
@@ -72,7 +72,7 @@
     border-radius: 4px;
 }
 .profile-symbol-btn a {
-    color: #fff;
+    color: #FFD700;                   /* Farbe für eingebettete <a>-Tags anpassen */
     text-decoration: none;
     font-size: 16px;
 }
@@ -81,6 +81,6 @@
 .profile-symbol-btn.btn:disabled {
     opacity: 1;
     background-color: #2c5282 !important;
-    color: #fff !important;
+    color: #FFD700 !important;       /* Gleiche Farbe auch für deaktivierten Zustand beibehalten */
     border-color: #2c5282 !important;
 }
