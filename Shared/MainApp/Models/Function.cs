@@ -33,6 +33,7 @@ namespace FMV_OG.Shared
             this.fnColorStyle = fn.SelectSingleNode("@style")?.Value ?? "";
             this.fnColorValue = fn.SelectSingleNode("@color")?.Value ?? "";
             this.profileFn = fn.SelectSingleNode("@profileFn")?.Value ?? "";
+            //Needs translation to the new profileFMI enum; Programm new Service to tranlate calle mehtodes from there
             this.profileI = fn.SelectSingleNode("@profileI")?.Value ?? "";
             this.profileP = fn.SelectSingleNode("@profileP")?.Value ?? "";
             this.profileR = fn.SelectSingleNode("@profileR")?.Value ?? "";
@@ -56,6 +57,13 @@ namespace FMV_OG.Shared
             this.Description = fn.SelectSingleNode("Description")?.InnerText ?? "";
         }
         public List<string[]> metadata { get; set; }
+        
+        public List<Aspect> inputs { get; set; } = new List<Aspect>();
+        public List<Aspect> outputs { get; set; } = new List<Aspect>();
+        public List<Aspect> resources { get; set; } = new List<Aspect>();
+        public List<Aspect> preconditions { get; set; } = new List<Aspect>();
+        public List<Aspect> controls { get; set; } = new List<Aspect>();
+        public int time { get; set; } = 0;
         public string options { get; set; }
         public string IDNr { get; set; }
         public int orphans { get; set; }
@@ -66,6 +74,7 @@ namespace FMV_OG.Shared
         public double y { get; set; }
         public string fmiType { get; set; } = "";
         public string fmiHighlight { get; set; } = "";
+        /*
         public List<string> activeI { get; set; } = new List<string>();
         public List<string> activeP { get; set; } = new List<string>();
         public List<string> activeR { get; set; } = new List<string>();
@@ -76,15 +85,33 @@ namespace FMV_OG.Shared
         public List<string> totalR { get; set; } = new List<string>();
         public List<string> totalC { get; set; } = new List<string>();
         public List<string> totalT { get; set; } = new List<string>();
+        */
         public string AgentId { get; set; } = "";
         public string LevelId { get; set; } = "";
         public bool wasActive { get; set; } = false;
+
+        public enum profileFMI : ushort
+        {
+            One = 0,
+            
+            All = 1,
+
+            Any = 2,
+
+        }
         public string profileFn { get; set; }
+        public profileFMI PrInputs { get; set; }
+        public profileFMI PrPreconditions { get; set; }
+        public profileFMI PrResources { get; set; }
+        public profileFMI PrControls { get; set; }
+
+        /* Old Profil Handling
         public string profileI { get; set; }
         public string profileP { get; set; }
         public string profileR { get; set; }
         public string profileC { get; set; }
         public string profileT { get; set; }
+        */
         public XmlNode? group { get; set; }
         public XmlNode groupType { get; set; }
         public XmlNode groupIDNr { get; set; }
@@ -197,44 +224,49 @@ namespace FMV_OG.Shared
             }
             return textLines;
         }
+
+
+        //<summary>
+        //All methoides to be used in FMI
         public bool isActive()
         {
-			if (activeI.Count == 0)
+			if (inputs.Count == 0)
             {
 				return false;
 			} 
             else
             {
-                switch (profileI)
+                switch (PrInputs)
                 {
                     case "": if (activeI.Count < totalI.Count) return false; break;
                     case "All": if (activeI.Count < totalI.Count) return false; break;
                     case "Any": if (totalI.Count > 0 && activeI.Count == 0) return false; break;
                 }
-                switch (profileP)
+                switch (PrPreconditions)
                 {
                     case "": if (activeP.Count < totalP.Count) return false; break;
                     case "All": if (activeP.Count < totalP.Count) return false; break;
                     case "Any": if (totalP.Count > 0 && activeP.Count == 0) return false; break;
                 }
-                switch (profileR)
+                switch (PrResources)
                 {
                     case "": if (activeR.Count < totalR.Count) return false; break;
                     case "All": if (activeR.Count < totalR.Count) return false; break;
                     case "Any": if (totalR.Count > 0 && activeR.Count == 0) return false; break;
                 }
-                switch (profileT)
-                {
-                    case "": if (activeT.Count < totalT.Count) return false; break;
-                    case "All": if (activeT.Count < totalT.Count) return false; break;
-                    case "Any": if (totalT.Count > 0 && activeT.Count == 0) return false; break;
-                }
-                switch (profileC)
+                
+                switch (PrControls)
                 {
                     case "": if (activeC.Count < totalC.Count) return false; break;
                     case "All": if (activeC.Count < totalC.Count) return false; break;
                     case "Any": if (totalC.Count > 0 && activeC.Count == 0) return false; break;
                 }
+                /*switch (profileT)
+                {
+                    case "": if (activeT.Count < totalT.Count) return false; break;
+                    case "All": if (activeT.Count < totalT.Count) return false; break;
+                    case "Any": if (totalT.Count > 0 && activeT.Count == 0) return false; break;
+                }*/
                 return true;
             }
 	    }
@@ -329,9 +361,9 @@ namespace FMV_OG.Shared
                 }
                 return P_A;
             }
-            if (activeI.Count > 0 && profileI != "None")
+            if (activeI.Count > 0 && PrInput != "None")
             {
-                P_I = pAspect(activeI, profileI);
+                P_I = pAspect(activeI, PrInput);
             }
             if (activeP.Count > 0 && profileP != "None")
             {
@@ -388,9 +420,9 @@ namespace FMV_OG.Shared
                 }
                 return P_A;
             }
-            if (activeI.Count > 0 && profileI != "None")
+            if (activeI.Count > 0 && PrInput != "None")
             {
-                P_I = pAspect(activeI, profileI);
+                P_I = pAspect(activeI, PrInput);
             }
             if (activeP.Count > 0 && profileP != "None")
             {
