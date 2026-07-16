@@ -33,12 +33,19 @@ namespace FMV_OG.Shared
             this.fnColorStyle = fn.SelectSingleNode("@style")?.Value ?? "";
             this.fnColorValue = fn.SelectSingleNode("@color")?.Value ?? "";
             this.profileFn = fn.SelectSingleNode("@profileFn")?.Value ?? "";
-            //Needs translation to the new profileFMI enum; Programm new Service to tranlate calle mehtodes from there
-            this.profileI = fn.SelectSingleNode("@profileI")?.Value ?? "";
-            this.profileP = fn.SelectSingleNode("@profileP")?.Value ?? "";
-            this.profileR = fn.SelectSingleNode("@profileR")?.Value ?? "";
-            this.profileC = fn.SelectSingleNode("@profileC")?.Value ?? "";
-            this.profileT = fn.SelectSingleNode("@profileT")?.Value ?? "";
+            // Alte Profil-Zeichenketten (in XML vorhanden) werden vorerst weiter übernommen,
+            // damit der Ladevorgang nicht bricht.
+            var profileIStr = fn.SelectSingleNode("@profileI")?.Value ?? "";
+            var profilePStr = fn.SelectSingleNode("@profileP")?.Value ?? "";
+            var profileRStr = fn.SelectSingleNode("@profileR")?.Value ?? "";
+            var profileCStr = fn.SelectSingleNode("@profileC")?.Value ?? "";
+            var profileTStr = fn.SelectSingleNode("@profileT")?.Value ?? "";
+
+            this.PrInputs = ParseProfile(profileIStr, false);
+            this.PrPreconditions = ParseProfile(profilePStr, true);
+            this.PrResources = ParseProfile(profileRStr, true);
+            this.PrControls = ParseProfile(profileCStr, true);
+            // Time wird derzeit nicht als eigenes Profil verwaltet (bleibt bei alten String‑Eigenschaften).
             this.groupType = fn.SelectSingleNode("@groupType")!;
             this.groupIDNr = fn.SelectSingleNode("@groupIDNr")!;
             this.groupActive = fn.SelectSingleNode("@groupActive")!;
@@ -56,8 +63,20 @@ namespace FMV_OG.Shared
             this.LevelId = fn.SelectSingleNode("@levelId")?.Value ?? "";
             this.Description = fn.SelectSingleNode("Description")?.InnerText ?? "";
         }
+
+        // Hilfsmethode für die Konvertierung von XML‑String‑Profilen in das enum
+        private static profileFMI ParseProfile(string raw, bool allowNone)
+        {
+            if (string.IsNullOrEmpty(raw)) return profileFMI.All;
+            if (raw.Equals("All", StringComparison.OrdinalIgnoreCase)) return profileFMI.All;
+            if (raw.Equals("Any", StringComparison.OrdinalIgnoreCase)) return profileFMI.Any;
+            if (allowNone && raw.Equals("None", StringComparison.OrdinalIgnoreCase)) return profileFMI.None;
+            // Fallback: All (wie bisher)
+            return profileFMI.All;
+        }
+
         public List<string[]> metadata { get; set; }
-        
+
         public List<Aspect> inputs { get; set; } = new List<Aspect>();
         public List<Aspect> outputs { get; set; } = new List<Aspect>();
         public List<Aspect> resources { get; set; } = new List<Aspect>();
@@ -74,7 +93,9 @@ namespace FMV_OG.Shared
         public double y { get; set; }
         public string fmiType { get; set; } = "";
         public string fmiHighlight { get; set; } = "";
-        /*
+
+        // Die ursprünglichen Listen für die aktiven Aspekte (werden weiter genutzt, solange die
+        // vollständige Umstellung auf List<Aspect> noch nicht abgeschlossen ist).
         public List<string> activeI { get; set; } = new List<string>();
         public List<string> activeP { get; set; } = new List<string>();
         public List<string> activeR { get; set; } = new List<string>();
@@ -85,7 +106,7 @@ namespace FMV_OG.Shared
         public List<string> totalR { get; set; } = new List<string>();
         public List<string> totalC { get; set; } = new List<string>();
         public List<string> totalT { get; set; } = new List<string>();
-        */
+
         public string AgentId { get; set; } = "";
         public string LevelId { get; set; } = "";
         public bool wasActive { get; set; } = false;
@@ -98,6 +119,10 @@ namespace FMV_OG.Shared
 
             Any = 2,
 
+            /// <summary>
+            /// Aspekt wird bei der Aktivierungsprüfung ignoriert (entspricht dem früheren „None“).
+            /// </summary>
+            None = 3
         }
         public string profileFn { get; set; }
         public profileFMI PrInputs { get; set; }
@@ -226,354 +251,88 @@ namespace FMV_OG.Shared
         }
 
 
-        //<summary>
-        //All methoides to be used in FMI
+        // <summary>
+        // All methods to be used in FMI
         public bool isActive()
         {
-			if (inputs.Count == 0)
+            // Keine Inputs → niemals aktiv
+            if (inputs.Count == 0)
             {
-				return false;
-			} 
-            else
+                return false;
+            }
+
+            // Input-Profil überprüfen
+            switch (PrInputs)
             {
-                switch (PrInputs)
-                {
-                    case "": if (activeI.Count < totalI.Count) return false; break;
-                    case "All": if (activeI.Count < totalI.Count) return false; break;
-                    case "Any": if (totalI.Count > 0 && activeI.Count == 0) return false; break;
-                }
+                case profileFMI.All:
+                case profileFMI.One:
+                    if (activeI.Count < totalI.Count) return false;
+                    break;
+                case profileFMI.Any:
+                    if (totalI.Count > 0 && activeI.Count == 0) return false;
+                    break;
+                case profileFMI.None:
+                    // Nichts prüfen
+                    break;
+                default:
+                    if (activeI.Count < totalI.Count) return false;
+                    break;
+            }
+
+            // Precondition (falls nicht None)
+            if (PrPreconditions != profileFMI.None)
+            {
                 switch (PrPreconditions)
                 {
-                    case "": if (activeP.Count < totalP.Count) return false; break;
-                    case "All": if (activeP.Count < totalP.Count) return false; break;
-                    case "Any": if (totalP.Count > 0 && activeP.Count == 0) return false; break;
+                    case profileFMI.All:
+                    case profileFMI.One:
+                        if (activeP.Count < totalP.Count) return false;
+                        break;
+                    case profileFMI.Any:
+                        if (totalP.Count > 0 && activeP.Count == 0) return false;
+                        break;
+                    default:
+                        if (activeP.Count < totalP.Count) return false;
+                        break;
                 }
+            }
+
+            // Resource
+            if (PrResources != profileFMI.None)
+            {
                 switch (PrResources)
                 {
-                    case "": if (activeR.Count < totalR.Count) return false; break;
-                    case "All": if (activeR.Count < totalR.Count) return false; break;
-                    case "Any": if (totalR.Count > 0 && activeR.Count == 0) return false; break;
+                    case profileFMI.All:
+                    case profileFMI.One:
+                        if (activeR.Count < totalR.Count) return false;
+                        break;
+                    case profileFMI.Any:
+                        if (totalR.Count > 0 && activeR.Count == 0) return false;
+                        break;
+                    default:
+                        if (activeR.Count < totalR.Count) return false;
+                        break;
                 }
-                
+            }
+
+            // Control
+            if (PrControls != profileFMI.None)
+            {
                 switch (PrControls)
                 {
-                    case "": if (activeC.Count < totalC.Count) return false; break;
-                    case "All": if (activeC.Count < totalC.Count) return false; break;
-                    case "Any": if (totalC.Count > 0 && activeC.Count == 0) return false; break;
-                }
-                /*switch (profileT)
-                {
-                    case "": if (activeT.Count < totalT.Count) return false; break;
-                    case "All": if (activeT.Count < totalT.Count) return false; break;
-                    case "Any": if (totalT.Count > 0 && activeT.Count == 0) return false; break;
-                }*/
-                return true;
-            }
-	    }
-        public void resetAspects()
-        {
-            activeI.Clear();
-            activeP.Clear();
-            activeR.Clear();
-            activeC.Clear();
-            activeT.Clear();
-            totalI.Clear();
-            totalP.Clear();
-            totalR.Clear();
-            totalC.Clear();
-            totalT.Clear();
-            fmiHighlight = "";
-            wasActive = false;
-        }
-        public Dictionary<string, string[]> getVariables()
-        {
-            return _variables;
-        }
-        public void newVariable(string key, string[] value) 
-        {
-			_variables[key] = value;
-		}
-        public string[]? getVariable(string key) 
-        {
-            if (_variables.ContainsKey(key))
-            {
-                //Console.WriteLine($"getVariable: {key} | {_variables[key][0]} | {_variables[key][1]}");
-                return _variables[key];
-            }
-            else
-            {
-                return null;
-            }
-		}
-        public void resetVariables() 
-        {
-			_variables = new Dictionary<string, string[]> ();
-        }
-        public void removeVariable(string key)
-        {
-            foreach (var s in _variables.Where(kv => kv.Key.StartsWith(key)).ToList())
-            {
-                _variables.Remove(s.Key);
-                //Console.WriteLine($"Removed: {s.Key}");
-            }
-        }
-        public void resetKvalues()
-        {
-            Kvalues = new Dictionary<string, double>();
-            Cvalues = new Dictionary<string, string>();
-        }
-        public string returnTrue(string KeyName)
-        {
-            return $"1:{KeyName}";
-        }
-        public string PFTG(string KeyName) //Probability as a Fault Tree Gate
-        {
-            double P_I = 1;
-            double P_P = 1;
-            double P_T = 1;
-            double P_R = 1;
-            double P_C = 1;
-            double pAspect(List<string> activeA, string profileA)
-            {
-                double P_A;
-                double y = 0;
-                double z = 1;
-                foreach (var cName in activeA)
-                {
-                    var cNameA = cName.Split("|"); //1|Initiation|0|I
-                    var vKey = $"{cNameA[3]}{cNameA[0]}_{KeyName}";
-                    if (!_variables.ContainsKey(vKey))
-                    {
-                        return double.NaN;
-                    }
-                    var value = double.Parse(_variables[vKey][0], CultureInfo.InvariantCulture);
-                    //x += value;
-                    y *= (1 - value);
-                    z *= value;
-                }
-                if (profileA == "Any") //represents an OR logic gate
-                {
-                    P_A = 1 - y;
-                }
-                else //remaining case of "All" or the default "", representing an AND logic gate
-                {
-                    P_A = z;
-                }
-                return P_A;
-            }
-            if (activeI.Count > 0 && PrInput != "None")
-            {
-                P_I = pAspect(activeI, PrInput);
-            }
-            if (activeP.Count > 0 && profileP != "None")
-            {
-                P_P = pAspect(activeP, profileP);
-            }
-            if (activeT.Count > 0 && profileT != "None")
-            {
-                P_T = pAspect(activeT, profileT);
-            }
-            if (activeR.Count > 0 && profileR != "None")
-            {
-                P_R = pAspect(activeR, profileR);
-            }
-            if (activeC.Count > 0 && profileC != "None")
-            {
-                P_C = pAspect(activeC, profileC);
-            }
-            //Console.WriteLine($"P: {P_I} * {P_P} * {P_T} * {P_R} * {P_C}");
-            return $"{P_I * P_P * P_T * P_R * P_C}"; 
-        }
-        public string PBBN(string KeyName) // Probability as a Bayesian Belief Network
-        {
-            double P_I = 1;
-            double P_P = 1;
-            double P_T = 1;
-            double P_R = 1;
-            double P_C = 1;
-            double pAspect(List<string> activeA, string profileA)
-            {
-                double P_A;
-                //double x = 0;
-                double y = 1;
-                double z = 1;
-                foreach (var cName in activeA)
-                {
-                    var cNameA = cName.Split("|"); //1|Initiation|0|I
-                    var vKey = $"{cNameA[3]}{cNameA[0]}_{KeyName}";
-                    if (!_variables.ContainsKey(vKey))
-                    {
-                        return double.NaN;
-                    }
-                    var value = double.Parse(_variables[vKey][0], CultureInfo.InvariantCulture);
-                    //x += value;
-                    y *= (1 - value);
-                    z *= value;
-                }
-                if (profileA == "Any") //represents an OR logic gate
-                {
-                    P_A = 1 - y;
-                }
-                else //remaining case of "All" or the default "", representing an AND logic gate
-                {
-                    P_A = z;
-                }
-                return P_A;
-            }
-            if (activeI.Count > 0 && PrInput != "None")
-            {
-                P_I = pAspect(activeI, PrInput);
-            }
-            if (activeP.Count > 0 && profileP != "None")
-            {
-                P_P = pAspect(activeP, profileP);
-            }
-            if (activeT.Count > 0 && profileT != "None")
-            {
-                P_T = pAspect(activeT, profileT);
-            }
-            var countRC = 0;
-            if (activeR.Count > 0 && profileR != "None")
-            {
-                P_R = pAspect(activeR, profileR);
-                countRC += activeR.Count;
-            }
-            if (activeC.Count > 0 && profileC != "None")
-            {
-                P_C = pAspect(activeC, profileC);
-                countRC += activeC.Count;
-            }
-            double P_fn = _variables.ContainsKey(KeyName) ? double.Parse(_variables[KeyName][0], CultureInfo.InvariantCulture) : 1; //if no C or R then use start HOT P for p_fn
-            if (countRC > 0)
-            {
-                double CP_CtRt = _variables.ContainsKey($"CP_CtRt_{KeyName}") ? double.Parse(_variables[$"CP_CtRt_{KeyName}"][0], CultureInfo.InvariantCulture) : 1;
-                double CP_CtRf = _variables.ContainsKey($"CP_CtRf_{KeyName}") ? double.Parse(_variables[$"CP_CtRf_{KeyName}"][0], CultureInfo.InvariantCulture) : 0;
-                double CP_CfRt = _variables.ContainsKey($"CP_CfRt_{KeyName}") ? double.Parse(_variables[$"CP_CfRt_{KeyName}"][0], CultureInfo.InvariantCulture) : 0;
-                double CP_CfRf = _variables.ContainsKey($"CP_CfRf_{KeyName}") ? double.Parse(_variables[$"CP_CfRf_{KeyName}"][0], CultureInfo.InvariantCulture) : 0;
-                P_fn = CP_CtRt * P_C * P_R + CP_CtRf * P_C * (1 - P_R) + CP_CfRt * (1 - P_C) * P_R + CP_CfRf * (1 - P_C) * (1 - P_R);
-            }
-            if (fmiType == "Exit") { P_fn = 1; }
-            //Console.WriteLine($"P: {P_I} * {P_P} * {P_T} * {P_fn} ({P_R} , {P_C})");
-            return (P_I * P_P * P_T * P_fn).ToString("0.##", CultureInfo.InvariantCulture);
-        }
-        public string array(string[] content)
-        {
-            var returnString = _variables[content[0]][0];
-
-            //set up the content list of comma delimited values as an array
-            List<string> valueArray = new List<string>();
-            if (returnString.Length > 0) { valueArray = returnString.Split(",").ToList(); }
-
-            //increment all values in the array by 1
-            for (int i = 0; i < valueArray.Count; i++)
-            {
-                if (valueArray[i].Length > 0)
-                {
-                    valueArray[i] = (int.Parse(valueArray[i]) + 1).ToString();
+                    case profileFMI.All:
+                    case profileFMI.One:
+                        if (activeC.Count < totalC.Count) return false;
+                        break;
+                    case profileFMI.Any:
+                        if (totalC.Count > 0 && activeC.Count == 0) return false;
+                        break;
+                    default:
+                        if (activeC.Count < totalC.Count) return false;
+                        break;
                 }
             }
 
-            returnString = string.Join(",", valueArray);
-            return returnString;
+            // Time wird momentan immer als erfüllt angesehen (früheres Verhalten beibehalten)
+            return true;
         }
-        public string resource(string[] content)
-        {
-            var returnString = _variables[content[0]][0];
-
-            //set up the content list of comma delimited values as an array
-            List<int> valueArray = new List<int>();
-            if (returnString.Length > 0) 
-            { 
-                valueArray = returnString.Split(",", StringSplitOptions.TrimEntries).ToList().ConvertAll(Convert.ToInt32); 
-            }
-            List<int> queueArray = new List<int>();
-            var fnMDQ = metadata.Find(x => x[0] == "Queue_Array");
-            if (fnMDQ is not null)
-            {
-                if (fnMDQ[1].Length > 0) 
-                { 
-                    queueArray = metadata.Find(x => x[0] == "Queue_Array")![1].Split(",", StringSplitOptions.TrimEntries).ToList().ConvertAll(Convert.ToInt32);
-                }
-            }
-
-            //increment all values in the array by 1
-            for (int i = 0; i < valueArray.Count; i++)
-            {
-                valueArray[i] += 1;
-            }
-            if (fnMDQ is not null)
-            {
-                for (int i = 0; i < queueArray.Count; i++)
-                {
-                    queueArray[i] += 1;
-                }
-            }
-            //update tracking Keys if they are available
-            if (metadata.Find(x => x[0] == "Process_Max") is not null) { metadata.Find(x => x[0] == "Process_Max")![1] = valueArray.Count == 0 ? "" : valueArray.Max().ToString(); }
-            if (metadata.Find(x => x[0] == "Queue_Max") is not null) { metadata.Find(x => x[0] == "Queue_Max")![1] = queueArray.Count == 0 ? "" : queueArray.Max().ToString(); }
-
-            //if the first (oldest) value in the array reaches the Process Time, then remove it from the array
-            //and Activate the Function's output (else do not Activate the output)
-            if (valueArray.Count > 0 && _variables["Process_Time"] is not null)
-            {
-                if (valueArray[0] >= int.Parse(_variables["Process_Time"][0]))
-                {
-                    valueArray.Remove(valueArray[0]);
-                    if (metadata.Find(x => x[0] == "Activate") is not null)
-                    {
-                        metadata.Find(x => x[0] == "Activate")![1] = "1";
-                    }
-                }
-                else
-                {
-                    if (metadata.Find(x => x[0] == "Activate") is not null)
-                    {
-                        metadata.Find(x => x[0] == "Activate")![1] = "0";
-                    }
-                }
-            }
-
-
-            if (fnMDQ is not null) //if there is a Queue management
-            {
-                //if there is a new arrival, add it to the Queue
-                if (metadata.Find(x => x[0] == "New_Arrival") is not null)
-                {
-                    if (metadata.Find(x => x[0] == "New_Arrival")![1] == "1")
-                    {
-                        queueArray.Add(0);
-                    }
-                }
-                //if the Queue is not empty, check the array capacity,
-                //if available space, add to the end of the array and reduce the queue
-                if (queueArray.Count > 0 && _variables["Capacity"] is not null)
-                {
-                    if (valueArray.Count < int.Parse(_variables["Capacity"][0]))
-                    {
-                        valueArray.Add(0);
-                        queueArray.Remove(queueArray[0]);
-                    }
-                }
-                metadata.Find(x => x[0] == "Queue_Array")![1] = string.Join(",", queueArray);
-            }
-            else //if there is not a Queue management, deal directly with the array
-            {
-                //if there is a new arrival, add it to the array
-                if (metadata.Find(x => x[0] == "New_Arrival") is not null)
-                {
-                    if (metadata.Find(x => x[0] == "New_Arrival")![1] == "1")
-                    {
-                        valueArray.Add(0);
-                    }
-                }
-            }
-
-            //Update tracking Keys if they are available
-            if (metadata.Find(x => x[0] == "Process_Count") is not null) { metadata.Find(x => x[0] == "Process_Count")![1] = valueArray.Count.ToString(); }
-            if (metadata.Find(x => x[0] == "Queue_Count") is not null) { metadata.Find(x => x[0] == "Queue_Count")![1] = queueArray.Count.ToString(); }
-
-            returnString = string.Join(",", valueArray);
-            return returnString;
-        }
-    }
-}
