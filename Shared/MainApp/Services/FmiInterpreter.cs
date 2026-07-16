@@ -8,7 +8,6 @@ namespace FMV_OG.Shared.MainApp.Services
         private readonly IMetadataService metadataService;
         private static readonly Regex IncomingVariablePattern = new(@"^([IPRCT]\d+_|[IPRCTA](n|sum|avg|min|max|prd)_)");
 
-        //Optional: inject Prev_<Key> variables from PreviousCycleValues into equations. Off this phase.
         public bool EnablePrevVariables { get; set; } = false;
 
         public FmiRunState RunState { get; private set; } = new();
@@ -118,14 +117,14 @@ namespace FMV_OG.Shared.MainApp.Services
         public FmiEvaluationResult EvaluateFunction(Function iBG, FmiEvaluationContext ctx)
         {
             var result = new FmiEvaluationResult { FunctionId = iBG.IDNr };
-            metadataService.CalcVariables(iBG, ctx.CouplingList, ctx.FunctionList, ctx.Cycle); //calculate the new variable values for the given function
+            metadataService.CalcVariables(iBG, ctx.CouplingList, ctx.FunctionList, ctx.Cycle);
             if (iBG.metadata is not null)
             {
-                foreach (string[] md3Key in iBG.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
+                foreach (string[] md3Key in iBG.metadata)
                 {
-                    if (md3Key[1].Length > 0 || md3Key[3].Length > 0) //metadata key has a value or has an equation
+                    if (md3Key[1].Length > 0 || md3Key[3].Length > 0)
                     {
-                        if (md3Key[2] == "true") //it has an equation
+                        if (md3Key[2] == "true")
                         {
                             if (md3Key[0].StartsWith("Global_"))
                             {
@@ -133,11 +132,9 @@ namespace FMV_OG.Shared.MainApp.Services
                             }
                             else
                             {
-                                iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] }); //if equation, update variable before, and again after, the eval
+                                iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] });
                                 metadataService.MetaDataKeys[md3Key[0]] = md3Key[1];
                             }
-                            //=======================================
-                            //This is an option to run custom code on a Function. The code is written in the Function.cs component. An example is 'returnTrue'
                             if (md3Key[3].StartsWith("execute("))
                             {
                                 var contentText = md3Key[3].Replace("execute(", "").Replace(")", "");
@@ -155,33 +152,6 @@ namespace FMV_OG.Shared.MainApp.Services
                                 var content = $"{md3Key[0]},{md3Key[3].Replace("array(", "").Replace(")", "")}".Split(",");
                                 md3Key[1] = iBG.array(content);
                             }
-                            //=======================================
-                            //This is an option to call an external API
-                            // if (md3Key[3].StartsWith("api(")) //check for api use here, otherwise pass to equation eval function
-                            // {
-                            //     var apiExpression = md3Key[3].Replace("api(", "").Replace(")", "").Replace("\"", "").Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                            //     var jsonContent = "";
-                            //     var varCount = apiExpression.Length;
-                            //     var varParameters = $"?fnName={iBG.IDName}&keyName={md3Key[0]}";
-                            //     if (varCount > 1) //if more than one parameter in api() call, then build a query string, otherwise add all variables and data to the body content
-                            //     {
-                            //         for (var i = 1; i < varCount; i++)
-                            //         {
-                            //             varParameters += $"&{apiExpression[i]}={iBG.getVariable(apiExpression[i])?[0]??""}";
-                            //         }
-                            //         jsonContent = "";
-                            //     }
-                            //     else
-                            //     {
-                            //         jsonContent = JsonSerializer.Serialize(iBG.getVariables());
-                            //     }
-                            //     var requestUrl = new Uri($"{apiExpression[0]}{varParameters}");
-                            //     var requestMessage = new HttpRequestMessage(HttpMethod.Post, requestUrl);
-                            //     requestMessage.Content = new StringContent(jsonContent);
-                            //     var reply = await Http.SendAsync(requestMessage);
-                            //     md3Key[1] = reply.StatusCode == HttpStatusCode.OK ? await reply.Content.ReadAsStringAsync() : reply?.ReasonPhrase ?? "NaN";
-                            // }
-                            //=======================================
                             else
                             {
                                 try
@@ -211,7 +181,6 @@ namespace FMV_OG.Shared.MainApp.Services
             return result;
         }
 
-        /// <summary>Legacy -> RunState mirror after evaluating one function (legacy stays authoritative).</summary>
         private void MirrorFunctionState(Function fn, FmiEvaluationResult result)
         {
             var state = RunState.GetOrCreate(fn.IDNr);
