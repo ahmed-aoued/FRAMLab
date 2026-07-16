@@ -1,4 +1,4 @@
-﻿using FMV_OG.Shared;
+using FMV_OG.Shared;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Generic;
 using System.Xml;
@@ -238,6 +238,20 @@ namespace FMV_OG.Shared
                 return true;
             }
 	    }
+        /// <summary>
+        /// Returns the number of active input aspects.
+        /// Iterates over the internal list of active input identifiers.
+        /// </summary>
+        public int GetActiveInputCount()
+        {
+            int count = 0;
+            foreach (var item in activeI)
+            {
+                // Each entry corresponds to an active input aspect.
+                count++;
+            }
+            return count;
+        }
         public void resetAspects()
         {
             activeI.Clear();
