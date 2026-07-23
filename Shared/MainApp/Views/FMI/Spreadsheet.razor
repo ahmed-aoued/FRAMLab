@@ -97,11 +97,11 @@
         {
             <PropertyColumn Title=@Loc["FMI_TYPE"] Class="show-fmiprofile" Property="@(fn => fn.fmiType)" Sortable="true" />
             <PropertyColumn Title="p O" Class="show-fmiprofile" Property="@(fn => fn.profileFn)" Sortable="true" />
-            <PropertyColumn Title="p I" Class="show-fmiprofile" Property="@(fn => fn.profileI)" Sortable="true" />
-            <PropertyColumn Title="p P" Class="show-fmiprofile" Property="@(fn => fn.profileP)" Sortable="true" />
-            <PropertyColumn Title="p R" Class="show-fmiprofile" Property="@(fn => fn.profileR)" Sortable="true" />
-            <PropertyColumn Title="p C" Class="show-fmiprofile" Property="@(fn => fn.profileC)" Sortable="true" />
-            <PropertyColumn Title="p T" Class="show-fmiprofile" Property="@(fn => fn.profileT)" Sortable="true" />
+            <PropertyColumn Title="p I" Class="show-fmiprofile" Property="@(fn => Function.ProfileToString(fn.PrInputs))" Sortable="true" />
+            <PropertyColumn Title="p P" Class="show-fmiprofile" Property="@(fn => Function.ProfileToString(fn.PrPreconditions))" Sortable="true" />
+            <PropertyColumn Title="p R" Class="show-fmiprofile" Property="@(fn => Function.ProfileToString(fn.PrResources))" Sortable="true" />
+            <PropertyColumn Title="p C" Class="show-fmiprofile" Property="@(fn => Function.ProfileToString(fn.PrControls))" Sortable="true" />
+            <PropertyColumn Title="p T" Class="show-fmiprofile" Property="@(fn => "")" Sortable="true" />
             <PropertyColumn Title=@Loc["FMI_ACTIVATED"] Class="show-fmiprofile" Property="@(fn => fn.wasActive)" Sortable="true" />
         }
         @if (stateContainer.showMetadata)
@@ -362,7 +362,7 @@
             }
             if (stateContainer.showFMIProfile)
             {
-                saveCsv += $",{fn.fmiType},{fn.profileFn},{fn.profileI},{fn.profileP},{fn.profileR},{fn.profileC},{fn.profileT},{fn.wasActive}";
+                saveCsv += $",{fn.fmiType},{fn.profileFn},{Function.ProfileToString(fn.PrInputs)},{Function.ProfileToString(fn.PrPreconditions)},{Function.ProfileToString(fn.PrResources)},{Function.ProfileToString(fn.PrControls)},,{fn.wasActive}";
             }
             if (stateContainer.showMetadata)
             {

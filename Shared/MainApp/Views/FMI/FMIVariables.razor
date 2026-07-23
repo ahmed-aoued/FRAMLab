@@ -9,9 +9,9 @@
             <div class="modal-var-body">
                 @if (stateContainer.selectedFunction is not null)
                 {
-                    foreach (var data in stateContainer.selectedFunction.getVariables())
+                    foreach (var data in stateContainer.selectedFunction.variableList)
                     {
-                        <div title="@data.Value[1]">@data.Key</div>
+                        <div>@data.Name</div>
                     }
                 }
             </div>

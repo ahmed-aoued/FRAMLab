@@ -412,8 +412,10 @@
                     foreach (var meta in outputFn!.metadata)
                     {
                         //Console.WriteLine($"----metadata: Value of {meta[0]} On {coupling.toType} [{coupling.label}] From Function <{outputFn.IDName}>");
-                        outputFn.newVariable(meta[0], new string[] { meta[1], $"Value of {meta[0]}" });
-                        stateContainer.selectedFunction.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", new string[] { meta[1], $"Value of {meta[0]}\nOn {coupling.toType} [{coupling.label}]\nFrom Function <{outputFn.IDName}>" });
+                        var vO = outputFn.getVariable(meta[0]) ?? outputFn.newVariable(meta[0], variableType.String);
+                        vO.Value = meta[1];
+                        var vS = stateContainer.selectedFunction.getVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}") ?? stateContainer.selectedFunction.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", variableType.String);
+                        vS.Value = meta[1];
                     }
                 }
             }
@@ -797,18 +799,19 @@
             {
                 switch (coupling.toType)
                 {
-                    case "I": if (!nextFn.activeI.Contains(coupling.Name)) nextFn.activeI.Add(coupling.Name); break;
-                    case "P": if (!nextFn.activeP.Contains(coupling.Name)) nextFn.activeP.Add(coupling.Name); break;
-                    case "R": if (!nextFn.activeR.Contains(coupling.Name)) nextFn.activeR.Add(coupling.Name); break;
-                    case "C": if (!nextFn.activeC.Contains(coupling.Name)) nextFn.activeC.Add(coupling.Name); break;
-                    case "T": if (!nextFn.activeT.Contains(coupling.Name)) nextFn.activeT.Add(coupling.Name); break;
+                    case "I": nextFn.ActivateCoupling("I", coupling.Name, coupling.outputFn); break;
+                    case "P": nextFn.ActivateCoupling("P", coupling.Name, coupling.outputFn); break;
+                    case "R": nextFn.ActivateCoupling("R", coupling.Name, coupling.outputFn); break;
+                    case "C": nextFn.ActivateCoupling("C", coupling.Name, coupling.outputFn); break;
+                    case "T": nextFn.ActivateCoupling("T", coupling.Name); break;
                 }
                 var outputFn = stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn);
                 if (outputFn is not null)
                 {
                     foreach (var meta in outputFn.metadata)
                     {
-                        nextFn.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", new string[] { meta[1], meta[1] });
+                        var v = nextFn.getVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}") ?? nextFn.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", variableType.String);
+                        v.Value = meta[1];
                     }
                 }
             }
@@ -837,11 +840,11 @@
                     {
                         switch (pCoupling.toType)
                         {
-                            case "I": getFn.totalI.Add(pCoupling.Name); break;
-                            case "P": getFn.totalP.Add(pCoupling.Name); break;
-                            case "R": getFn.totalR.Add(pCoupling.Name); break;
-                            case "C": getFn.totalC.Add(pCoupling.Name); break;
-                            case "T": getFn.totalT.Add(pCoupling.Name); break;
+                            case "I": getFn.EnsureCoupling("I", pCoupling.Name); break;
+                            case "P": getFn.EnsureCoupling("P", pCoupling.Name); break;
+                            case "R": getFn.EnsureCoupling("R", pCoupling.Name); break;
+                            case "C": getFn.EnsureCoupling("C", pCoupling.Name); break;
+                            case "T": getFn.EnsureCoupling("T", pCoupling.Name); break;
                         }
                     }
                 }
@@ -926,7 +929,7 @@
                         fnBG.fmiHighlight = "exit-fill";
                         trackHighlights += 1;
                         trackExitFunctions.Add(fnBG.IDNr);
-                        IProfileExit += $"Function <{fnBG.IDName}>:\n    Input: {(fnBG.profileI == "" ? "All" : fnBG.profileI)}{"        ".Substring(0, 8 - 3)}\n";
+                        IProfileExit += $"Function <{fnBG.IDName}>:\n    Input: {Function.ProfileToString(fnBG.PrInputs)}{"        ".Substring(0, 8 - 3)}\n";
                     }
                     else if (check2 == 0 && check3 == 0)
                     { //No Aspects or Couplings at all - ignore
@@ -944,22 +947,22 @@
                     { //else Passthrough function (Input and Output but no other Aspects)
                         fnBG.fmiType = "Passthrough";
                         IProfile += $"Function <{fnBG.IDName}>:";
-                        IProfile += $"\n    Input: {(fnBG.profileI == "" ? "All" : fnBG.profileI)}{"        ".Substring(0, 8 - 3)}";
-                        IProfile += $"Precondition: {(fnBG.profileP == "" ? "All" : fnBG.profileP)}{"        ".Substring(0, 8 - (fnBG.profileP.Length == 0 ? 3 : fnBG.profileP.Length))}";
-                        IProfile += $"Resource: {(fnBG.profileR == "" ? "All" : fnBG.profileR)}{"        ".Substring(0, 8 - (fnBG.profileR.Length == 0 ? 3 : fnBG.profileR.Length))}";
-                        IProfile += $"Control: {(fnBG.profileC == "" ? "All" : fnBG.profileC)}{"        ".Substring(0, 8 - (fnBG.profileC.Length == 0 ? 3 : fnBG.profileC.Length))}";
-                        IProfile += $"Time: {(fnBG.profileT == "" ? "All" : fnBG.profileT)}{"        ".Substring(0, 8 - (fnBG.profileT.Length == 0 ? 3 : fnBG.profileT.Length))}\n";
+                        IProfile += $"\n    Input: {Function.ProfileToString(fnBG.PrInputs)}{"        ".Substring(0, 8 - 3)}";
+                        IProfile += $"Precondition: {Function.ProfileToString(fnBG.PrPreconditions)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrPreconditions).Length)}";
+                        IProfile += $"Resource: {Function.ProfileToString(fnBG.PrResources)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrResources).Length)}";
+                        IProfile += $"Control: {Function.ProfileToString(fnBG.PrControls)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrControls).Length)}";
+                        IProfile += $"Time: All{"        ".Substring(0, 8 - 3)}\n";
                     }
                 }
                 else
                 {
                     fnBG.fmiType = "Foreground";
                     IProfile += $"Function <{fnBG.IDName}>:";
-                    IProfile += $"\n    Input: {(fnBG.profileI == "" ? "All" : fnBG.profileI)}{"        ".Substring(0, 8 - 3)}";
-                    IProfile += $"Precondition: {(fnBG.profileP == "" ? "All" : fnBG.profileP)}{"        ".Substring(0, 8 - (fnBG.profileP.Length == 0 ? 3 : fnBG.profileP.Length))}";
-                    IProfile += $"Resource: {(fnBG.profileR == "" ? "All" : fnBG.profileR)}{"        ".Substring(0, 8 - (fnBG.profileR.Length == 0 ? 3 : fnBG.profileR.Length))}";
-                    IProfile += $"Control: {(fnBG.profileC == "" ? "All" : fnBG.profileC)}{"        ".Substring(0, 8 - (fnBG.profileC.Length == 0 ? 3 : fnBG.profileC.Length))}";
-                    IProfile += $"Time: {(fnBG.profileT == "" ? "All" : fnBG.profileT)}{"        ".Substring(0, 8 - (fnBG.profileT.Length == 0 ? 3 : fnBG.profileT.Length))}\n";
+                    IProfile += $"\n    Input: {Function.ProfileToString(fnBG.PrInputs)}{"        ".Substring(0, 8 - 3)}";
+                    IProfile += $"Precondition: {Function.ProfileToString(fnBG.PrPreconditions)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrPreconditions).Length)}";
+                    IProfile += $"Resource: {Function.ProfileToString(fnBG.PrResources)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrResources).Length)}";
+                    IProfile += $"Control: {Function.ProfileToString(fnBG.PrControls)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrControls).Length)}";
+                    IProfile += $"Time: All{"        ".Substring(0, 8 - 3)}\n";
                 }
             }
             stateContainer.fmiMessage += $"\nInterpretation Profile\n{IProfile}{IProfileExit}\nSummary of FMIlog\nBegin initialisation\n";
@@ -1045,9 +1048,9 @@
                                     consumeOnly = fnMDC2[1];
                                     foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == fnBG2.IDNr && !x.activated && x.toType == "I" && (consumeAll || consumeOnly.Contains(x.label))))
                                     {//This is about forcing an Input to be consumed (but not if also part of repeating cycle?)
-                                        fnBG2.activeI.Remove(coupling.Name);
+                                        fnBG2.DeactivateCoupling("I", coupling.Name);
                                         activeAspectsArray.Remove(coupling);
-                                        fnBG2.removeVariable($"{coupling.toType}{coupling.outputFn}_");
+                                        fnBG2.variableList.RemoveAll(v => v.Name.StartsWith($"{coupling.toType}{coupling.outputFn}_"));
                                         coupling.fmiHighlight = "";
                                     }
                                 }
@@ -1256,18 +1259,19 @@
                     {
                         switch (coupling.toType)
                         {
-                            case "I": nextFn.activeI.Add(coupling.Name); break;
-                            case "P": nextFn.activeP.Add(coupling.Name); break;
-                            case "R": nextFn.activeR.Add(coupling.Name); break;
-                            case "C": nextFn.activeC.Add(coupling.Name); break;
-                            case "T": nextFn.activeT.Add(coupling.Name); break;
+                            case "I": nextFn.ActivateCoupling("I", coupling.Name, coupling.outputFn); break;
+                            case "P": nextFn.ActivateCoupling("P", coupling.Name, coupling.outputFn); break;
+                            case "R": nextFn.ActivateCoupling("R", coupling.Name, coupling.outputFn); break;
+                            case "C": nextFn.ActivateCoupling("C", coupling.Name, coupling.outputFn); break;
+                            case "T": nextFn.ActivateCoupling("T", coupling.Name); break;
                         }
-                        var outputFn = stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn);
-                        if (outputFn is not null)
+                        var outputFn2 = stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn);
+                        if (outputFn2 is not null)
                         {
-                            foreach (var meta in outputFn.metadata)
+                            foreach (var meta in outputFn2.metadata)
                             {
-                                nextFn.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", new string[] { meta[1], meta[1] });
+                                var v = nextFn.getVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}") ?? nextFn.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", variableType.String);
+                                v.Value = meta[1];
                             }
                         }
                     }
@@ -1307,18 +1311,18 @@
                     {
                         switch (coupling.toType)
                         {
-                            case "I": fnBG.activeI.Remove(coupling.Name); break;
-                            case "P": fnBG.activeP.Remove(coupling.Name); break;
-                            case "R": fnBG.activeR.Remove(coupling.Name); break;
-                            case "C": fnBG.activeC.Remove(coupling.Name); break;
-                            case "T": fnBG.activeT.Remove(coupling.Name); break;
+                            case "I": fnBG.DeactivateCoupling("I", coupling.Name); break;
+                            case "P": fnBG.DeactivateCoupling("P", coupling.Name); break;
+                            case "R": fnBG.DeactivateCoupling("R", coupling.Name); break;
+                            case "C": fnBG.DeactivateCoupling("C", coupling.Name); break;
+                            case "T": fnBG.DeactivateCoupling("T", coupling.Name); break;
                         }
                         activeAspectsArray.Remove(coupling);
                         //Console.WriteLine("=====================");
                         //Console.WriteLine($"Coupling: {coupling.Name}, {coupling.toType}{coupling.outputFn}_");
                         //Console.WriteLine($"Function: {fnBG2.IDNr}, {fnBG2.IDName}");
                         //Console.WriteLine("=====================");
-                        fnBG.removeVariable($"{coupling.toType}{coupling.outputFn}_");
+                        fnBG.variableList.RemoveAll(v => v.Name.StartsWith($"{coupling.toType}{coupling.outputFn}_"));
                     }
                     coupling.fmiHighlight = "";
                 }

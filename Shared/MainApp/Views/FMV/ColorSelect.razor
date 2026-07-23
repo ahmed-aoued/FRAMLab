@@ -1,15 +1,18 @@
-﻿@inject StateContainer stateContainer
+﻿@using MudBlazor
+@inject StateContainer stateContainer
 @inject IJSRuntime JSRuntime
 
-<div id="myModal" class="modal fade show" style="display:block" aria-modal="true" role="dialog" tabindex="100" @onkeydown="checkforEsc" @onclick=clickOut>
-    <div class="modal-dialog modal-dialog-centered modal-color" @onclick=clickNothing @onclick:stopPropagation>
-        <div class="modal-content">
-            <div class="modal-header sticky-top bg-white p-0">
-                <button class="btn btn-menu oi oi-loop-circular" style="top:0" @onclick=@((e) => freezeColor(e, "")) />
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions" ContentClass="color-select-content" Class="color-select-dialog">
+    <DialogContent>
+        <div class="color-select-inner" tabindex="100" @onkeydown="checkforEsc">
+            <div class="d-flex align-center p-1" style="gap:6px;">
+                <MudIconButton Icon="@Icons.Material.Filled.Autorenew" Size="Size.Small" Color="Color.Default"
+                               title="Reset" OnClick="@((e) => freezeColor(e, ""))" aria-label="Reset color" />
                 <input id="colorSelector" type="color" class="w-100" value="@displayValue" @oninput="colorInput" />
-                <button type="button" class="close m-0 pt-1 pb-1 pl-3 pr-3" @onclick="checkForClose">&times;</button>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default"
+                               title="Close" OnClick="checkForClose" aria-label="Close" />
             </div>
-            <div class="modal-body p-0" >
+            <div class="p-0">
                 <svg width="341px" height="131px">
                     <!--original standard colours-->
                     <rect x="27" y="1" width="51" height="25" id="#E50000" fill="#E50000" tabindex="102" @onmouseover=@((e)=> selectColor(e, "#E50000")) @onclick=@((e) => freezeColor(e, "#E50000"))></rect>
@@ -139,8 +142,8 @@
                 </svg>
             </div>
         </div>
-    </div>
-</div>
+    </DialogContent>
+</MudDialog>
 
 @code {
     [Parameter] public EventCallback<bool> OnClose { get; set; }
@@ -148,7 +151,23 @@
     private string displayValue = "";
     private string initialValue = "";
     private bool freeze = true;
-    
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = false,
+        CloseButton = false,
+        CloseOnEscapeKey = false,
+        BackdropClick = true,
+        NoHeader = true
+    };
+
+    private bool _visible
+    {
+        get => true;
+        set { if (!value) { _ = OnClose.InvokeAsync(false); } }
+    }
+
     protected override void OnAfterRender(bool firstRender)
     {
         if (firstRender)
@@ -185,13 +204,6 @@
                 FocusElement(displayValue);
             }
         }
-    }
-    private void clickNothing(MouseEventArgs e)
-    {
-    }
-    private async void clickOut(MouseEventArgs e)
-    {
-        await OnClose.InvokeAsync(false);
     }
     private void selectColor(MouseEventArgs e, string selectedColor)
     {

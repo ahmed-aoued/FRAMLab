@@ -1,34 +1,33 @@
-﻿@inject StateContainer stateContainer
+﻿@using MudBlazor
+@inject StateContainer stateContainer
 @inject IJSRuntime JSRuntime
 @inject IConfiguration render
 
-<div id="myModal" class="modal fade show" style="display:block" aria-modal="true" role="dialog" tabindex="100" @onkeydown=checkforEsc @onclick=clickOut>
-    <div class="modal-dialog modal-fmi" @onclick=clickNothing @onclick:stopPropagation>
-        <div class="modal-content">
-            <div class="modal-header sticky-top bg-white p-0 pl-1 align-items-center">
-                Display
-                <select id="display" class="fmi-key fmi-setup" @onchange=checkDisplay >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                </select>
-                <select id="selectKey" class="fmi-key fmi-setup w-100" @onchange=updateKey >
-                    <option value="">- none -</option>
-                    @foreach (var key in stateContainer.metaDataKeys.Keys)
-                    {
-                        <option value="@key">
-                            @key
-                        </option>
-                    }
-                </select>
-                <div class="float-right">
-                    <button type="button" class="close m-0 pt-1 pb-1 pl-3 pr-3" @onclick="@(() => OnClose.InvokeAsync(false))">&times;</button>
-                </div>
-            </div>
-            <div class="modal-body p-1 overflow-hidden">
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions" ContentClass="fmi-display-content" Class="fmi-display-dialog">
+    <TitleContent>
+        <div class="d-flex align-center" style="gap:8px;">
+            <MudText Typo="Typo.h6">Display</MudText>
+            <select id="display" class="fmi-key fmi-setup" @onchange=checkDisplay >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+            </select>
+            <select id="selectKey" class="fmi-key fmi-setup flex-grow-1" @onchange=updateKey >
+                <option value="">- none -</option>
+                @foreach (var key in stateContainer.metaDataKeys.Keys)
+                {
+                    <option value="@key">
+                        @key
+                    </option>
+                }
+            </select>
+        </div>
+    </TitleContent>
+    <DialogContent>
+            <div class="p-1 overflow-hidden">
                 <div class="d-flex">
                     <svg width="120" height="120" @onclick=selectDisplay>
                         @if (!stateContainer.hideFMIhighlight)
@@ -115,13 +114,37 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
+    </DialogContent>
+</MudDialog>
 
 @code {
     [Parameter] public EventCallback<bool> OnClose { get; set; }
     private string selectedDisplay = "1";
+
+    // Two-way bound to MudDialog.Visible. When the dialog closes via backdrop,
+    // escape or the close button, the setter forwards OnClose so stateContainer
+    // flags (in Index.razor) stay in sync.
+    private bool _visible
+    {
+        get => true;
+        set
+        {
+            if (!value)
+            {
+                _ = OnClose.InvokeAsync(false);
+            }
+        }
+    }
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        NoHeader = false
+    };
 
     protected override void OnAfterRender(bool firstRender)
     {

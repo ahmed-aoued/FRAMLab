@@ -9,6 +9,8 @@ namespace FMV_OG.Shared
         private string orphan;
         private string name;
         private string fnIDNr;
+
+        private bool isActive;
         public ElementReference elementReference;
 
         public Aspect(string type, string index, string orphan, string name, string fnIDNr)
@@ -43,6 +45,12 @@ namespace FMV_OG.Shared
         {
             get { return fnIDNr; }
             set { fnIDNr = value; }
+        }
+
+        public bool IsActive
+        {
+            get { return isActive; }
+            set { isActive = value; }
         }
     }
 }

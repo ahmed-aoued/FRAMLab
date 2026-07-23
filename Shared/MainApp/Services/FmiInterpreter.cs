@@ -1,4 +1,9 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
+//To change:
+//EvaluateExpression()
+//
+
 
 namespace FMV_OG.Shared.MainApp.Services
 {
@@ -108,10 +113,42 @@ namespace FMV_OG.Shared.MainApp.Services
             }
         }
 
+        private static variableType MapType(FmiValueType kind) => kind switch
+        {
+            FmiValueType.Number => variableType.Double,
+            FmiValueType.Boolean => variableType.Bool,
+            FmiValueType.Array => variableType.Array1D,
+            _ => variableType.String
+        };
+
+        private static variableType InferType(string raw)
+        {
+            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                return variableType.Double;
+            if (raw == "true" || raw == "false" || raw == "1" || raw == "0")
+                return variableType.Bool;
+            return variableType.String;
+        }
+
+        private static object CoerceValue(string raw, variableType type) => type switch
+        {
+            variableType.Double => double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0.0,
+            variableType.Int => int.TryParse(raw, out var i) ? i : 0,
+            variableType.Bool => raw == "true" || raw == "1",
+            _ => raw
+        };
+
         private static void InjectVariable(Function fn, string name, FmiValue value, string description)
         {
-            var legacy = value.ToLegacyString();
-            fn.newVariable(name, new string[] { legacy, description != "" ? description : legacy });
+            var type = MapType(value.Type);
+            var v = fn.getVariable(name) ?? fn.newVariable(name, type);
+            v.Value = value.Type switch
+            {
+                FmiValueType.Number => value.AsNumber(),
+                FmiValueType.Boolean => value.AsBool(),
+                FmiValueType.Array => value.AsList(),
+                _ => value.ToLegacyString()
+            };
         }
 
         public FmiEvaluationResult EvaluateFunction(Function iBG, FmiEvaluationContext ctx)
@@ -128,11 +165,13 @@ namespace FMV_OG.Shared.MainApp.Services
                         {
                             if (md3Key[0].StartsWith("Global_"))
                             {
-                                iBG.newVariable(md3Key[0], new string[] { metadataService.MetaDataKeys[md3Key[0]], metadataService.MetaDataKeys[md3Key[0]] });
+                                var vg = iBG.getVariable(md3Key[0]) ?? iBG.newVariable(md3Key[0], variableType.String);
+                                vg.Value = metadataService.MetaDataKeys[md3Key[0]];
                             }
                             else
                             {
-                                iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] });
+                                var va = iBG.getVariable(md3Key[0]) ?? iBG.newVariable(md3Key[0], variableType.String);
+                                va.Value = md3Key[1];
                                 metadataService.MetaDataKeys[md3Key[0]] = md3Key[1];
                             }
                             if (md3Key[3].StartsWith("execute("))
@@ -156,7 +195,8 @@ namespace FMV_OG.Shared.MainApp.Services
                             {
                                 try
                                 {
-                                    md3Key[1] = expressionEvaluator.Eval(md3Key[3], iBG.getVariables(), ctx.DataRows, ctx.DataKeys);
+                                    var vars = iBG.variableList.ToDictionary(v => v.Name, v => new string[] { v.Value?.ToString() ?? "", "" });
+                                    md3Key[1] = expressionEvaluator.Eval(md3Key[3], vars, ctx.DataRows, ctx.DataKeys);
                                 }
                                 catch (Exception ex)
                                 {
@@ -165,7 +205,10 @@ namespace FMV_OG.Shared.MainApp.Services
                                 }
                             }
                         }
-                        iBG.newVariable(md3Key[0], new string[] { md3Key[1], md3Key[1] });
+                        var vr = iBG.getVariable(md3Key[0]);
+                        if (vr == null) { vr = iBG.newVariable(md3Key[0], InferType(md3Key[1])); }
+                        else if (vr.Type == variableType.String) { vr.Type = InferType(md3Key[1]); }
+                        vr.Value = CoerceValue(md3Key[1], vr.Type);
                         metadataService.MetaDataKeys[md3Key[0]] = md3Key[1];
 
                         var fnMD = metadataService.MetadataDS.Tables["Metadata"]!.Select($"IDNr = {iBG.IDNr} and Cycle = -1")[0];
@@ -217,15 +260,16 @@ namespace FMV_OG.Shared.MainApp.Services
                     }
                 }
             }
-            foreach (var variable in fn.getVariables())
+            foreach (var variable in fn.variableList)
             {
-                if (IncomingVariablePattern.IsMatch(variable.Key))
+                var val = variable.Value?.ToString() ?? "";
+                if (IncomingVariablePattern.IsMatch(variable.Name))
                 {
-                    state.IncomingValues[variable.Key] = FmiValue.FromLegacyString(variable.Value[0]);
+                    state.IncomingValues[variable.Name] = FmiValue.FromLegacyString(val);
                 }
-                else if (declaredByName.TryGetValue(variable.Key, out var def) && def.Persist && def.Scope == FmiVariableScope.Function)
+                else if (declaredByName.TryGetValue(variable.Name, out var def) && def.Persist && def.Scope == FmiVariableScope.Function)
                 {
-                    state.PersistentVariables[def.Name] = FmiValue.FromLegacyString(variable.Value[0], def.Type);
+                    state.PersistentVariables[def.Name] = FmiValue.FromLegacyString(val, def.Type);
                 }
             }
             foreach (var globalKey in metadataService.MetaDataKeys)

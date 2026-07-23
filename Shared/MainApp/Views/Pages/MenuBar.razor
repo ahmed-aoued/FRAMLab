@@ -1,5 +1,6 @@
 ﻿@using System.IO
 @using System.Text
+@using MudBlazor
 @inject ILocalStorageService localStorage
 @inject IJSRuntime JSRuntime
 @inject BrowserService Service
@@ -7,58 +8,128 @@
 @inject AgentLevelService agentLevelService
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
-<!-- here -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display: none">
-    <defs>
-        <circle id="circle-test" cx="5" cy="5" r="4" />
-        <path id="calendar-icon" d="M7.5 8C7.75 8 8 8.25 8 8.5V11.5C8 11.7812 7.75 12 7.5 12H4.5C4.21875 12 4 11.7812 4 11.5V8.5C4 8.25 4.21875 8 4.5 8H7.5ZM5 0C5.40625 0 5.75 0.34375 5.75 0.75V2H10.25V0.75C10.25 0.34375 10.5625 0 11 0C11.4062 0 11.75 0.34375 11.75 0.75V2H13C14.0938 2 15 2.90625 15 4V14C15 15.125 14.0938 16 13 16H3C1.875 16 1 15.125 1 14V4C1 2.90625 1.875 2 3 2H4.25V0.75C4.25 0.34375 4.5625 0 5 0ZM13.5 6H2.5V14C2.5 14.2812 2.71875 14.5 3 14.5H13C13.25 14.5 13.5 14.2812 13.5 14V6Z" />
-    </defs>
-</svg>
-<!-- here -->
-<div class="navbar fixed-top bg-light p-2">
-    <div>
-        <span class="menu-group menu-group-project">
-            <div class="btn btn-menu file-input-zone oi oi-data-transfer-upload" >
-                <InputFile id="openFileBtn" OnChange="onInputFileChange" single accept=".xfmv" title=@Loc["OPEN_TOOLTIP"] />
+
+<MudAppBar Fixed="true" Dense="true" Elevation="1" Class="framlab-appbar">
+    <div class="d-flex align-center flex-grow-1" style="gap:4px; min-width:0; overflow:hidden;">
+        @* Project: open / save *@
+        <MudTooltip Text="@Loc["OPEN_TOOLTIP"]">
+            <div class="mud-icon-button-file">
+                <InputFile id="openFileBtn" OnChange="onInputFileChange" single accept=".xfmv" class="file-input-overlay" title="@Loc["OPEN_TOOLTIP"]" />
+                <MudIconButton Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" Size="Size.Medium" aria-label="@Loc["OPEN_TOOLTIP"]" />
             </div>
-            <button id="saveFileBtn" class="btn btn-menu oi oi-data-transfer-download" title=@Loc["SAVE_TOOLTIP"] @onclick=OnFileSave></button>
-        </span>
-        <span class="menu-group menu-group-selection">
-            <div class="btn btn-menu btn-selection file-input-zone oi oi-cloud-upload">
-                <InputFile id="importSelectionBtn" OnChange="OnSelectionImport" single accept=".sxfmv" title="Import selection (.sxfmv)" />
-            </div>
-            <button id="exportSelectionBtn" class="btn btn-menu btn-selection oi oi-cloud-download" title="Export selection (.sxfmv)" @onclick=OnSelectionExport></button>
-        </span>
-        <button class="btn btn-menu oi oi-image" title=@Loc["IMAGE_TOOLTIP"] @onclick=OnImageSave></button>
-        <button class="btn btn-menu oi oi-document" title="PDF" @onclick=b_showPDF></button>
-        <button class="btn btn-menu oi oi-zoom-out" title=@Loc["ZOOM_MINUS_TOOLTIP"] @onclick=zoomMinus @onfocusin=@(() => stateContainer.updateUndo())></button>
-        <button class="btn btn-menu oi oi-fullscreen-enter" title=@Loc["ZOOM_FULLSCREEN"] @onclick=zoomFill @onfocusin=@(() => stateContainer.updateUndo())></button>
-        <button class="btn btn-menu oi oi-zoom-in" title=@Loc["ZOOM_PLUS_TOOLTIP"] @onclick=zoomPlus @onfocusin=@(() => stateContainer.updateUndo())></button>
-        <button class="btn btn-menu oi oi-action-undo" title=@Loc["UNDO_TOOLTIP"] @onclick=actionUndo></button>
-        <button class="btn btn-menu oi oi-action-redo" title=@Loc["REDO_TOOLTIP"] @onclick=actionRedo></button>
-        <div class="btn btn-vr oi"></div>
-        <button class="btn btn-menu oi" title="Group" @onclick=actionGroup>
-            <svg viewBox="5 12 90 100">
-                <defs>
-                    <path transform="translate(-50, -50)" id="fno" d="M 14 50 L 32 18.8 L 67.5 18.8 L 85.5 50 L 67.5 81.1 L 32 81.1 L 14 50 Z" stroke="dimgrey" stroke-width="4" fill-opacity="0" />
-                </defs>
-                <g transform="translate(50, 50)">
-                    <use xlink:href="#fno" transform="scale(0.75)" />
-                    <use xlink:href="#fno" />
-                </g>
-            </svg>
-        </button>
+        </MudTooltip>
+        <MudTooltip Text="@Loc["SAVE_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary" Size="Size.Medium" OnClick="OnFileSave" aria-label="@Loc["SAVE_TOOLTIP"]" />
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Zoom *@
+        <MudTooltip Text="@Loc["ZOOM_MINUS_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Medium" OnClick="zoomMinus" aria-label="@Loc["ZOOM_MINUS_TOOLTIP"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["ZOOM_FULLSCREEN"]">
+            <MudIconButton Icon="@Icons.Material.Filled.FitScreen" Size="Size.Medium" OnClick="zoomFill" aria-label="@Loc["ZOOM_FULLSCREEN"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["ZOOM_PLUS_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Medium" OnClick="zoomPlus" aria-label="@Loc["ZOOM_PLUS_TOOLTIP"]" />
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Undo / redo *@
+        <MudTooltip Text="@Loc["UNDO_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Undo" Size="Size.Medium" OnClick="actionUndo" aria-label="@Loc["UNDO_TOOLTIP"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["REDO_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Redo" Size="Size.Medium" OnClick="actionRedo" aria-label="@Loc["REDO_TOOLTIP"]" />
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Group *@
+        <MudTooltip Text="@L("GROUP_TOOLTIP", "Group")">
+            <MudIconButton Size="Size.Medium" OnClick="actionGroup" aria-label="@L("GROUP_TOOLTIP", "Group")">
+                <svg viewBox="5 12 90 100" style="width:20px;height:20px;">
+                    <defs>
+                        <path transform="translate(-50, -50)" id="fno" d="M 14 50 L 32 18.8 L 67.5 18.8 L 85.5 50 L 67.5 81.1 L 32 81.1 L 14 50 Z" stroke="currentColor" stroke-width="4" fill-opacity="0" />
+                    </defs>
+                    <g transform="translate(50, 50)">
+                        <use xlink:href="#fno" transform="scale(0.75)" />
+                        <use xlink:href="#fno" />
+                    </g>
+                </svg>
+            </MudIconButton>
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Overflow: selection import/export, image, pdf *@
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Medium" Dense="true" AriaLabel="@L("MORE_ACTIONS", "More actions")" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+            <MudMenuItem>
+                <div class="mud-menu-item-file">
+                    <InputFile id="importSelectionBtn" OnChange="OnSelectionImport" single accept=".sxfmv" class="file-input-overlay" />
+                    <div class="d-flex align-center" style="gap:8px;">
+                        <MudIcon Icon="@Icons.Material.Filled.FileUpload" Size="Size.Small" />
+                        <span>@L("IMPORT_SELECTION", "Import selection (.sxfmv)")</span>
+                    </div>
+                </div>
+            </MudMenuItem>
+            <MudMenuItem OnClick="OnSelectionExport">
+                <div class="d-flex align-center" style="gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.FileDownload" Size="Size.Small" />
+                    <span>@L("EXPORT_SELECTION", "Export selection (.sxfmv)")</span>
+                </div>
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem OnClick="OnImageSave">
+                <div class="d-flex align-center" style="gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
+                    <span>@Loc["IMAGE_TOOLTIP"]</span>
+                </div>
+            </MudMenuItem>
+            <MudMenuItem OnClick="b_showPDF">
+                <div class="d-flex align-center" style="gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
+                    <span>@L("PDF_REPORT", "PDF report")</span>
+                </div>
+            </MudMenuItem>
+        </MudMenu>
+
+        <MudSpacer />
+
+        @* Right side: view toggles *@
+        <MudTooltip Text="@Loc["SHOW_LABEL"]">
+            <MudToggleIconButton Toggled="@_labelsOn" ToggledChanged="OnLabelsToggled"
+                                 Icon="@Icons.Material.Outlined.Label" ToggledIcon="@Icons.Material.Filled.Label"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["SHOW_LABEL"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["RENDER"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Medium" OnClick="ChangeFnStyle" aria-label="@Loc["RENDER"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["TABLE_VIEW"]">
+            <MudToggleIconButton Toggled="@_spreadsheetOn" ToggledChanged="OnSpreadsheetToggled"
+                                 Icon="@Icons.Material.Outlined.GridOn" ToggledIcon="@Icons.Material.Filled.GridOn"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["TABLE_VIEW"]" />
+        </MudTooltip>
+        <MudTooltip Text="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")">
+            <MudToggleIconButton Toggled="@_agentsLevelsViewOn" ToggledChanged="OnAgentsLevelsViewToggled"
+                                 Icon="@Icons.Material.Outlined.AccountTree" ToggledIcon="@Icons.Material.Filled.AccountTree"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["RELOAD"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Medium" OnClick="Recover" aria-label="@Loc["RELOAD"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["INFO_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Medium" OnClick="ShowInfo" aria-label="@Loc["INFO_TOOLTIP"]" />
+        </MudTooltip>
+        <MudTooltip Text="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")">
+            <MudToggleIconButton Toggled="@_rightPanelOn" ToggledChanged="OnRightPanelToggled"
+                                 Icon="@Icons.Material.Outlined.Tune" ToggledIcon="@Icons.Material.Filled.Tune"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")" />
+        </MudTooltip>
     </div>
-    <div class="float-right">
-        <button class="btn btn-menu oi oi-tags" title=@Loc["SHOW_LABEL"] @onclick=ShowLabels></button>
-        <button class="btn btn-menu oi oi-eye" title=@Loc["RENDER"] @onclick=ChangeFnStyle @onfocusin=@(() => stateContainer.updateUndo())></button>
-        <button class="btn btn-menu oi oi-spreadsheet" title=@Loc["TABLE_VIEW"] @onclick=showSpreadsheet></button>
-        <button class="btn btn-menu" title="Agents & Levels" @onclick=ToggleAgentsLevelsView>AL</button>
-        <button class="btn btn-menu oi oi-reload" title=@Loc["RELOAD"] @onclick=Recover></button>
-        <button class="btn btn-menu oi oi-info" title=@Loc["INFO_TOOLTIP"] @onclick=ShowInfo></button>
-        <button class="btn btn-menu oi oi-menu @(stateContainer.rightPanel == "agents-levels" ? "active" : "")" title="Manage agents and levels" @onclick=ToggleAgentsLevelsPanel></button>
-    </div>
-</div>
+</MudAppBar>
 
 @code {
     [Parameter]
@@ -67,6 +138,24 @@
     public EventCallback<InputFileChangeEventArgs> onInputFileChange { get; set; }
     [Parameter]
     public EventCallback fileIsLoaded { get; set; }
+
+    // Localization helper: falls back to a default English string if the resx key is missing.
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
+
+    // Toggle state derived from StateContainer (kept in sync on each render).
+    private bool _labelsOn => stateContainer.aspectLabelsDisplay != "none";
+    private bool _spreadsheetOn => stateContainer.spreadsheetVisible > 0;
+    private bool _agentsLevelsViewOn => stateContainer.AgentsLevelsViewActive;
+    private bool _rightPanelOn => stateContainer.rightPanel == "agents-levels";
+
+    private void OnLabelsToggled(bool _) => ShowLabels();
+    private void OnSpreadsheetToggled(bool _) => showSpreadsheet();
+    private void OnAgentsLevelsViewToggled(bool _) => ToggleAgentsLevelsView();
+    private void OnRightPanelToggled(bool _) => ToggleAgentsLevelsPanel();
 
     public void showSpreadsheet()
     {

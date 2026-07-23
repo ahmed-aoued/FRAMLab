@@ -320,4 +320,79 @@
     <value>Zoom In</value>
     <comment>Source: FMV v2.2</comment>
   </data>
+  <data name="FN_DESCRIPTION" xml:space="preserve">
+    <value>Function description</value>
+  </data>
+  <data name="GROUP_TOOLTIP" xml:space="preserve">
+    <value>Group</value>
+  </data>
+  <data name="MORE_ACTIONS" xml:space="preserve">
+    <value>More actions</value>
+  </data>
+  <data name="IMPORT_SELECTION" xml:space="preserve">
+    <value>Import selection (.sxfmv)</value>
+  </data>
+  <data name="EXPORT_SELECTION" xml:space="preserve">
+    <value>Export selection (.sxfmv)</value>
+  </data>
+  <data name="PDF_REPORT" xml:space="preserve">
+    <value>PDF report</value>
+  </data>
+  <data name="AGENTS_LEVELS_VIEW" xml:space="preserve">
+    <value>Agents &amp; Levels view</value>
+  </data>
+  <data name="MANAGE_AGENTS_LEVELS" xml:space="preserve">
+    <value>Manage agents and levels</value>
+  </data>
+  <data name="CLOSE" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="AGENTS" xml:space="preserve">
+    <value>Agents</value>
+  </data>
+  <data name="NO_AGENTS" xml:space="preserve">
+    <value>No agents created.</value>
+  </data>
+  <data name="AGENT_COLOR" xml:space="preserve">
+    <value>Agent color</value>
+  </data>
+  <data name="DELETE_AGENT" xml:space="preserve">
+    <value>Delete agent</value>
+  </data>
+  <data name="AGENT_NAME" xml:space="preserve">
+    <value>Agent name</value>
+  </data>
+  <data name="AGENT_TYPE" xml:space="preserve">
+    <value>Type (optional)</value>
+  </data>
+  <data name="NEW_AGENT_COLOR" xml:space="preserve">
+    <value>New agent color</value>
+  </data>
+  <data name="ADD_AGENT" xml:space="preserve">
+    <value>Add agent</value>
+  </data>
+  <data name="LEVELS" xml:space="preserve">
+    <value>Levels</value>
+  </data>
+  <data name="NO_LEVELS" xml:space="preserve">
+    <value>No levels created.</value>
+  </data>
+  <data name="LEVEL_COLOR" xml:space="preserve">
+    <value>Level color</value>
+  </data>
+  <data name="DELETE_LEVEL" xml:space="preserve">
+    <value>Delete level</value>
+  </data>
+  <data name="LEVEL_NAME" xml:space="preserve">
+    <value>Level name</value>
+  </data>
+  <data name="HIERARCHY" xml:space="preserve">
+    <value>Hierarchy</value>
+  </data>
+  <data name="NEW_LEVEL_COLOR" xml:space="preserve">
+    <value>New level color</value>
+  </data>
+  <data name="ADD_LEVEL" xml:space="preserve">
+    <value>Add level</value>
+  </data>
 </root>

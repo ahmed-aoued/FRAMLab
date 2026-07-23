@@ -1,18 +1,14 @@
-﻿@inject StateContainer stateContainer
+﻿@using MudBlazor
+@inject StateContainer stateContainer
 @inject IJSRuntime JSRuntime
 @inject IStringLocalizer<Localization.SharedResource> Loc
 
-<div id="myModal" class="modal fade show" style="display:block" aria-modal="true" role="dialog" tabindex="100" @onkeydown=checkforEsc @onclick=clickOut>
-    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" @onclick=clickNothing @onclick:stopPropagation>
-        <div class="modal-content">
-            <div class="modal-header sticky-top bg-white p-0 pl-1 align-items-center">
-                @stateContainer.fileName.Replace(".xfmv", "-text")
-                <div class="float-right">
-                    <button class="btn btn-menu oi oi-file" style="top:0" title=@Loc["SAVE_TOOLTIP"] @onclick=printFMILog />
-                    <button type="button" class="close m-0 pt-1 pb-1 pl-3 pr-3" @onclick="@(() => OnClose.InvokeAsync(false))">&times;</button>
-                </div>
-            </div>
-            <div id="PDFtable" class="modal-body p-1" style="font-family:'PT Sans',sans-serif">
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions" ContentStyle="overflow-y:auto;">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@stateContainer.fileName.Replace(".xfmv", "-text")</MudText>
+    </TitleContent>
+    <DialogContent>
+            <div id="PDFtable" class="p-1" style="font-family:'PT Sans',sans-serif">
                 @if (stateContainer.fileLoaded)
                 {
                     @foreach (Function fn in stateContainer.functionList)
@@ -188,48 +184,37 @@
                     }
                 }
             </div>
-        </div>
-    </div>
-</div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="printFMILog">@Loc["SAVE_TOOLTIP"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
-    protected override void OnAfterRender(bool firstRender)
+    private bool _visible
     {
-        if (firstRender)
-        {
-            FocusElement("myModal");
-        }
+        get => true;
+        set { if (!value) { _ = OnClose.InvokeAsync(false); } }
     }
-    private async void clickOut(MouseEventArgs e)
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Large,
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true
+    };
+
+    private async Task Close()
     {
         await OnClose.InvokeAsync(false);
     }
-    private void clickNothing(MouseEventArgs e)
-    {
-    }
-    private async void checkforEsc(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            await OnClose.InvokeAsync(false);
-        }
-        else if (e.Key == "Enter")
-        {
-            await OnClose.InvokeAsync(false);
-        }
-    }
-    public async void FocusElement(string elementName)
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("focusInput", elementName);
-        }
-        catch
-        {
-        }
-    }
+
     private async void printFMILog()
     {
         var table = $"{await JSRuntime.InvokeAsync<string>("getHTML", "PDFtable")}\n";

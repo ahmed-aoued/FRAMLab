@@ -2,6 +2,11 @@ using System.Data;
 using System.Globalization;
 using System.Xml;
 
+
+//To Change
+//CalcVariables()
+//
+
 namespace FMV_OG.Shared.MainApp.Services
 {
     public class MetadataService : IMetadataService
@@ -9,6 +14,24 @@ namespace FMV_OG.Shared.MainApp.Services
         public DataSet MetadataDS { get; set; } = new();
         public Dictionary<string, string> MetaDataKeys { get; set; } = new();
         public bool MetaIsDirty { get; set; }
+
+        private static void SetStringVariable(Function function, string name, string value)
+        {
+            var v = function.getVariable(name) ?? function.newVariable(name, variableType.String);
+            function.setVariable(v, value);
+        }
+
+        private static void SetIntVariable(Function function, string name, int value)
+        {
+            var v = function.getVariable(name) ?? function.newVariable(name, variableType.Int);
+            function.setVariable(v, value);
+        }
+
+        private static void SetDoubleVariable(Function function, string name, double value)
+        {
+            var v = function.getVariable(name) ?? function.newVariable(name, variableType.Double);
+            function.setVariable(v, value);
+        }
 
         public void CreateMetadataTable(XmlNode fn)
         {
@@ -101,14 +124,18 @@ namespace FMV_OG.Shared.MainApp.Services
 
         public void CalcVariables(Function function, List<Coupling> couplingList, List<Function> functionList, int cycleFMI)
         {
-            function.newVariable("Cycle", new string[] { cycleFMI.ToString(), "The FMI Cycle count" });
+            //function.newVariable("Cycle", new string[] { cycleFMI.ToString(), "The FMI Cycle count" });
+            var vCycle = function.getVariable("Cycle") ?? function.newVariable("Cycle", variableType.Int);
+            function.setVariable(vCycle, cycleFMI);
             foreach (var mdKeyValue in MetaDataKeys)
             {
                 var mdKey = mdKeyValue.Key;
                 var mdValue = mdKeyValue.Value;
                 if (mdKey.StartsWith("Global_"))
                 {
-                    function.newVariable(mdKey, new string[] { mdValue, mdValue });
+                    //function.newVariable(mdKey, new string[] { mdValue, mdValue });
+                    var vGlobal = function.getVariable(mdKey) ?? function.newVariable(mdKey, variableType.String);
+                    function.setVariable(vGlobal, mdValue);
                 }
 
                 double Isum = 0;
@@ -144,15 +171,12 @@ namespace FMV_OG.Shared.MainApp.Services
                 {
                     var outFn = functionList.Find(x => x.IDNr == coupling.outputFn);
                     var fnMD = outFn?.getVariable(mdKey);
-                    if (fnMD is null && outFn?.metadata.Find(x => x[0] == mdKey) is not null)
-                    {
-                        fnMD = new string[] { "0", "0" };
-                    }
+                    var hasMetadataKey = outFn?.metadata.Find(x => x[0] == mdKey) is not null;
 
-                    if (fnMD is not null)
+                    if (fnMD is not null || hasMetadataKey)
                     {
-                        var fnMDString = fnMD[0];
-                        if (!double.TryParse(string.IsNullOrEmpty(fnMDString) ? "0" : fnMDString, CultureInfo.InvariantCulture, out var fnMDValue))
+                        var fnMDString = fnMD?.Value?.ToString() ?? "0";
+                        if (!double.TryParse(string.IsNullOrEmpty(fnMDString) ? "0" : fnMDString, CultureInfo.InvariantCulture, out double fnMDValue))
                         {
                             if (fnMDString.ToLower() == "true")
                             {
@@ -203,12 +227,12 @@ namespace FMV_OG.Shared.MainApp.Services
 
                 if (In > 0)
                 {
-                    function.newVariable($"In_{mdKey}", new string[] { In.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Inputs" });
-                    function.newVariable($"Isum_{mdKey}", new string[] { Isum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Inputs" });
-                    function.newVariable($"Iavg_{mdKey}", new string[] { (Isum / In).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Inputs" });
-                    function.newVariable($"Imin_{mdKey}", new string[] { Imin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Inputs" });
-                    function.newVariable($"Imax_{mdKey}", new string[] { Imax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Inputs" });
-                    function.newVariable($"Iprd_{mdKey}", new string[] { Iprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Inputs" });
+                    SetIntVariable(function, $"In_{mdKey}", (int)In);
+                    SetDoubleVariable(function, $"Isum_{mdKey}", Isum);
+                    SetDoubleVariable(function, $"Iavg_{mdKey}", Isum / In);
+                    SetDoubleVariable(function, $"Imin_{mdKey}", Imin);
+                    SetDoubleVariable(function, $"Imax_{mdKey}", Imax);
+                    SetDoubleVariable(function, $"Iprd_{mdKey}", Iprd);
                     Amin = Imin;
                     Amax = Imax;
                     Aprd = Iprd;
@@ -216,12 +240,12 @@ namespace FMV_OG.Shared.MainApp.Services
 
                 if (Pn > 0)
                 {
-                    function.newVariable($"Pn_{mdKey}", new string[] { Pn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Preconditions" });
-                    function.newVariable($"Psum_{mdKey}", new string[] { Psum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Preconditions" });
-                    function.newVariable($"Pavg_{mdKey}", new string[] { (Psum / Pn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Preconditions" });
-                    function.newVariable($"Pmin_{mdKey}", new string[] { Pmin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Preconditions" });
-                    function.newVariable($"Pmax_{mdKey}", new string[] { Pmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Preconditions" });
-                    function.newVariable($"Pprd_{mdKey}", new string[] { Pprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Preconditions" });
+                    SetIntVariable(function, $"Pn_{mdKey}", (int)Pn);
+                    SetDoubleVariable(function, $"Psum_{mdKey}", Psum);
+                    SetDoubleVariable(function, $"Pavg_{mdKey}", Psum / Pn);
+                    SetDoubleVariable(function, $"Pmin_{mdKey}", Pmin);
+                    SetDoubleVariable(function, $"Pmax_{mdKey}", Pmax);
+                    SetDoubleVariable(function, $"Pprd_{mdKey}", Pprd);
                     Amin = double.IsNaN(Amin) ? Pmin : Math.Min(Amin, Pmin);
                     Amax = double.IsNaN(Amax) ? Pmax : Math.Max(Amax, Pmax);
                     Aprd = double.IsNaN(Aprd) ? Pprd : Aprd * Pprd;
@@ -229,12 +253,12 @@ namespace FMV_OG.Shared.MainApp.Services
 
                 if (Rn > 0)
                 {
-                    function.newVariable($"Rn_{mdKey}", new string[] { Rn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Resources" });
-                    function.newVariable($"Rsum_{mdKey}", new string[] { Rsum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Resources" });
-                    function.newVariable($"Ravg_{mdKey}", new string[] { (Rsum / Rn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Resources" });
-                    function.newVariable($"Rmin_{mdKey}", new string[] { Rmin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Resources" });
-                    function.newVariable($"Rmax_{mdKey}", new string[] { Rmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Resources" });
-                    function.newVariable($"Rprd_{mdKey}", new string[] { Rprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Resources" });
+                    SetIntVariable(function, $"Rn_{mdKey}", (int)Rn);
+                    SetDoubleVariable(function, $"Rsum_{mdKey}", Rsum);
+                    SetDoubleVariable(function, $"Ravg_{mdKey}", Rsum / Rn);
+                    SetDoubleVariable(function, $"Rmin_{mdKey}", Rmin);
+                    SetDoubleVariable(function, $"Rmax_{mdKey}", Rmax);
+                    SetDoubleVariable(function, $"Rprd_{mdKey}", Rprd);
                     Amin = double.IsNaN(Amin) ? Rmin : Math.Min(Amin, Rmin);
                     Amax = double.IsNaN(Amax) ? Rmax : Math.Max(Amax, Rmax);
                     Aprd = double.IsNaN(Aprd) ? Rprd : Aprd * Rprd;
@@ -242,12 +266,12 @@ namespace FMV_OG.Shared.MainApp.Services
 
                 if (Cn > 0)
                 {
-                    function.newVariable($"Cn_{mdKey}", new string[] { Cn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Controls" });
-                    function.newVariable($"Csum_{mdKey}", new string[] { Csum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Controls" });
-                    function.newVariable($"Cavg_{mdKey}", new string[] { (Csum / Cn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Controls" });
-                    function.newVariable($"Cmin_{mdKey}", new string[] { Cmin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from Controls" });
-                    function.newVariable($"Cmax_{mdKey}", new string[] { Cmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Controls" });
-                    function.newVariable($"Cprd_{mdKey}", new string[] { Cprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Controls" });
+                    SetIntVariable(function, $"Cn_{mdKey}", (int)Cn);
+                    SetDoubleVariable(function, $"Csum_{mdKey}", Csum);
+                    SetDoubleVariable(function, $"Cavg_{mdKey}", Csum / Cn);
+                    SetDoubleVariable(function, $"Cmin_{mdKey}", Cmin);
+                    SetDoubleVariable(function, $"Cmax_{mdKey}", Cmax);
+                    SetDoubleVariable(function, $"Cprd_{mdKey}", Cprd);
                     Amin = double.IsNaN(Amin) ? Cmin : Math.Min(Amin, Cmin);
                     Amax = double.IsNaN(Amax) ? Cmax : Math.Max(Amax, Cmax);
                     Aprd = double.IsNaN(Aprd) ? Cprd : Aprd * Cprd;
@@ -255,12 +279,12 @@ namespace FMV_OG.Shared.MainApp.Services
 
                 if (Tn > 0)
                 {
-                    function.newVariable($"Tn_{mdKey}", new string[] { Tn.ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from Times" });
-                    function.newVariable($"Tsum_{mdKey}", new string[] { Tsum.ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from Times" });
-                    function.newVariable($"Tavg_{mdKey}", new string[] { (Tsum / Tn).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from Times" });
-                    function.newVariable($"Tmin_{mdKey}", new string[] { Tmin.ToString(CultureInfo.InvariantCulture), "Minimum of {mdKey} from Times" });
-                    function.newVariable($"Tmax_{mdKey}", new string[] { Tmax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from Times" });
-                    function.newVariable($"Tprd_{mdKey}", new string[] { Tprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from Times" });
+                    SetIntVariable(function, $"Tn_{mdKey}", (int)Tn);
+                    SetDoubleVariable(function, $"Tsum_{mdKey}", Tsum);
+                    SetDoubleVariable(function, $"Tavg_{mdKey}", Tsum / Tn);
+                    SetDoubleVariable(function, $"Tmin_{mdKey}", Tmin);
+                    SetDoubleVariable(function, $"Tmax_{mdKey}", Tmax);
+                    SetDoubleVariable(function, $"Tprd_{mdKey}", Tprd);
                     Amin = double.IsNaN(Amin) ? Tmin : Math.Min(Amin, Tmin);
                     Amax = double.IsNaN(Amax) ? Tmax : Math.Max(Amax, Tmax);
                     Aprd = double.IsNaN(Aprd) ? Tprd : Aprd * Tprd;
@@ -268,12 +292,12 @@ namespace FMV_OG.Shared.MainApp.Services
 
                 if (In + Pn + Rn + Cn + Tn > 0)
                 {
-                    function.newVariable($"An_{mdKey}", new string[] { (In + Pn + Rn + Cn + Tn).ToString(CultureInfo.InvariantCulture), $"Number of {mdKey} from All Aspects" });
-                    function.newVariable($"Asum_{mdKey}", new string[] { (Isum + Psum + Rsum + Csum + Tsum).ToString(CultureInfo.InvariantCulture), $"Sum of {mdKey} from All Aspects" });
-                    function.newVariable($"Aavg_{mdKey}", new string[] { ((Isum + Psum + Rsum + Csum + Tsum) / (In + Pn + Rn + Cn + Tn)).ToString(CultureInfo.InvariantCulture), $"Average of {mdKey} from All Aspects" });
-                    function.newVariable($"Amin_{mdKey}", new string[] { Amin.ToString(CultureInfo.InvariantCulture), $"Minimum of {mdKey} from All Aspects" });
-                    function.newVariable($"Amax_{mdKey}", new string[] { Amax.ToString(CultureInfo.InvariantCulture), $"Maximum of {mdKey} from All Aspects" });
-                    function.newVariable($"Aprd_{mdKey}", new string[] { Aprd.ToString(CultureInfo.InvariantCulture), $"Product of {mdKey} from All Aspects" });
+                    SetIntVariable(function, $"An_{mdKey}", (int)(In + Pn + Rn + Cn + Tn));
+                    SetDoubleVariable(function, $"Asum_{mdKey}", Isum + Psum + Rsum + Csum + Tsum);
+                    SetDoubleVariable(function, $"Aavg_{mdKey}", (Isum + Psum + Rsum + Csum + Tsum) / (In + Pn + Rn + Cn + Tn));
+                    SetDoubleVariable(function, $"Amin_{mdKey}", Amin);
+                    SetDoubleVariable(function, $"Amax_{mdKey}", Amax);
+                    SetDoubleVariable(function, $"Aprd_{mdKey}", Aprd);
                 }
             }
         }

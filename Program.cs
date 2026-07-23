@@ -4,6 +4,7 @@ using FMV_OG.Shared.MainApp.Services;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using MudBlazor.Services;
 using System.Globalization;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -24,7 +25,8 @@ builder.Services.AddScoped<SvgUtilsInterop>();
 
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddSingleton<StateContainer>();
-builder.Services.AddLocalization(); 
+builder.Services.AddLocalization();
+builder.Services.AddMudServices();
 
 var http = new HttpClient()
 {

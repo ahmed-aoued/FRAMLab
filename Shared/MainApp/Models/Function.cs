@@ -55,6 +55,12 @@ namespace FMV_OG.Shared
             this.fnColorStyle = fn.SelectSingleNode("@style")?.Value ?? "";
             this.fnColorValue = fn.SelectSingleNode("@color")?.Value ?? "";
             this.profileFn = fn.SelectSingleNode("@profileFn")?.Value ?? "";
+            // Legacy XML attributes -> enum (backward compatible)
+            this.PrInputs = ParseProfile(fn.SelectSingleNode("@profileI")?.Value);
+            this.PrPreconditions = ParseProfile(fn.SelectSingleNode("@profileP")?.Value);
+            this.PrResources = ParseProfile(fn.SelectSingleNode("@profileR")?.Value);
+            this.PrControls = ParseProfile(fn.SelectSingleNode("@profileC")?.Value);
+            // Note: @profileT (Time) is intentionally not mapped to an enum property.
             this.groupType = fn.SelectSingleNode("@groupType")!;
             this.groupIDNr = fn.SelectSingleNode("@groupIDNr")!;
             this.groupActive = fn.SelectSingleNode("@groupActive")!;
@@ -117,7 +123,35 @@ namespace FMV_OG.Shared
         public profileFMI PrResources { get; set; }
         public profileFMI PrControls { get; set; }
 
+        // ----------------------------------------
+        // Helper: translate legacy XML profile strings
+        // ("All" / "Any" / "None" / "") into profileFMI enum.
+        // Empty string defaults to All (matches old UI behaviour).
+        // ----------------------------------------
+        public static profileFMI ParseProfile(string? value)
+        {
+            return value switch
+            {
+                "All" => profileFMI.All,
+                "Any" => profileFMI.Any,
+                "None" => profileFMI.None,
+                _ => profileFMI.All,
+            };
+        }
+
+        public static string ProfileToString(profileFMI profile)
+        {
+            return profile switch
+            {
+                profileFMI.All => "All",
+                profileFMI.Any => "Any",
+                profileFMI.None => "None",
+                _ => "",
+            };
+        }
+
         // lists for FMI cycle tracking
+        /*
         public List<string> activeI { get; set; } = new List<string>();
         public List<string> activeP { get; set; } = new List<string>();
         public List<string> activeR { get; set; } = new List<string>();
@@ -129,10 +163,13 @@ namespace FMV_OG.Shared
         public List<string> totalC { get; set; } = new List<string>();
         public List<string> totalT { get; set; } = new List<string>();
 
+        */
+
         // ----------------------------------------
         // Legacy variable dictionary (string key -> string[] value)
         // used by FmiInterpreter / FMIControl for coupling-based variables
         // ----------------------------------------
+        /*
         public void newVariable(string key, string[] value)
         {
             _variables[key] = value;
@@ -149,7 +186,7 @@ namespace FMV_OG.Shared
             foreach (var k in keysToRemove)
                 _variables.Remove(k);
         }
-
+        */
         // ----------------------------------------
         // Legacy “variable” management for FMI profile (was ExpandoObject)
         // rewritten with a concrete class VariableInfo to avoid CS1061
@@ -175,7 +212,7 @@ namespace FMV_OG.Shared
         {
             switch (varInfo.Type)
             {
-                case variableType.String: if (value is not string) throw new ArgumentException("Invalid value for String"); varInfo.Value = value; break;
+                case variableType.String: if (value is not string) throw new ArgumentException("Invalid value for String");varInfo.Value = value; break;
                 case variableType.Int: if (value is not int) throw new ArgumentException("Invalid value for Int"); varInfo.Value = value; break;
                 case variableType.Double: if (value is not double) throw new ArgumentException("Invalid value for Double"); varInfo.Value = value; break;
                 case variableType.Bool: if (value is not bool) throw new ArgumentException("Invalid value for Bool"); varInfo.Value = value; break;
@@ -195,20 +232,33 @@ namespace FMV_OG.Shared
 
         public void resetVariables()
         {
-            _variables.Clear();
             variableList.Clear();
         }
 
         // ------------------------------------------------------
         // remaining unchanged methods (isActive, resetAspects, resource, array, etc.)
         // ------------------------------------------------------
+        
+        /*
         private int countActive(List<Aspect> activeList)
         {
             int count = 0;
             foreach (var aspect in activeList)
                 if (aspect.IsActive) count++;
             return count;
+        }*/
+
+        private int countActive(List<Aspect> activeList)
+        {
+            return activeList.Count(aspect => aspect.IsActive);
         }
+
+        /*
+        private void deactivateAspects(List<Aspect> aspectList)
+        {
+            foreach (var aspect in aspectList)
+                aspect.IsActive = false;
+        }*/
 
         private void deactivateAspects(List<Aspect> aspectList)
         {
@@ -255,19 +305,66 @@ namespace FMV_OG.Shared
             deactivateAspects(preconditions);
             deactivateAspects(resources);
             deactivateAspects(controls);
+            time = 0;
             fmiHighlight = "";
             wasActive = false;
         }
+
+        // ----------------------------------------
+        // Helpers: activate / deactivate / ensure coupling aspects
+        // Replaces the old activeI/P/R/C/T and totalI/P/R/C/T string lists.
+        // ----------------------------------------
+        private List<Aspect>? AspectListFor(string type) => type switch
+        {
+            "I" => inputs,
+            "P" => preconditions,
+            "R" => resources,
+            "C" => controls,
+            _ => null
+        };
+
+        public void ActivateCoupling(string type, string couplingName, string outputFnIDNr = "")
+        {
+            if (type == "T") { time++; return; }
+            var list = AspectListFor(type);
+            if (list == null) return;
+            var a = list.FirstOrDefault(x => x.IDName == couplingName);
+            if (a != null) a.IsActive = true;
+            else list.Add(new Aspect(type, "", "", couplingName, outputFnIDNr) { IsActive = true });
+        }
+
+        public void DeactivateCoupling(string type, string couplingName)
+        {
+            if (type == "T") { time = Math.Max(0, time - 1); return; }
+            var list = AspectListFor(type);
+            if (list == null) return;
+            var a = list.FirstOrDefault(x => x.IDName == couplingName);
+            if (a != null) a.IsActive = false;
+        }
+
+        public void EnsureCoupling(string type, string couplingName)
+        {
+            if (type == "T") return;
+            var list = AspectListFor(type);
+            if (list == null) return;
+            if (!list.Any(x => x.IDName == couplingName))
+                list.Add(new Aspect(type, "", "", couplingName, "") { IsActive = false });
+        }
+
 
         public void resetKvalues()
         {
             Kvalues = new Dictionary<string, double>();
             Cvalues = new Dictionary<string, string>();
         }
+
+        /*
         public string returnTrue(string KeyName)
         {
             return $"1:{KeyName}";
-        }
+        }*/
+
+        //Group Function
 
         public XmlNode? group { get; set; }
         public XmlNode groupType { get; set; }
@@ -277,6 +374,8 @@ namespace FMV_OG.Shared
         public XmlNode groupY { get; set; }
         public double startX { get; set; } = 0;
         public double startY { get; set; } = 0;
+
+        //Whatever Kvalues and Cvalues are
         public Dictionary<string, double> Kvalues { get; set; } = new Dictionary<string, double>();
         public Dictionary<string, string> Cvalues { get; set; } = new Dictionary<string, string>();
         public string toolTip { get; set; } = "";
@@ -376,9 +475,11 @@ namespace FMV_OG.Shared
             return textLines;
         }
 
+
         public string array(string[] content)
         {
-            var returnString = _variables[content[0]][0];
+            var varInfo = getVariable(content[0]);
+            var returnString = varInfo?.Value?.ToString() ?? "";
             List<string> valueArray = new List<string>();
             if (returnString.Length > 0) { valueArray = returnString.Split(",").ToList(); }
             for (int i = 0; i < valueArray.Count; i++)
@@ -389,6 +490,7 @@ namespace FMV_OG.Shared
             return returnString;
         }
 
+        /*
         public string resource(string[] content)
         {
             var returnString = _variables[content[0]][0];
@@ -448,6 +550,6 @@ namespace FMV_OG.Shared
 
             returnString = string.Join(",", valueArray);
             return returnString;
-        }
+        }*/
     }
 }

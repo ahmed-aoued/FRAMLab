@@ -1,3 +1,4 @@
+@using MudBlazor
 @inject IJSRuntime JSRuntime
 @inject StateContainer stateContainer
 @inject IConfiguration render
@@ -13,19 +14,35 @@
             <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
             <hr class="mt-2 mb-2" />
         }
-        <div class="d-flex pt-2 pb-0">
-            <div class="d-flex flex-column">
-                <button id="newFnButton" class="btn btn-menu oi oi-plus" title=@Loc["NEW_TOOLTIP"] tabindex="3" @onclick=newFunction @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup=NextFn></button>
+        <div class="d-flex pt-2 pb-0 align-start">
+            <div class="d-flex flex-column sidebar-btn-col">
+                <MudIconButton id="newFnButton" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Medium"
+                               title="@Loc["NEW_TOOLTIP"]" tabindex="3" OnClick=newFunction
+                               @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup=NextFn
+                               aria-label="@Loc["NEW_TOOLTIP"]" Class="sidebar-new-fn" />
                 <div class="d-flex">
                     <button class="btn btn-half btn-half-s" title=@Loc["FN_FONT_DECREASE"] tabindex="1" @onclick=zoomFs @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>A</button>
                     <button class="btn btn-half btn-half-l" title=@Loc["FN_FONT_INCREASE"] tabindex="2" @onclick=zoomFl @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>A</button>
                 </div>
             </div>
-            <textarea id="fnNameText" name="fnNameText" title=@Loc["NAME_FN"] tabindex="4" disabled=@stateContainer.isDisabled value=@stateContainer.fnName @onchange="FnNameChange" />
+            <div class="flex-grow-1">
+                <MudTextField @key="@("fnname-" + stateContainer.selectedFn)" T="string"
+                              Value="@stateContainer.fnName" ValueChanged="OnFnNameChanged"
+                              Label="@Loc["NAME_FN"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Disabled="@stateContainer.isDisabled" tabindex="4"
+                              Immediate="false" Class="sidebar-fn-name" />
+            </div>
         </div>
-        <div class="d-flex pt-0">
-            <button class="btn btn-desc oi oi-pencil" title=@Loc["FN_DESCRIPTION"] @onclick=expandDesc ></button>
-            <textarea class=@descriptionClass id="fnDescriptionText" name="fnDescriptionText" title=@Loc["FN_DESCRIPTION"] tabindex="5" disabled=@stateContainer.isDisabled value=@(stateContainer.selectedFunction?.Description??"") @onchange="FnDescChange" />
+        <div class="d-flex pt-1 align-start">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default"
+                           title="@Loc["FN_DESCRIPTION"]" OnClick=expandDesc aria-label="@Loc["FN_DESCRIPTION"]" Class="sidebar-desc-toggle" />
+            <div class="flex-grow-1">
+                <MudTextField @key="@("fndesc-" + stateContainer.selectedFn)" T="string"
+                              Value="@(stateContainer.selectedFunction?.Description ?? "")" ValueChanged="OnFnDescChanged"
+                              Label="@Loc["FN_DESCRIPTION"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Disabled="@stateContainer.isDisabled" tabindex="5"
+                              Lines="@(descriptionClass == "fmi-descE" ? 5 : 2)" Class="sidebar-fn-desc" />
+            </div>
         </div>
         <div class="d-flex pt-2">
             <div class="d-flex flex-column align-items-center">
@@ -573,26 +590,25 @@
                     else if (!string.IsNullOrEmpty(stateContainer.selectedFunction.AgentId))
                     {
                         var agent = stateContainer.agentList.Find(a => a.IDNr == stateContainer.selectedFunction.AgentId);
-                        <div class="assignment-display mb-1">
-                            <span class="text-truncate">@(agent?.Name ?? $"Agent {stateContainer.selectedFunction.AgentId}")</span>
-                            <button class="btn btn-link text-danger p-0 ml-2" title="Remove" @onclick=ClearAgent>
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                        <div class="assignment-display mb-1 d-flex align-center">
+                            <span class="text-truncate flex-grow-1">@(agent?.Name ?? $"Agent {stateContainer.selectedFunction.AgentId}")</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                           title="Remove" OnClick=ClearAgent aria-label="Remove agent" />
                         </div>
                     }
                     else
                     {
-                        <div class="input-group input-group-sm assignment-select">
-                            <select class="form-control" @bind="selectedAgentId">
-                                <option value="">Select agent</option>
+                        <div class="d-flex align-center assignment-select" style="gap:4px;">
+                            <MudSelect T="string" @bind-Value="selectedAgentId" Label="Select agent" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" Dense="true" Class="flex-grow-1">
                                 @foreach (var agent in stateContainer.agentList)
                                 {
-                                    <option value="@agent.IDNr">@($"{agent.IDNr} - {agent.Name}")</option>
+                                    <MudSelectItem T="string" Value="@agent.IDNr">@($"{agent.IDNr} - {agent.Name}")</MudSelectItem>
                                 }
-                            </select>
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary oi oi-plus d-flex align-items-center" type="button" title="Add agent to function" @onclick=AssignAgent disabled="@(string.IsNullOrEmpty(selectedAgentId))"></button>
-                            </div>
+                            </MudSelect>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                                           Variant="Variant.Outlined" title="Add agent to function"
+                                           OnClick=AssignAgent Disabled="@(string.IsNullOrEmpty(selectedAgentId))" aria-label="Add agent to function" />
                         </div>
                     }
                 }
@@ -616,36 +632,37 @@
                     else if (!string.IsNullOrEmpty(stateContainer.selectedFunction.LevelId))
                     {
                         var level = stateContainer.levelList.Find(l => l.IDNr == stateContainer.selectedFunction.LevelId);
-                        <div class="assignment-display mb-1">
-                            <span class="text-truncate">@(level?.Name ?? $"Level {stateContainer.selectedFunction.LevelId}")</span>
-                            <button class="btn btn-link text-danger p-0 ml-2" title="Remove" @onclick=ClearLevel>
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                        <div class="assignment-display mb-1 d-flex align-center">
+                            <span class="text-truncate flex-grow-1">@(level?.Name ?? $"Level {stateContainer.selectedFunction.LevelId}")</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                           title="Remove" OnClick=ClearLevel aria-label="Remove level" />
                         </div>
                     }
                     else
                     {
-                        <div class="input-group input-group-sm mb-1 assignment-select">
-                            <select class="form-control" @bind="selectedLevelId">
-                                <option value="">Select level</option>
+                        <div class="d-flex align-center mb-1 assignment-select" style="gap:4px;">
+                            <MudSelect T="string" @bind-Value="selectedLevelId" Label="Select level" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" Dense="true" Class="flex-grow-1">
                                 @foreach (var level in stateContainer.levelList)
                                 {
-                                    <option value="@level.IDNr">@($"{level.IDNr} - {level.Name}")</option>
+                                    <MudSelectItem T="string" Value="@level.IDNr">@($"{level.IDNr} - {level.Name}")</MudSelectItem>
                                 }
-                            </select>
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-secondary oi oi-plus" type="button" title="Add level to function" @onclick=AssignLevel disabled="@(string.IsNullOrEmpty(selectedLevelId))"></button>
-                            </div>
+                            </MudSelect>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                                           Variant="Variant.Outlined" title="Add level to function"
+                                           OnClick=AssignLevel Disabled="@(string.IsNullOrEmpty(selectedLevelId))" aria-label="Add level to function" />
                         </div>
                     }
                 }
             </div>
         </div>
-        <!-- Zoom and color buttons unchanged -->
-        <div class="d-flex pt-2">
+        <!-- Zoom and color buttons -->
+        <div class="d-flex pt-2 align-center">
             <button class="btn btn-half btn-half-s" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
             <button class="btn btn-half btn-half-l" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
-            <button class="btn btn-menu oi oi-brush ml-1" title=@Loc["FN_COLOUR"] tabindex="25" @onclick="ModalColor" @onkeyup="ModalKey"></button>
+            <MudIconButton Icon="@Icons.Material.Filled.Palette" Color="Color.Primary" Size="Size.Medium"
+                           title="@Loc["FN_COLOUR"]" tabindex="25" OnClick="ModalColor" @onkeyup="ModalKey"
+                           aria-label="@Loc["FN_COLOUR"]" Class="ml-1" />
         </div>
         @if (stateContainer.showKeys == "")
         {
@@ -966,15 +983,16 @@
         if (stateContainer.selectedFunction is not null)
         {
             stateContainer.updateUndo();
+            // T button stays rendered but does nothing
+            if (type == "T") return;
             var getProfile = "";
             switch (type)
             {
                 case "Fn": getProfile = stateContainer.selectedFunction.profileFn; break;
-                case "I": getProfile = stateContainer.selectedFunction.profileI; break;
-                case "P": getProfile = stateContainer.selectedFunction.profileP; break;
-                case "R": getProfile = stateContainer.selectedFunction.profileR; break;
-                case "C": getProfile = stateContainer.selectedFunction.profileC; break;
-                case "T": getProfile = stateContainer.selectedFunction.profileT; break;
+                case "I": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrInputs); break;
+                case "P": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrPreconditions); break;
+                case "R": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrResources); break;
+                case "C": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrControls); break;
                 default: getProfile = ""; break;
             }
             switch (getProfile)
@@ -989,11 +1007,10 @@
             switch (type)
             {
                 case "Fn": stateContainer.selectedFunction.profileFn = getProfile; break;
-                case "I": stateContainer.selectedFunction.profileI = getProfile; break;
-                case "P": stateContainer.selectedFunction.profileP = getProfile; break;
-                case "R": stateContainer.selectedFunction.profileR = getProfile; break;
-                case "C": stateContainer.selectedFunction.profileC = getProfile; break;
-                case "T": stateContainer.selectedFunction.profileT = getProfile; break;
+                case "I": stateContainer.selectedFunction.PrInputs = Function.ParseProfile(getProfile); break;
+                case "P": stateContainer.selectedFunction.PrPreconditions = Function.ParseProfile(getProfile); break;
+                case "R": stateContainer.selectedFunction.PrResources = Function.ParseProfile(getProfile); break;
+                case "C": stateContainer.selectedFunction.PrControls = Function.ParseProfile(getProfile); break;
             }
         }
     }
@@ -1041,14 +1058,15 @@
     {
         if (stateContainer.selectedFunction is not null)
         {
+            // T button renders but has no associated enum property
+            if (type == "T") return @<a></a>;
             var getProfile = "";
             switch (type)
             {
-                case "I": getProfile = stateContainer.selectedFunction.profileI; break;
-                case "P": getProfile = stateContainer.selectedFunction.profileP; break;
-                case "R": getProfile = stateContainer.selectedFunction.profileR; break;
-                case "C": getProfile = stateContainer.selectedFunction.profileC; break;
-                case "T": getProfile = stateContainer.selectedFunction.profileT; break;
+                case "I": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrInputs); break;
+                case "P": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrPreconditions); break;
+                case "R": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrResources); break;
+                case "C": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrControls); break;
                 default: getProfile = ""; break;
             }
             switch (getProfile)
@@ -1091,7 +1109,7 @@
                 stateContainer.deleteFn();
                 SetElement("fnNameText", stateContainer.fnName);
             }
-            else 
+            else
             {
                 stateContainer.sFnIDName(tempFnName);
             }
@@ -1103,6 +1121,32 @@
         if (stateContainer.selectedFn != "-1")
         {
             stateContainer.sFnDesc(e.Value?.ToString() ?? "");
+            refreshParent.InvokeAsync();
+        }
+    }
+
+    // MudBlazor ValueChanged wrappers (string value instead of ChangeEventArgs)
+    private void OnFnNameChanged(string value)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            var tempFnName = value ?? stateContainer.selectedFn;
+            if (tempFnName == "")
+            {
+                stateContainer.deleteFn();
+            }
+            else
+            {
+                stateContainer.sFnIDName(tempFnName);
+            }
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void OnFnDescChanged(string value)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            stateContainer.sFnDesc(value ?? "");
             refreshParent.InvokeAsync();
         }
     }
