@@ -31,9 +31,16 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Set base path for GitHub Pages
+        shell: python
         run: |
-          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-          sed -i "s|<base href=\"/\" />|<base href=\"/${REPO_NAME}/\" />|" wwwroot/index.html
+          repo = '${{ github.repository }}'
+          repo_name = repo.split('/')[1]
+          with open('wwwroot/index.html', 'r') as f:
+              content = f.read()
+          content = content.replace('<base href="/" />', f'<base href="/{repo_name}/" />')
+          with open('wwwroot/index.html', 'w') as f:
+              f.write(content)
+          print(f'Set <base> href to "/{repo_name}/"')
 
       - name: Restore dependencies
         run: dotnet restore
