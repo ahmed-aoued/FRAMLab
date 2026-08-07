@@ -1,0 +1,81 @@
+﻿@using MudBlazor
+
+<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Hexagon" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">FRAMLab</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            For more information on FRAM - the FUNCTIONAL RESONANCE ANALYSIS METHOD
+            for modelling non-trivial socio-technical systems, please visit <MudLink Href="https://functionalresonance.com/" Target="_blank">functionalresonance.com</MudLink>
+        </MudText>
+        <MudSimpleTable Dense="true" Hover="false" Elevation="0" Class="mb-3 about-shortcuts">
+            <tbody>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.UploadFile" Size="Size.Small" /></td><td>Upload an existing FMV data file</td>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" /></td><td>Download the model as an FMV data file</td></tr>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" /></td><td>Download the model as an SVG image</td>
+                    <td><kbd>Ctrl+R</kbd></td><td>Refresh new model</td></tr>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Small" /></td><td>Zoom out</td>
+                    <td><MudIcon Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Small" /></td><td>Zoom in</td></tr>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.Undo" Size="Size.Small" /></td><td>Undo</td>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Redo" Size="Size.Small" /></td><td>Redo</td></tr>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Small" /></td><td>Hide/Show aspect labels</td>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" /></td><td>Change function style rendering</td></tr>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" /></td><td>Restore latest model</td>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" /></td><td>Add colour to a function</td></tr>
+            </tbody>
+        </MudSimpleTable>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            <strong>Add a function</strong> with <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mx-1" /> and enter a name.
+            To delete a function, delete all aspects and then the name text of the function.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            <strong>I</strong>nput · <strong>O</strong>utput · <strong>P</strong>recondition · <strong>R</strong>esource · <strong>C</strong>ontrol · <strong>T</strong>ime —
+            add an aspect to the selected function. Select a function by clicking/tapping (it shows a highlight). To delete an aspect, delete all its text.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            When an <strong>Output</strong> aspect has the same name as an <strong>I P R C T</strong> aspect on another function, a potential coupling line connects the functions.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Drag a function to arrange the model. On iPad use long-press to lock scrolling. Use F11 for full-screen, or install the app for offline use.
+        </MudText>
+        <MudDivider Class="mb-2" />
+        <MudText Typo="Typo.caption"><strong>Copyright © 2021 ZERPRIZE LIMITED</strong></MudText>
+        <MudText Typo="Typo.caption" Class="mb-2">
+            This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or any later version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY. See <MudLink Href="https://www.gnu.org/licenses/" Target="_blank">gnu.org/licenses</MudLink>.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudLink Href="https://github.com/ahmed-aoued/FRAMLab" Target="_blank" Class="mr-4">Source Code</MudLink>
+        <MudLink Href="_blank" Target="_blank" Class="mr-4">Privacy Policy</MudLink>
+        <MudLink Href="_blank" Target="_blank" Class="mr-auto">Instructions</MudLink>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public EventCallback<bool> OnClick { get; set; }
+
+    private bool _visible
+    {
+        get => true;
+        set { if (!value) { _ = OnClick.InvokeAsync(false); } }
+    }
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true
+    };
+
+    private async Task Close()
+    {
+        await OnClick.InvokeAsync(false);
+    }
+}

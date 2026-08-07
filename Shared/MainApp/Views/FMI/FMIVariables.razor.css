@@ -1,0 +1,22 @@
+﻿.modal-variables {
+    position: absolute;
+    max-width: fit-content;
+    margin-top: calc(-50vh + 100px);
+    margin-right: auto;
+    margin-bottom: auto;
+    margin-left: 0.5rem;
+}
+.modal-var-body {
+    overflow-y: scroll;
+    max-height: 20vh;
+    font-size: smaller;
+    font-family: 'PT Sans Caption', sans-serif;
+    padding: 0 0 0 4px;
+}
+.var-variables {
+    width: 67%;
+    border-right: 1px solid var(--line);
+}
+.var-functions {
+    width: 33%;
+}

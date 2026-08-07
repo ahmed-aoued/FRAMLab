@@ -1,0 +1,42 @@
+﻿@using MudBlazor
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div>
+    @Body
+</div>
+
+@code {
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#49BECC",
+            PrimaryContrastText = "#ffffff",
+            AppbarBackground = "#ffffff",
+            AppbarText = "#103A42",
+            DrawerBackground = "#ffffff",
+            DrawerText = "#103A42",
+            Surface = "#ffffff",
+            Background = "#EEF7F9",
+            TextPrimary = "#103A42",
+            TextSecondary = "#5E7A80",
+            Divider = "#E2EDEF"
+        },
+        Typography = new Typography()
+        {
+            Default = new DefaultTypography()
+            {
+                FontFamily = new[] { "Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif" }
+            }
+        },
+        LayoutProperties = new LayoutProperties()
+        {
+            DefaultBorderRadius = "8px"
+        }
+    };
+}

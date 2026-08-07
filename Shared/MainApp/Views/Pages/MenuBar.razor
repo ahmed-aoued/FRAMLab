@@ -1,0 +1,961 @@
+﻿@using System.IO
+@using System.Text
+@using MudBlazor
+@inject ILocalStorageService localStorage
+@inject IJSRuntime JSRuntime
+@inject BrowserService Service
+@inject StateContainer stateContainer
+@inject AgentLevelService agentLevelService
+@inject IConfiguration render
+@inject IStringLocalizer<Localization.SharedResource> Loc
+
+<MudAppBar Fixed="true" Dense="true" Elevation="1" Class="framlab-appbar">
+    <div class="d-flex align-center flex-grow-1" style="gap:4px; min-width:0; overflow:hidden;">
+        @* Project: open / save *@
+        <MudTooltip Text="@Loc["OPEN_TOOLTIP"]">
+            <div class="mud-icon-button-file">
+                <InputFile id="openFileBtn" OnChange="onInputFileChange" single accept=".xfmv" class="file-input-overlay" title="@Loc["OPEN_TOOLTIP"]" />
+                <MudIconButton Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" Size="Size.Medium" aria-label="@Loc["OPEN_TOOLTIP"]" />
+            </div>
+        </MudTooltip>
+        <MudTooltip Text="@Loc["SAVE_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary" Size="Size.Medium" OnClick="OnFileSave" aria-label="@Loc["SAVE_TOOLTIP"]" />
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Zoom *@
+        <MudTooltip Text="@Loc["ZOOM_MINUS_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Medium" OnClick="zoomMinus" aria-label="@Loc["ZOOM_MINUS_TOOLTIP"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["ZOOM_FULLSCREEN"]">
+            <MudIconButton Icon="@Icons.Material.Filled.FitScreen" Size="Size.Medium" OnClick="zoomFill" aria-label="@Loc["ZOOM_FULLSCREEN"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["ZOOM_PLUS_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Medium" OnClick="zoomPlus" aria-label="@Loc["ZOOM_PLUS_TOOLTIP"]" />
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Undo / redo *@
+        <MudTooltip Text="@Loc["UNDO_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Undo" Size="Size.Medium" OnClick="actionUndo" aria-label="@Loc["UNDO_TOOLTIP"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["REDO_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Redo" Size="Size.Medium" OnClick="actionRedo" aria-label="@Loc["REDO_TOOLTIP"]" />
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Group *@
+        <MudTooltip Text="@L("GROUP_TOOLTIP", "Group")">
+            <MudIconButton Size="Size.Medium" OnClick="actionGroup" aria-label="@L("GROUP_TOOLTIP", "Group")">
+                <svg viewBox="5 12 90 100" style="width:20px;height:20px;">
+                    <defs>
+                        <path transform="translate(-50, -50)" id="fno" d="M 14 50 L 32 18.8 L 67.5 18.8 L 85.5 50 L 67.5 81.1 L 32 81.1 L 14 50 Z" stroke="currentColor" stroke-width="4" fill-opacity="0" />
+                    </defs>
+                    <g transform="translate(50, 50)">
+                        <use xlink:href="#fno" transform="scale(0.75)" />
+                        <use xlink:href="#fno" />
+                    </g>
+                </svg>
+            </MudIconButton>
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+
+        @* Overflow: selection import/export, image, pdf *@
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Medium" Dense="true" AriaLabel="@L("MORE_ACTIONS", "More actions")" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+            <MudMenuItem>
+                <div class="mud-menu-item-file">
+                    <InputFile id="importSelectionBtn" OnChange="OnSelectionImport" single accept=".sxfmv" class="file-input-overlay" />
+                    <div class="d-flex align-center" style="gap:8px;">
+                        <MudIcon Icon="@Icons.Material.Filled.FileUpload" Size="Size.Small" />
+                        <span>@L("IMPORT_SELECTION", "Import selection (.sxfmv)")</span>
+                    </div>
+                </div>
+            </MudMenuItem>
+            <MudMenuItem OnClick="OnSelectionExport">
+                <div class="d-flex align-center" style="gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.FileDownload" Size="Size.Small" />
+                    <span>@L("EXPORT_SELECTION", "Export selection (.sxfmv)")</span>
+                </div>
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem OnClick="OnImageSave">
+                <div class="d-flex align-center" style="gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
+                    <span>@Loc["IMAGE_TOOLTIP"]</span>
+                </div>
+            </MudMenuItem>
+            <MudMenuItem OnClick="b_showPDF">
+                <div class="d-flex align-center" style="gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
+                    <span>@L("PDF_REPORT", "PDF report")</span>
+                </div>
+            </MudMenuItem>
+        </MudMenu>
+
+        <MudSpacer />
+
+        @* Right side: view toggles *@
+        <MudTooltip Text="@Loc["SHOW_LABEL"]">
+            <MudToggleIconButton Toggled="@_labelsOn" ToggledChanged="OnLabelsToggled"
+                                 Icon="@Icons.Material.Outlined.Label" ToggledIcon="@Icons.Material.Filled.Label"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["SHOW_LABEL"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["RENDER"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Medium" OnClick="ChangeFnStyle" aria-label="@Loc["RENDER"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["TABLE_VIEW"]">
+            <MudToggleIconButton Toggled="@_spreadsheetOn" ToggledChanged="OnSpreadsheetToggled"
+                                 Icon="@Icons.Material.Outlined.GridOn" ToggledIcon="@Icons.Material.Filled.GridOn"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["TABLE_VIEW"]" />
+        </MudTooltip>
+        <MudTooltip Text="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")">
+            <MudToggleIconButton Toggled="@_agentsLevelsViewOn" ToggledChanged="OnAgentsLevelsViewToggled"
+                                 Icon="@Icons.Material.Outlined.AccountTree" ToggledIcon="@Icons.Material.Filled.AccountTree"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["RELOAD"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Medium" OnClick="Recover" aria-label="@Loc["RELOAD"]" />
+        </MudTooltip>
+        <MudTooltip Text="@Loc["INFO_TOOLTIP"]">
+            <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Medium" OnClick="ShowInfo" aria-label="@Loc["INFO_TOOLTIP"]" />
+        </MudTooltip>
+        <MudTooltip Text="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")">
+            <MudToggleIconButton Toggled="@_rightPanelOn" ToggledChanged="OnRightPanelToggled"
+                                 Icon="@Icons.Material.Outlined.Tune" ToggledIcon="@Icons.Material.Filled.Tune"
+                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")" />
+        </MudTooltip>
+    </div>
+</MudAppBar>
+
+@code {
+    [Parameter]
+    public EventCallback refreshParent { get; set; }
+    [Parameter]
+    public EventCallback<InputFileChangeEventArgs> onInputFileChange { get; set; }
+    [Parameter]
+    public EventCallback fileIsLoaded { get; set; }
+
+    // Localization helper: falls back to a default English string if the resx key is missing.
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
+
+    // Toggle state derived from StateContainer (kept in sync on each render).
+    private bool _labelsOn => stateContainer.aspectLabelsDisplay != "none";
+    private bool _spreadsheetOn => stateContainer.spreadsheetVisible > 0;
+    private bool _agentsLevelsViewOn => stateContainer.AgentsLevelsViewActive;
+    private bool _rightPanelOn => stateContainer.rightPanel == "agents-levels";
+
+    private void OnLabelsToggled(bool _) => ShowLabels();
+    private void OnSpreadsheetToggled(bool _) => showSpreadsheet();
+    private void OnAgentsLevelsViewToggled(bool _) => ToggleAgentsLevelsView();
+    private void OnRightPanelToggled(bool _) => ToggleAgentsLevelsPanel();
+
+    public void showSpreadsheet()
+    {
+        stateContainer.spreadsheetVisible += 1;
+        if (stateContainer.spreadsheetVisible > 2)
+        {
+            stateContainer.spreadsheetVisible = 0;
+        }
+        refreshParent.InvokeAsync();
+    }
+    private void ToggleAgentsLevelsView()
+    {
+        stateContainer.ToggleAgentsLevelsView();
+        refreshParent.InvokeAsync();
+    }
+    private void ToggleAgentsLevelsPanel()
+    {
+        stateContainer.rightPanel = stateContainer.rightPanel == "agents-levels" ? "" : "agents-levels";
+        refreshParent.InvokeAsync();
+    }
+    public async void OnFileSave()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            foreach (var fn in stateContainer.functionList)
+            {
+                foreach (string[] mdKey in fn.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
+                {
+                    mdKey[1] = mdKey[4]; //return to initial value
+                }
+            }
+            stateContainer.selectedFn = "-1"; //this action also updates the metadata in the xml
+            var saveXfmv = stateContainer.projectData_Undo[0].OuterXml;
+            //var textBytes = Encoding.UTF8.GetBytes(saveXfmv);
+            //string saveBase = Convert.ToBase64String(textBytes);
+            await JSRuntime.InvokeAsync<object>(
+                "FileSaveAs",
+                stateContainer.fileName,
+                saveXfmv
+            );
+        }
+    }
+    public async Task OnSelectionExport()
+    {
+        if (!stateContainer.fileLoaded)
+        {
+            stateContainer.debugOutput = "Open a project before exporting a selection.";
+            return;
+        }
+
+        var selectedIds = GetSelectedFunctionIds();
+        if (selectedIds.Count == 0)
+        {
+            stateContainer.debugOutput = "Select at least one function to export.";
+            return;
+        }
+
+        if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction?.IDName == "")
+        {
+            stateContainer.defaultFnLabel();
+        }
+        stateContainer.selectedFn = "-1";
+
+        var exportDoc = BuildSelectionExport(selectedIds);
+        var baseName = Path.GetFileNameWithoutExtension(stateContainer.fileName);
+        var exportName = string.IsNullOrWhiteSpace(baseName) ? "selection.sxfmv" : $"{baseName}-selection.sxfmv";
+        await JSRuntime.InvokeAsync<object>(
+            "FileSaveAs",
+            exportName,
+            exportDoc.OuterXml
+        );
+    }
+
+    public async Task OnSelectionImport(InputFileChangeEventArgs e)
+    {
+        if (!stateContainer.fileLoaded)
+        {
+            stateContainer.debugOutput = "Open a project before importing a selection.";
+            return;
+        }
+
+        var buffer = new byte[e.File.Size];
+        await e.File.OpenReadStream(1050000).ReadAsync(buffer);
+        var content = Encoding.UTF8.GetString(buffer);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            stateContainer.debugOutput = "Selection file was empty.";
+            return;
+        }
+
+        var importDoc = new XmlDocument();
+        try
+        {
+            importDoc.LoadXml(content);
+        }
+        catch
+        {
+            stateContainer.debugOutput = "Selection file could not be parsed.";
+            return;
+        }
+
+        var importedCount = ImportSelectionDocument(importDoc);
+        if (importedCount == 0)
+        {
+            stateContainer.debugOutput = "No functions found to import.";
+            return;
+        }
+
+        await fileIsLoaded.InvokeAsync();
+        if (stateContainer.AgentsLevelsViewActive)
+        {
+            agentLevelService.RefreshLayoutIfChanged();
+        }
+        await refreshParent.InvokeAsync();
+        stateContainer.debugOutput = $"Imported {importedCount} functions.";
+    }
+    public async void OnImageSave()
+    {
+        string imageName = $"{stateContainer.fileName.Substring(0, stateContainer.fileName.LastIndexOf("."))}.svg";
+        await JSRuntime.InvokeAsync<object>(
+        "FileSaveAs",
+        imageName,
+        await JSRuntime.InvokeAsync<string>("getHTML", "canvas_1")
+        );
+    }
+
+    private HashSet<string> GetSelectedFunctionIds()
+    {
+        var selectedIds = new HashSet<string>();
+        if (stateContainer.selectedMulti.Count > 0)
+        {
+            foreach (var id in stateContainer.selectedMulti)
+            {
+                selectedIds.Add(id);
+            }
+        }
+        else if (stateContainer.selectedFn != "-1")
+        {
+            selectedIds.Add(stateContainer.selectedFn);
+        }
+        return selectedIds;
+    }
+
+    private XmlDocument BuildSelectionExport(HashSet<string> selectedIds)
+    {
+        var source = stateContainer.projectData_Undo[0];
+        var exportDoc = new XmlDocument();
+        exportDoc.LoadXml("<FM Version=\"0,3,0,0\"><Functions></Functions><Inputs></Inputs><Preconditions></Preconditions><Resources></Resources><Controls></Controls><Times></Times><Outputs></Outputs><Aspects></Aspects><Groups></Groups><Agents></Agents><Levels></Levels></FM>");
+
+        var exportFunctions = exportDoc.SelectSingleNode("//FM/Functions")!;
+        CopyAttributes(source.SelectSingleNode("//FM/Functions"), exportFunctions, exportDoc);
+
+        var exportAspects = exportDoc.SelectSingleNode("//FM/Aspects")!;
+        CopyAttributes(source.SelectSingleNode("//FM/Aspects"), exportAspects, exportDoc);
+
+        foreach (var id in selectedIds)
+        {
+            var fnNode = source.SelectSingleNode($"//FM/Functions/Function[IDNr=\"{id}\"]");
+            if (fnNode is not null)
+            {
+                exportFunctions.AppendChild(exportDoc.ImportNode(fnNode, true));
+            }
+        }
+
+        CopySectionByFunctionId(source, exportDoc, "Inputs", "Input", selectedIds);
+        CopySectionByFunctionId(source, exportDoc, "Preconditions", "Precondition", selectedIds);
+        CopySectionByFunctionId(source, exportDoc, "Resources", "Resource", selectedIds);
+        CopySectionByFunctionId(source, exportDoc, "Controls", "Control", selectedIds);
+        CopySectionByFunctionId(source, exportDoc, "Times", "Time", selectedIds);
+        CopySectionByFunctionId(source, exportDoc, "Outputs", "Output", selectedIds);
+
+        var aspects = source.SelectNodes("//FM/Aspects/Aspect");
+        if (aspects is not null)
+        {
+            foreach (XmlNode aspect in aspects)
+            {
+                var outputFn = aspect.SelectSingleNode("@outputFn")?.Value ?? "";
+                var toFn = aspect.SelectSingleNode("@toFn")?.Value ?? "";
+                if (selectedIds.Contains(outputFn) && selectedIds.Contains(toFn))
+                {
+                    exportAspects.AppendChild(exportDoc.ImportNode(aspect, true));
+                }
+            }
+        }
+
+        var agentIds = new HashSet<string>();
+        var levelIds = new HashSet<string>();
+        foreach (var id in selectedIds)
+        {
+            var fnNode = source.SelectSingleNode($"//FM/Functions/Function[IDNr=\"{id}\"]");
+            var agentId = fnNode?.SelectSingleNode("@agentId")?.Value ?? "";
+            var levelId = fnNode?.SelectSingleNode("@levelId")?.Value ?? "";
+            if (!string.IsNullOrWhiteSpace(agentId)) agentIds.Add(agentId);
+            if (!string.IsNullOrWhiteSpace(levelId)) levelIds.Add(levelId);
+        }
+
+        var exportAgents = exportDoc.SelectSingleNode("//FM/Agents")!;
+        foreach (var agentId in agentIds)
+        {
+            var agentNode = source.SelectSingleNode($"//FM/Agents/Agent[IDNr=\"{agentId}\"]");
+            if (agentNode is not null)
+            {
+                exportAgents.AppendChild(exportDoc.ImportNode(agentNode, true));
+            }
+        }
+
+        var exportLevels = exportDoc.SelectSingleNode("//FM/Levels")!;
+        foreach (var levelId in levelIds)
+        {
+            var levelNode = source.SelectSingleNode($"//FM/Levels/Level[IDNr=\"{levelId}\"]");
+            if (levelNode is not null)
+            {
+                exportLevels.AppendChild(exportDoc.ImportNode(levelNode, true));
+            }
+        }
+
+        return exportDoc;
+    }
+
+    private void CopyAttributes(XmlNode? sourceNode, XmlNode targetNode, XmlDocument doc)
+    {
+        if (sourceNode?.Attributes is null) return;
+        foreach (XmlAttribute attr in sourceNode.Attributes)
+        {
+            var newAttr = doc.CreateAttribute(attr.Name);
+            newAttr.Value = attr.Value;
+            targetNode.Attributes?.Append(newAttr);
+        }
+    }
+
+    private void CopySectionByFunctionId(XmlDocument source, XmlDocument exportDoc, string sectionName, string elementName, HashSet<string> selectedIds)
+    {
+        var sourceNodes = source.SelectNodes($"//FM/{sectionName}/{elementName}");
+        if (sourceNodes is null) return;
+        var targetSection = exportDoc.SelectSingleNode($"//FM/{sectionName}")!;
+        foreach (XmlNode node in sourceNodes)
+        {
+            var fnId = node.SelectSingleNode("FunctionIDNr")?.InnerText ?? "";
+            if (selectedIds.Contains(fnId))
+            {
+                targetSection.AppendChild(exportDoc.ImportNode(node, true));
+            }
+        }
+    }
+
+    private int ImportSelectionDocument(XmlDocument importDoc)
+    {
+        var functions = importDoc.SelectNodes("//FM/Functions/Function");
+        if (functions is null || functions.Count == 0)
+        {
+            return 0;
+        }
+
+        stateContainer.updateUndo();
+        var target = stateContainer.projectData_Undo[0];
+
+        var idMap = new Dictionary<string, string>();
+        var nextFnId = GetNextId(target, "//FM/Functions/Function/IDNr");
+        var positionOffset = 40.0;
+
+        foreach (XmlNode fn in functions)
+        {
+            var oldId = fn.SelectSingleNode("IDNr")?.InnerText ?? "";
+            if (string.IsNullOrWhiteSpace(oldId))
+            {
+                continue;
+            }
+            var newId = nextFnId.ToString();
+            nextFnId += 1;
+            idMap[oldId] = newId;
+            fn.SelectSingleNode("IDNr")!.InnerText = newId;
+            ResetGroupAttributes(fn);
+            OffsetFunctionPosition(fn, positionOffset);
+        }
+
+        var agentMap = BuildAgentMap(importDoc, target, functions);
+        var levelMap = BuildLevelMap(importDoc, target, functions);
+
+        foreach (XmlNode fn in functions)
+        {
+            UpdateFunctionReference(fn, "agentId", agentMap);
+            UpdateFunctionReference(fn, "levelId", levelMap);
+        }
+
+        var targetFunctions = EnsureRoot(target, "Functions");
+        foreach (XmlNode fn in functions)
+        {
+            targetFunctions.AppendChild(target.ImportNode(fn, true));
+        }
+
+        ImportSectionByFunctionId(importDoc, target, "Inputs", "Input", idMap);
+        ImportSectionByFunctionId(importDoc, target, "Preconditions", "Precondition", idMap);
+        ImportSectionByFunctionId(importDoc, target, "Resources", "Resource", idMap);
+        ImportSectionByFunctionId(importDoc, target, "Controls", "Control", idMap);
+        ImportSectionByFunctionId(importDoc, target, "Times", "Time", idMap);
+        ImportSectionByFunctionId(importDoc, target, "Outputs", "Output", idMap);
+        ImportAspectCouplings(importDoc, target, idMap);
+
+        return functions.Count;
+    }
+
+    private void ResetGroupAttributes(XmlNode functionNode)
+    {
+        var attributes = new[] { "groupType", "groupIDNr", "groupActive", "groupX", "groupY" };
+        foreach (var attribute in attributes)
+        {
+            if (functionNode.Attributes?[attribute] is not null)
+            {
+                functionNode.Attributes[attribute]!.Value = "";
+            }
+        }
+    }
+
+    private void OffsetFunctionPosition(XmlNode functionNode, double offset)
+    {
+        if (functionNode.Attributes?["x"] is not null)
+        {
+            functionNode.Attributes["x"]!.Value = OffsetValue(functionNode.Attributes["x"]!.Value, offset);
+        }
+        if (functionNode.Attributes?["y"] is not null)
+        {
+            functionNode.Attributes["y"]!.Value = OffsetValue(functionNode.Attributes["y"]!.Value, offset);
+        }
+        if (functionNode.Attributes?["groupX"] is not null)
+        {
+            functionNode.Attributes["groupX"]!.Value = OffsetValue(functionNode.Attributes["groupX"]!.Value, offset);
+        }
+        if (functionNode.Attributes?["groupY"] is not null)
+        {
+            functionNode.Attributes["groupY"]!.Value = OffsetValue(functionNode.Attributes["groupY"]!.Value, offset);
+        }
+    }
+
+    private string OffsetValue(string value, double offset)
+    {
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return (parsed + offset).ToString("0.##", CultureInfo.InvariantCulture);
+        }
+        return value;
+    }
+
+    private void UpdateFunctionReference(XmlNode functionNode, string attributeName, Dictionary<string, string> map)
+    {
+        var attr = functionNode.Attributes?[attributeName];
+        if (attr is null) return;
+        var oldId = attr.Value ?? "";
+        if (string.IsNullOrWhiteSpace(oldId)) return;
+        if (map.TryGetValue(oldId, out var newId))
+        {
+            attr.Value = newId;
+        }
+        else
+        {
+            attr.Value = "";
+        }
+    }
+
+    private Dictionary<string, string> BuildAgentMap(XmlDocument importDoc, XmlDocument targetDoc, XmlNodeList functions)
+    {
+        var map = new Dictionary<string, string>();
+        var targetAgents = EnsureRoot(targetDoc, "Agents");
+
+        var existingByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var existingAgents = targetDoc.SelectNodes("//FM/Agents/Agent");
+        if (existingAgents is not null)
+        {
+            foreach (XmlNode agent in existingAgents)
+            {
+                var name = agent.SelectSingleNode("Name")?.InnerText ?? "";
+                var id = agent.SelectSingleNode("IDNr")?.InnerText ?? "";
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(id))
+                {
+                    existingByName[name] = id;
+                }
+            }
+        }
+
+        var nextId = GetNextId(targetDoc, "//FM/Agents/Agent/IDNr");
+        foreach (XmlNode fn in functions)
+        {
+            var oldId = fn.SelectSingleNode("@agentId")?.Value ?? "";
+            if (string.IsNullOrWhiteSpace(oldId) || map.ContainsKey(oldId))
+            {
+                continue;
+            }
+
+            var importAgent = importDoc.SelectSingleNode($"//FM/Agents/Agent[IDNr=\"{oldId}\"]");
+            if (importAgent is null)
+            {
+                map[oldId] = "";
+                continue;
+            }
+
+            var name = importAgent.SelectSingleNode("Name")?.InnerText ?? "";
+            if (!string.IsNullOrWhiteSpace(name) && existingByName.TryGetValue(name, out var existingId))
+            {
+                map[oldId] = existingId;
+                continue;
+            }
+
+            var newId = nextId.ToString();
+            nextId += 1;
+            var clone = targetDoc.ImportNode(importAgent, true);
+            clone.SelectSingleNode("IDNr")!.InnerText = newId;
+            targetAgents.AppendChild(clone);
+            map[oldId] = newId;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                existingByName[name] = newId;
+            }
+        }
+
+        return map;
+    }
+
+    private Dictionary<string, string> BuildLevelMap(XmlDocument importDoc, XmlDocument targetDoc, XmlNodeList functions)
+    {
+        var map = new Dictionary<string, string>();
+        var targetLevels = EnsureRoot(targetDoc, "Levels");
+
+        var existingByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var existingLevels = targetDoc.SelectNodes("//FM/Levels/Level");
+        if (existingLevels is not null)
+        {
+            foreach (XmlNode level in existingLevels)
+            {
+                var name = level.SelectSingleNode("Name")?.InnerText ?? "";
+                var id = level.SelectSingleNode("IDNr")?.InnerText ?? "";
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(id))
+                {
+                    existingByName[name] = id;
+                }
+            }
+        }
+
+        var nextId = GetNextId(targetDoc, "//FM/Levels/Level/IDNr");
+        foreach (XmlNode fn in functions)
+        {
+            var oldId = fn.SelectSingleNode("@levelId")?.Value ?? "";
+            if (string.IsNullOrWhiteSpace(oldId) || map.ContainsKey(oldId))
+            {
+                continue;
+            }
+
+            var importLevel = importDoc.SelectSingleNode($"//FM/Levels/Level[IDNr=\"{oldId}\"]");
+            if (importLevel is null)
+            {
+                map[oldId] = "";
+                continue;
+            }
+
+            var name = importLevel.SelectSingleNode("Name")?.InnerText ?? "";
+            if (!string.IsNullOrWhiteSpace(name) && existingByName.TryGetValue(name, out var existingId))
+            {
+                map[oldId] = existingId;
+                continue;
+            }
+
+            var newId = nextId.ToString();
+            nextId += 1;
+            var clone = targetDoc.ImportNode(importLevel, true);
+            clone.SelectSingleNode("IDNr")!.InnerText = newId;
+            targetLevels.AppendChild(clone);
+            map[oldId] = newId;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                existingByName[name] = newId;
+            }
+        }
+
+        return map;
+    }
+
+    private void ImportSectionByFunctionId(XmlDocument importDoc, XmlDocument targetDoc, string sectionName, string elementName, Dictionary<string, string> idMap)
+    {
+        var sourceNodes = importDoc.SelectNodes($"//FM/{sectionName}/{elementName}");
+        if (sourceNodes is null || sourceNodes.Count == 0)
+        {
+            return;
+        }
+
+        var targetSection = EnsureRoot(targetDoc, sectionName);
+        var nextId = GetNextId(targetDoc, $"//FM/{sectionName}/{elementName}/IDNr");
+
+        foreach (XmlNode node in sourceNodes)
+        {
+            var fnId = node.SelectSingleNode("FunctionIDNr")?.InnerText ?? "";
+            if (!idMap.TryGetValue(fnId, out var mappedFnId))
+            {
+                continue;
+            }
+
+            var clone = targetDoc.ImportNode(node, true);
+            clone.SelectSingleNode("FunctionIDNr")!.InnerText = mappedFnId;
+            var idNode = clone.SelectSingleNode("IDNr");
+            if (idNode is not null)
+            {
+                idNode.InnerText = nextId.ToString();
+                nextId += 1;
+            }
+            targetSection.AppendChild(clone);
+        }
+    }
+
+    private void ImportAspectCouplings(XmlDocument importDoc, XmlDocument targetDoc, Dictionary<string, string> idMap)
+    {
+        var nodes = importDoc.SelectNodes("//FM/Aspects/Aspect");
+        if (nodes is null || nodes.Count == 0)
+        {
+            return;
+        }
+
+        var targetAspects = EnsureRoot(targetDoc, "Aspects");
+        foreach (XmlNode node in nodes)
+        {
+            var outputFn = node.SelectSingleNode("@outputFn")?.Value ?? "";
+            var toFn = node.SelectSingleNode("@toFn")?.Value ?? "";
+            if (!idMap.TryGetValue(outputFn, out var mappedOutput) || !idMap.TryGetValue(toFn, out var mappedTo))
+            {
+                continue;
+            }
+
+            var clone = targetDoc.ImportNode(node, true);
+            if (clone.Attributes?["outputFn"] is not null)
+            {
+                clone.Attributes["outputFn"]!.Value = mappedOutput;
+            }
+            if (clone.Attributes?["toFn"] is not null)
+            {
+                clone.Attributes["toFn"]!.Value = mappedTo;
+            }
+
+            var nameNode = clone.SelectSingleNode("Name");
+            if (nameNode is not null)
+            {
+                var parts = nameNode.InnerText.Split('|');
+                if (parts.Length >= 4)
+                {
+                    if (idMap.TryGetValue(parts[0], out var newOutput) && idMap.TryGetValue(parts[2], out var newTo))
+                    {
+                        parts[0] = newOutput;
+                        parts[2] = newTo;
+                        nameNode.InnerText = string.Join("|", parts);
+                    }
+                }
+            }
+
+            targetAspects.AppendChild(clone);
+        }
+    }
+
+    private XmlNode EnsureRoot(XmlDocument doc, string name)
+    {
+        var node = doc.SelectSingleNode($"//FM/{name}");
+        if (node is null)
+        {
+            node = doc.CreateElement(name);
+            doc.SelectSingleNode("//FM")!.AppendChild(node);
+        }
+        return node;
+    }
+
+    private int GetNextId(XmlDocument doc, string xpath)
+    {
+        var next = 0;
+        var nodes = doc.SelectNodes(xpath);
+        if (nodes is not null)
+        {
+            foreach (XmlNode node in nodes)
+            {
+                if (int.TryParse(node.InnerText, out var value))
+                {
+                    next = Math.Max(next, value + 1);
+                }
+            }
+        }
+        return next;
+    }
+    private void zoomPlus()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            stateContainer.scaleZoom += 0.25;
+            if (stateContainer.scaleZoom > 4)
+            {
+                stateContainer.scaleZoom = 4;
+            }
+            stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+            stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void zoomMinus()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            stateContainer.scaleZoom -= 0.25;
+            if (stateContainer.scaleZoom < 0.25)
+            {
+                stateContainer.scaleZoom = 0.25;
+            }
+            stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+            stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+            refreshParent.InvokeAsync();
+        }
+    }
+    public async void zoomFill()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            var dimensions = await Service.getDimensions();
+            if (stateContainer.canvasWidth / stateContainer.canvasHeight > Convert.ToDouble(dimensions.width - 270) / Convert.ToDouble(dimensions.height - 90))
+            {
+                stateContainer.canvasWidth = dimensions.width - 270;
+                stateContainer.scaleZoom = stateContainer.canvasWidth / stateContainer.viewWidth;
+                stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+            }
+            else
+            {
+                stateContainer.canvasHeight = dimensions.height - 90;
+                stateContainer.scaleZoom = stateContainer.canvasHeight / stateContainer.viewHeight;
+                stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+            }
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+            await refreshParent.InvokeAsync();
+        }
+    }
+    private void actionUndo()
+    {
+        if (stateContainer.undoIndex > 0)
+        {
+            if (stateContainer.projectData_Undo[stateContainer.undoIndex + 1].OuterXml.Length == 0)
+            {
+                stateContainer.updateUndo();
+                stateContainer.undoIndex -= 1;
+            }
+            stateContainer.projectData_Undo[0] = (XmlDocument)stateContainer.projectData_Undo[stateContainer.undoIndex].Clone();
+            fileIsLoaded.InvokeAsync();
+            stateContainer.selectedFn = stateContainer.selectedFn_Undo[stateContainer.undoIndex];
+            if (stateContainer.selectedFn != "-1")
+            {
+                stateContainer.fnName = stateContainer.selectedFunction?.IDName ?? "";
+                stateContainer.isDisabled = false;
+            }
+            stateContainer.undoIndex -= 1;
+        }
+    }
+    private void actionRedo()
+    {
+        if (stateContainer.projectData_Undo[stateContainer.undoIndex + 2] is not null)
+        {
+            if (stateContainer.projectData_Undo[stateContainer.undoIndex + 2].HasChildNodes)
+            {
+                stateContainer.undoIndex += 1;
+                stateContainer.projectData_Undo[0] = (XmlDocument)stateContainer.projectData_Undo[stateContainer.undoIndex + 1].Clone();
+                fileIsLoaded.InvokeAsync();
+                stateContainer.selectedFn = stateContainer.selectedFn_Undo[stateContainer.undoIndex + 1];
+                if (stateContainer.selectedFn != "-1")
+                {
+                    stateContainer.fnName = stateContainer.selectedFunction?.IDName ?? "";
+                    stateContainer.isDisabled = false;
+                }
+            }
+        }
+    }
+    private void ShowLabels()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            if (stateContainer.aspectLabelsDisplay == "none")
+            {
+                stateContainer.aspectLabelsDisplay = "";
+            }
+            else
+            {
+                stateContainer.aspectLabelsDisplay = "none";
+            }
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void ChangeFnStyle()
+    {
+        if (stateContainer.fileLoaded)
+        {
+            stateContainer.newFnStyle += 1;
+            if (render[$"{stateContainer.newFnStyle}:Name"] == null)
+            {
+                stateContainer.newFnStyle = 0;
+            }
+            foreach (XmlNode fn in stateContainer.projectData_Undo[0].SelectNodes("//FM/Functions/Function")!)
+            {
+                fn.SelectSingleNode("@fnStyle")!.Value = stateContainer.newFnStyle.ToString();
+                stateContainer.functionList.Find(x => x.IDNr == fn.SelectSingleNode("IDNr")?.InnerText)!.fnStyle = stateContainer.newFnStyle.ToString();
+            }
+            fileIsLoaded.InvokeAsync();
+        }
+    }
+    public async Task Restore()
+    {
+        try
+        {
+            stateContainer.isBackup = await localStorage.GetItemAsync<bool>("isBackup");
+            if (stateContainer.isBackup)
+            {
+                stateContainer.debugOutput = "Backup loading ...";
+                stateContainer.fileLoaded = false;
+                stateContainer.viewWidth = 0;
+                stateContainer.viewHeight = 0;
+                stateContainer.undoIndex = 0;
+                stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+                stateContainer.projectData_Undo[0] = new XmlDocument();
+                stateContainer.projectData_Undo[0].LoadXml(await localStorage.GetItemAsync<string>("backupData"));
+                stateContainer.fileName = await localStorage.GetItemAsync<string>("backupFileName");
+                stateContainer.inputDropStatus = "file-input-zone-hide";
+                stateContainer.isBackup = false;
+                await fileIsLoaded.InvokeAsync();
+                await localStorage.SetItemAsync("isBackup", false);
+            }
+        }
+        catch
+        {
+            stateContainer.debugOutput = "";
+        }
+    }
+    public async Task Recover()
+    {
+        if (stateContainer.AgentsLevelsViewActive)
+        {
+            if (agentLevelService.RefreshLayoutIfChanged())
+            {
+                await refreshParent.InvokeAsync();
+            }
+        }
+        else
+        {
+            await localStorage.SetItemAsync("isBackup", true);
+            await Restore();
+        }
+    }
+    private void ShowInfo()
+    {
+        stateContainer.showModal = true;
+        refreshParent.InvokeAsync();
+    }
+    private void b_showPDF()
+    {
+        stateContainer.showPDFreport = !stateContainer.showPDFreport;
+        refreshParent.InvokeAsync();
+    }
+    private void actionGroup()
+    {
+        if (stateContainer.selectedMulti.Count > 0)
+        {
+            var parentIDNr = stateContainer.selectedMulti[0];
+            XmlNode? group = stateContainer.fnGroups!.SelectSingleNode($"Group[FunctionIDNr={parentIDNr}]");
+            if (group == null)
+            {
+                group = stateContainer.projectData_Undo[0].CreateElement("Group");
+                XmlAttribute addActive = stateContainer.projectData_Undo[0].CreateAttribute("active");
+                XmlNode addFnIDNr = stateContainer.projectData_Undo[0].CreateElement("FunctionIDNr");
+                XmlNode addChild = stateContainer.projectData_Undo[0].CreateElement("CHILD");
+                group.Attributes!.Append(addActive);
+                group.AppendChild(addFnIDNr);
+                group.AppendChild(addChild);
+                stateContainer.fnGroups!.AppendChild(group);
+            }
+            else
+            {
+                foreach (var oldFnG in stateContainer.functionList.FindAll(x => x.groupIDNr.Value == parentIDNr))
+                {
+                    oldFnG.groupIDNr.Value = "";
+                    oldFnG.groupType.Value = "";
+                    oldFnG.groupActive.Value = "";
+                    oldFnG.group = null;
+                }
+            }
+            if (stateContainer.selectedMulti.Count == 1)
+            {
+                stateContainer.fnGroups.RemoveChild(group);
+                stateContainer.selectedFunction!.groupIDNr.Value = "";
+                stateContainer.selectedFunction.groupType.Value = "";
+                stateContainer.selectedFunction.groupActive.Value = "";
+                group = null;
+            }
+            else
+            {
+                group.SelectSingleNode("@active")!.Value = "";
+                group.SelectSingleNode("FunctionIDNr")!.InnerText = parentIDNr;
+                group.SelectSingleNode("CHILD")!.InnerText = string.Join("|", stateContainer.selectedMulti.Skip(1));
+
+                var parentFn = stateContainer.functionList.Find(x => x.IDNr == parentIDNr);
+                parentFn!.groupIDNr.Value = parentIDNr;
+            }
+            stateContainer.selectedMulti = new List<string>();
+            stateContainer.selectedFn = parentIDNr;
+            stateContainer.selectedFunction!.group = group;
+            refreshParent.InvokeAsync();
+        }
+    }
+}

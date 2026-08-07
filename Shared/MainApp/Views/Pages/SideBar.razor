@@ -1,0 +1,1577 @@
+@using MudBlazor
+@inject IJSRuntime JSRuntime
+@inject StateContainer stateContainer
+@inject IConfiguration render
+@inject IStringLocalizer<Localization.SharedResource> Loc
+@using System.Linq
+@using System.Globalization
+
+<div class="sidebar">
+    <div class="v-panel pr-2">
+        @if (stateContainer.showKeys != "")
+        {
+            <hr class="mt-0 mb-0" />
+            <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
+            <hr class="mt-2 mb-2" />
+        }
+        <div class="d-flex pt-2 pb-0 align-start">
+            <div class="d-flex flex-column sidebar-btn-col">
+                <MudIconButton id="newFnButton" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Medium"
+                               title="@Loc["NEW_TOOLTIP"]" tabindex="3" OnClick=newFunction
+                               @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup=NextFn
+                               aria-label="@Loc["NEW_TOOLTIP"]" Class="sidebar-new-fn" />
+                <div class="d-flex">
+                    <button class="btn btn-half btn-half-s" title=@Loc["FN_FONT_DECREASE"] tabindex="1" @onclick=zoomFs @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>A</button>
+                    <button class="btn btn-half btn-half-l" title=@Loc["FN_FONT_INCREASE"] tabindex="2" @onclick=zoomFl @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>A</button>
+                </div>
+            </div>
+            <div class="flex-grow-1">
+                <MudTextField @key="@("fnname-" + stateContainer.selectedFn)" T="string"
+                              Value="@stateContainer.fnName" ValueChanged="OnFnNameChanged"
+                              Label="@Loc["NAME_FN"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Disabled="@stateContainer.isDisabled" tabindex="4"
+                              Immediate="false" Class="sidebar-fn-name" />
+            </div>
+        </div>
+        <div class="d-flex pt-1 align-start">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default"
+                           title="@Loc["FN_DESCRIPTION"]" OnClick=expandDesc aria-label="@Loc["FN_DESCRIPTION"]" Class="sidebar-desc-toggle" />
+            <div class="flex-grow-1">
+                <MudTextField @key="@("fndesc-" + stateContainer.selectedFn)" T="string"
+                              Value="@(stateContainer.selectedFunction?.Description ?? "")" ValueChanged="OnFnDescChanged"
+                              Label="@Loc["FN_DESCRIPTION"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Disabled="@stateContainer.isDisabled" tabindex="5"
+                              Lines="@(descriptionClass == "fmi-descE" ? 5 : 2)" Class="sidebar-fn-desc" />
+            </div>
+        </div>
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button id="newOButton" class="btn btn-menu btn-textp" title=@Loc["OUTPUT"] tabindex="5" @onclick="@((e) => NewAspect(e, "Output"))" @onkeyup=NextFn>O</button>
+                <input type="text" name="fnProfileInput" class="btn btn-menu btn-menu-s" title=@profileFnTooltip() tabindex="27" value=@showFnProfile() disabled=@disableFnProfile() @onchange="@((e) => changeFnProfile(e, "Fn"))">
+            </div>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                GetNodesO = stateContainer.outputsList.FindAll(x => x.Type == "Output" && x.FunctionIDNr == stateContainer.selectedFn);
+                if (GetNodesO.Count > 0)
+                {
+                    var aspect = GetNodesO[0];
+                    <div class="autocomplete-wrapper">
+                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                               type="text" name="@($"output-{aspect.IDNr}")"
+                               @ref="aspect.elementReference"
+                               tabindex="6"
+                               value="@aspect.IDName"
+                               @oninput="@(e => HandleAspectInput(e, "Output", aspect.IDNr))"
+                               @onkeydown="@(e => HandleAspectKeyDown(e, "Output", aspect.IDNr))"
+                               @onfocus="@(e => OpenDropdown("Output", aspect.IDNr))"
+                               @onblur="@(async () => await HandleBlur("Output", aspect.IDNr))"
+                               @onchange="@(e => CommitAspect(e, "Output", aspect.IDNr))" />
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Output", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
+                        @if (IsDropdownOpen("Output", aspect.IDNr))
+                        {
+                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Output", aspect.IDNr))">
+                                @foreach (var item in GetFilteredExisting("Output", aspectFilterText))
+                                {
+                                    int idx = suggestionsActiveList.IndexOf(item);
+                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                        @onclick="@(() => SelectSuggestion("Output", aspect.IDNr, item))"
+                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                GetNodesO = null;
+            }
+        </div>
+        @if (GetNodesO is not null && GetNodesO.Count > 1)
+        {
+            int ListCount = 0;
+            @foreach (var aspect in GetNodesO)
+            {
+                if (ListCount > 0)
+                {
+                    <div class="d-flex aspect-list">
+                        <div class="autocomplete-wrapper">
+                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                                   type="text" name="@($"output-{aspect.IDNr}")"
+                                   @ref="aspect.elementReference"
+                                   tabindex="7"
+                                   value="@aspect.IDName"
+                                   @oninput="@(e => HandleAspectInput(e, "Output", aspect.IDNr))"
+                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Output", aspect.IDNr))"
+                                   @onfocus="@(e => OpenDropdown("Output", aspect.IDNr))"
+                                   @onblur="@(async () => await HandleBlur("Output", aspect.IDNr))"
+                                   @onchange="@(e => CommitAspect(e, "Output", aspect.IDNr))" />
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Output", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
+                            @if (IsDropdownOpen("Output", aspect.IDNr))
+                            {
+                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Output", aspect.IDNr))">
+                                    @foreach (var item in GetFilteredExisting("Output", aspectFilterText))
+                                    {
+                                        int idx = suggestionsActiveList.IndexOf(item);
+                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                            @onclick="@(() => SelectSuggestion("Output", aspect.IDNr, item))"
+                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+                ListCount++;
+            }
+        }
+        <!-- Input -->
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button id="newIButton" class="btn btn-menu btn-textp" title=@Loc["INPUT"] tabindex="8" @onclick="@((e) => NewAspect(e, "Input"))" @onkeyup=NextFn>I</button>
+                <button class="btn btn-half profile-symbol-btn" title=@profileITooltip() tabindex="28" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("I"))">@showProfile("I")</button>
+            </div>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                GetNodesI = stateContainer.aspectsList.FindAll(x => x.Type == "Input" && x.FunctionIDNr == stateContainer.selectedFn);
+                if (GetNodesI.Count > 0)
+                {
+                    var aspect = GetNodesI[0];
+                    <div class="autocomplete-wrapper">
+                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                               type="text" name="@($"input-{aspect.IDNr}")"
+                               @ref="aspect.elementReference"
+                               tabindex="9"
+                               value="@aspect.IDName"
+                               @oninput="@(e => HandleAspectInput(e, "Input", aspect.IDNr))"
+                               @onkeydown="@(e => HandleAspectKeyDown(e, "Input", aspect.IDNr))"
+                               @onfocus="@(e => OpenDropdown("Input", aspect.IDNr))"
+                               @onblur="@(async () => await HandleBlur("Input", aspect.IDNr))"
+                               @onchange="@(e => CommitAspect(e, "Input", aspect.IDNr))" />
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Input", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
+                        @if (IsDropdownOpen("Input", aspect.IDNr))
+                        {
+                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Input", aspect.IDNr))">
+                                @foreach (var item in GetFilteredExisting("Input", aspectFilterText))
+                                {
+                                    int idx = suggestionsActiveList.IndexOf(item);
+                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                        @onclick="@(() => SelectSuggestion("Input", aspect.IDNr, item))"
+                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                GetNodesI = null;
+            }
+        </div>
+        @if (GetNodesI is not null && GetNodesI.Count > 1)
+        {
+            int ListCount = 0;
+            @foreach (var aspect in GetNodesI)
+            {
+                if (ListCount > 0)
+                {
+                    <div class="d-flex aspect-list">
+                        <div class="autocomplete-wrapper">
+                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                                   type="text" name="@($"input-{aspect.IDNr}")"
+                                   @ref="aspect.elementReference"
+                                   tabindex="10"
+                                   value="@aspect.IDName"
+                                   @oninput="@(e => HandleAspectInput(e, "Input", aspect.IDNr))"
+                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Input", aspect.IDNr))"
+                                   @onfocus="@(e => OpenDropdown("Input", aspect.IDNr))"
+                                   @onblur="@(async () => await HandleBlur("Input", aspect.IDNr))"
+                                   @onchange="@(e => CommitAspect(e, "Input", aspect.IDNr))" />
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Input", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
+                            @if (IsDropdownOpen("Input", aspect.IDNr))
+                            {
+                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Input", aspect.IDNr))">
+                                    @foreach (var item in GetFilteredExisting("Input", aspectFilterText))
+                                    {
+                                        int idx = suggestionsActiveList.IndexOf(item);
+                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                            @onclick="@(() => SelectSuggestion("Input", aspect.IDNr, item))"
+                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+                ListCount++;
+            }
+        }
+        <!-- Precondition -->
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button id="newPButton" class="btn btn-menu btn-textp" title=@Loc["PRECONDITION"] tabindex="11" @onclick="@((e) => NewAspect(e, "Precondition"))" @onkeyup=NextFn>P</button>
+                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="29" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("P"))">@showProfile("P")</button>
+            </div>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                GetNodesP = stateContainer.aspectsList.FindAll(x => x.Type == "Precondition" && x.FunctionIDNr == stateContainer.selectedFn);
+                if (GetNodesP.Count > 0)
+                {
+                    var aspect = GetNodesP[0];
+                    <div class="autocomplete-wrapper">
+                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                               type="text" name="@($"precondition-{aspect.IDNr}")"
+                               @ref="aspect.elementReference"
+                               tabindex="12"
+                               value="@aspect.IDName"
+                               @oninput="@(e => HandleAspectInput(e, "Precondition", aspect.IDNr))"
+                               @onkeydown="@(e => HandleAspectKeyDown(e, "Precondition", aspect.IDNr))"
+                               @onfocus="@(e => OpenDropdown("Precondition", aspect.IDNr))"
+                               @onblur="@(async () => await HandleBlur("Precondition", aspect.IDNr))"
+                               @onchange="@(e => CommitAspect(e, "Precondition", aspect.IDNr))" />
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Precondition", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
+                        @if (IsDropdownOpen("Precondition", aspect.IDNr))
+                        {
+                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Precondition", aspect.IDNr))">
+                                @foreach (var item in GetFilteredExisting("Precondition", aspectFilterText))
+                                {
+                                    int idx = suggestionsActiveList.IndexOf(item);
+                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                        @onclick="@(() => SelectSuggestion("Precondition", aspect.IDNr, item))"
+                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                GetNodesP = null;
+            }
+        </div>
+        @if (GetNodesP is not null && GetNodesP.Count > 1)
+        {
+            int ListCount = 0;
+            @foreach (var aspect in GetNodesP)
+            {
+                if (ListCount > 0)
+                {
+                    <div class="d-flex aspect-list">
+                        <div class="autocomplete-wrapper">
+                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                                   type="text" name="@($"precondition-{aspect.IDNr}")"
+                                   @ref="aspect.elementReference"
+                                   tabindex="13"
+                                   value="@aspect.IDName"
+                                   @oninput="@(e => HandleAspectInput(e, "Precondition", aspect.IDNr))"
+                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Precondition", aspect.IDNr))"
+                                   @onfocus="@(e => OpenDropdown("Precondition", aspect.IDNr))"
+                                   @onblur="@(async () => await HandleBlur("Precondition", aspect.IDNr))"
+                                   @onchange="@(e => CommitAspect(e, "Precondition", aspect.IDNr))" />
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Precondition", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
+                            @if (IsDropdownOpen("Precondition", aspect.IDNr))
+                            {
+                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Precondition", aspect.IDNr))">
+                                    @foreach (var item in GetFilteredExisting("Precondition", aspectFilterText))
+                                    {
+                                        int idx = suggestionsActiveList.IndexOf(item);
+                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                            @onclick="@(() => SelectSuggestion("Precondition", aspect.IDNr, item))"
+                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+                ListCount++;
+            }
+        }
+        <!-- Resource -->
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button id="newRButton" class="btn btn-menu btn-textp" title=@Loc["RESOURCE"] tabindex="14" @onclick="@((e) => NewAspect(e, "Resource"))" @onkeyup=NextFn>R</button>
+                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="30" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("R"))">@showProfile("R")</button>
+            </div>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                GetNodesR = stateContainer.aspectsList.FindAll(x => x.Type == "Resource" && x.FunctionIDNr == stateContainer.selectedFn);
+                if (GetNodesR.Count > 0)
+                {
+                    var aspect = GetNodesR[0];
+                    <div class="autocomplete-wrapper">
+                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                               type="text" name="@($"resource-{aspect.IDNr}")"
+                               @ref="aspect.elementReference"
+                               tabindex="15"
+                               value="@aspect.IDName"
+                               @oninput="@(e => HandleAspectInput(e, "Resource", aspect.IDNr))"
+                               @onkeydown="@(e => HandleAspectKeyDown(e, "Resource", aspect.IDNr))"
+                               @onfocus="@(e => OpenDropdown("Resource", aspect.IDNr))"
+                               @onblur="@(async () => await HandleBlur("Resource", aspect.IDNr))"
+                               @onchange="@(e => CommitAspect(e, "Resource", aspect.IDNr))" />
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Resource", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
+                        @if (IsDropdownOpen("Resource", aspect.IDNr))
+                        {
+                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Resource", aspect.IDNr))">
+                                @foreach (var item in GetFilteredExisting("Resource", aspectFilterText))
+                                {
+                                    int idx = suggestionsActiveList.IndexOf(item);
+                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                        @onclick="@(() => SelectSuggestion("Resource", aspect.IDNr, item))"
+                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                GetNodesR = null;
+            }
+        </div>
+        @if (GetNodesR is not null && GetNodesR.Count > 1)
+        {
+            int ListCount = 0;
+            @foreach (var aspect in GetNodesR)
+            {
+                if (ListCount > 0)
+                {
+                    <div class="d-flex aspect-list">
+                        <div class="autocomplete-wrapper">
+                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                                   type="text" name="@($"resource-{aspect.IDNr}")"
+                                   @ref="aspect.elementReference"
+                                   tabindex="16"
+                                   value="@aspect.IDName"
+                                   @oninput="@(e => HandleAspectInput(e, "Resource", aspect.IDNr))"
+                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Resource", aspect.IDNr))"
+                                   @onfocus="@(e => OpenDropdown("Resource", aspect.IDNr))"
+                                   @onblur="@(async () => await HandleBlur("Resource", aspect.IDNr))"
+                                   @onchange="@(e => CommitAspect(e, "Resource", aspect.IDNr))" />
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Resource", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
+                            @if (IsDropdownOpen("Resource", aspect.IDNr))
+                            {
+                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Resource", aspect.IDNr))">
+                                    @foreach (var item in GetFilteredExisting("Resource", aspectFilterText))
+                                    {
+                                        int idx = suggestionsActiveList.IndexOf(item);
+                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                            @onclick="@(() => SelectSuggestion("Resource", aspect.IDNr, item))"
+                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+                ListCount++;
+            }
+        }
+        <!-- Control -->
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button id="newCButton" class="btn btn-menu btn-textp" title=@Loc["CONTROL"] tabindex="17" @onclick="@((e) => NewAspect(e, "Control"))" @onkeyup=NextFn>C</button>
+                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="31" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("C"))">@showProfile("C")</button>
+            </div>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                GetNodesC = stateContainer.aspectsList.FindAll(x => x.Type == "Control" && x.FunctionIDNr == stateContainer.selectedFn);
+                if (GetNodesC.Count > 0)
+                {
+                    var aspect = GetNodesC[0];
+                    <div class="autocomplete-wrapper">
+                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                               type="text" name="@($"control-{aspect.IDNr}")"
+                               @ref="aspect.elementReference"
+                               tabindex="18"
+                               value="@aspect.IDName"
+                               @oninput="@(e => HandleAspectInput(e, "Control", aspect.IDNr))"
+                               @onkeydown="@(e => HandleAspectKeyDown(e, "Control", aspect.IDNr))"
+                               @onfocus="@(e => OpenDropdown("Control", aspect.IDNr))"
+                               @onblur="@(async () => await HandleBlur("Control", aspect.IDNr))"
+                               @onchange="@(e => CommitAspect(e, "Control", aspect.IDNr))" />
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Control", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
+                        @if (IsDropdownOpen("Control", aspect.IDNr))
+                        {
+                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Control", aspect.IDNr))">
+                                @foreach (var item in GetFilteredExisting("Control", aspectFilterText))
+                                {
+                                    int idx = suggestionsActiveList.IndexOf(item);
+                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                        @onclick="@(() => SelectSuggestion("Control", aspect.IDNr, item))"
+                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                GetNodesC = null;
+            }
+        </div>
+        @if (GetNodesC is not null && GetNodesC.Count > 1)
+        {
+            int ListCount = 0;
+            @foreach (var aspect in GetNodesC)
+            {
+                if (ListCount > 0)
+                {
+                    <div class="d-flex aspect-list">
+                        <div class="autocomplete-wrapper">
+                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                                   type="text" name="@($"control-{aspect.IDNr}")"
+                                   @ref="aspect.elementReference"
+                                   tabindex="19"
+                                   value="@aspect.IDName"
+                                   @oninput="@(e => HandleAspectInput(e, "Control", aspect.IDNr))"
+                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Control", aspect.IDNr))"
+                                   @onfocus="@(e => OpenDropdown("Control", aspect.IDNr))"
+                                   @onblur="@(async () => await HandleBlur("Control", aspect.IDNr))"
+                                   @onchange="@(e => CommitAspect(e, "Control", aspect.IDNr))" />
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Control", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
+                            @if (IsDropdownOpen("Control", aspect.IDNr))
+                            {
+                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Control", aspect.IDNr))">
+                                    @foreach (var item in GetFilteredExisting("Control", aspectFilterText))
+                                    {
+                                        int idx = suggestionsActiveList.IndexOf(item);
+                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                            @onclick="@(() => SelectSuggestion("Control", aspect.IDNr, item))"
+                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+                ListCount++;
+            }
+        }
+        <!-- Time -->
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-center">
+                <button id="newTButton" class="btn btn-menu btn-textp" title=@Loc["TIME"] tabindex="20" @onclick="@((e) => NewAspect(e, "Time"))" @onkeyup=NextFn>T</button>
+                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="32" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("T"))">@showProfile("T")</button>
+            </div>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                GetNodesT = stateContainer.aspectsList.FindAll(x => x.Type == "Time" && x.FunctionIDNr == stateContainer.selectedFn);
+                if (GetNodesT.Count > 0)
+                {
+                    var aspect = GetNodesT[0];
+                    <div class="autocomplete-wrapper">
+                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                               type="text" name="@($"time-{aspect.IDNr}")"
+                               @ref="aspect.elementReference"
+                               tabindex="21"
+                               value="@aspect.IDName"
+                               @oninput="@(e => HandleAspectInput(e, "Time", aspect.IDNr))"
+                               @onkeydown="@(e => HandleAspectKeyDown(e, "Time", aspect.IDNr))"
+                               @onfocus="@(e => OpenDropdown("Time", aspect.IDNr))"
+                               @onblur="@(async () => await HandleBlur("Time", aspect.IDNr))"
+                               @onchange="@(e => CommitAspect(e, "Time", aspect.IDNr))" />
+                        <button class="dropdown-btn" tabindex="-1"
+                                @onclick="@(async () => await ButtonClick("Time", aspect.IDNr, aspect.elementReference))"
+                                @onmousedown:preventDefault @onmousedown:stopPropagation
+                                type="button">▼</button>
+                        @if (IsDropdownOpen("Time", aspect.IDNr))
+                        {
+                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Time", aspect.IDNr))">
+                                @foreach (var item in GetFilteredExisting("Time", aspectFilterText))
+                                {
+                                    int idx = suggestionsActiveList.IndexOf(item);
+                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                        @onclick="@(() => SelectSuggestion("Time", aspect.IDNr, item))"
+                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                GetNodesT = null;
+            }
+        </div>
+        @if (GetNodesT is not null && GetNodesT.Count > 1)
+        {
+            int ListCount = 0;
+            @foreach (var aspect in GetNodesT)
+            {
+                if (ListCount > 0)
+                {
+                    <div class="d-flex aspect-list">
+                        <div class="autocomplete-wrapper">
+                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                                   type="text" name="@($"time-{aspect.IDNr}")"
+                                   @ref="aspect.elementReference"
+                                   tabindex="22"
+                                   value="@aspect.IDName"
+                                   @oninput="@(e => HandleAspectInput(e, "Time", aspect.IDNr))"
+                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Time", aspect.IDNr))"
+                                   @onfocus="@(e => OpenDropdown("Time", aspect.IDNr))"
+                                   @onblur="@(async () => await HandleBlur("Time", aspect.IDNr))"
+                                   @onchange="@(e => CommitAspect(e, "Time", aspect.IDNr))" />
+                            <button class="dropdown-btn" tabindex="-1"
+                                    @onclick="@(async () => await ButtonClick("Time", aspect.IDNr, aspect.elementReference))"
+                                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                                    type="button">▼</button>
+                            @if (IsDropdownOpen("Time", aspect.IDNr))
+                            {
+                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Time", aspect.IDNr))">
+                                    @foreach (var item in GetFilteredExisting("Time", aspectFilterText))
+                                    {
+                                        int idx = suggestionsActiveList.IndexOf(item);
+                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                                            @onclick="@(() => SelectSuggestion("Time", aspect.IDNr, item))"
+                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                }
+                ListCount++;
+            }
+        }
+        <!-- Agent / Level panels unchanged -->
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-start pt-1">
+                <button class="btn btn-menu btn-textp" title="Assign Agent" tabindex="33" @onclick=ToggleAgentPanel>A</button>
+            </div>
+            <div class="flex-grow-1 pl-1 pt-2">
+                @if (showAgentPanel)
+                {
+                    if (stateContainer.agentList.Count == 0)
+                    {
+                        <small class="text-muted">No agents defined. Use the menu bar shortcut to add agents.</small>
+                    }
+                    else if (stateContainer.selectedFn == "-1" || stateContainer.selectedFunction is null)
+                    {
+                        <small class="text-muted">Select a function to assign agents.</small>
+                    }
+                    else if (!string.IsNullOrEmpty(stateContainer.selectedFunction.AgentId))
+                    {
+                        var agent = stateContainer.agentList.Find(a => a.IDNr == stateContainer.selectedFunction.AgentId);
+                        <div class="assignment-display mb-1 d-flex align-center">
+                            <span class="text-truncate flex-grow-1">@(agent?.Name ?? $"Agent {stateContainer.selectedFunction.AgentId}")</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                           title="Remove" OnClick=ClearAgent aria-label="Remove agent" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-center assignment-select" style="gap:4px;">
+                            <MudSelect T="string" @bind-Value="selectedAgentId" Label="Select agent" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" Dense="true" Class="flex-grow-1">
+                                @foreach (var agent in stateContainer.agentList)
+                                {
+                                    <MudSelectItem T="string" Value="@agent.IDNr">@($"{agent.IDNr} - {agent.Name}")</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                                           Variant="Variant.Outlined" title="Add agent to function"
+                                           OnClick=AssignAgent Disabled="@(string.IsNullOrEmpty(selectedAgentId))" aria-label="Add agent to function" />
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+        <div class="d-flex pt-2">
+            <div class="d-flex flex-column align-items-start pt-1">
+                <button class="btn btn-menu btn-textp" title="Assign Level" tabindex="34" @onclick=ToggleLevelPanel>L</button>
+            </div>
+            <div class="flex-grow-1 pl-1 pt-2">
+                @if (showLevelPanel)
+                {
+                    if (stateContainer.levelList.Count == 0)
+                    {
+                        <small class="text-muted">No levels defined. Use the menu bar shortcut to add levels.</small>
+                    }
+                    else if (stateContainer.selectedFn == "-1" || stateContainer.selectedFunction is null)
+                    {
+                        <small class="text-muted">Select a function to assign levels.</small>
+                    }
+                    else if (!string.IsNullOrEmpty(stateContainer.selectedFunction.LevelId))
+                    {
+                        var level = stateContainer.levelList.Find(l => l.IDNr == stateContainer.selectedFunction.LevelId);
+                        <div class="assignment-display mb-1 d-flex align-center">
+                            <span class="text-truncate flex-grow-1">@(level?.Name ?? $"Level {stateContainer.selectedFunction.LevelId}")</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                           title="Remove" OnClick=ClearLevel aria-label="Remove level" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-center mb-1 assignment-select" style="gap:4px;">
+                            <MudSelect T="string" @bind-Value="selectedLevelId" Label="Select level" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" Dense="true" Class="flex-grow-1">
+                                @foreach (var level in stateContainer.levelList)
+                                {
+                                    <MudSelectItem T="string" Value="@level.IDNr">@($"{level.IDNr} - {level.Name}")</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
+                                           Variant="Variant.Outlined" title="Add level to function"
+                                           OnClick=AssignLevel Disabled="@(string.IsNullOrEmpty(selectedLevelId))" aria-label="Add level to function" />
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+        <!-- Zoom and color buttons -->
+        <div class="d-flex pt-2 align-center">
+            <button class="btn btn-half btn-half-s" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
+            <button class="btn btn-half btn-half-l" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
+            <MudIconButton Icon="@Icons.Material.Filled.Palette" Color="Color.Primary" Size="Size.Medium"
+                           title="@Loc["FN_COLOUR"]" tabindex="25" OnClick="ModalColor" @onkeyup="ModalKey"
+                           aria-label="@Loc["FN_COLOUR"]" Class="ml-1" />
+        </div>
+        @if (stateContainer.showKeys == "")
+        {
+            <hr class="mt-2 mb-0" />
+            <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback refreshParent { get; set; }
+    [Parameter]
+    public EventCallback newFunction { get; set; }
+    [Parameter]
+    public EventCallback<KeyboardEventArgs> nextFn { get; set; }
+
+    private List<Aspect>? GetNodesI;
+    private List<Aspect>? GetNodesO;
+    private List<Aspect>? GetNodesT;
+    private List<Aspect>? GetNodesC;
+    private List<Aspect>? GetNodesP;
+    private List<Aspect>? GetNodesR;
+    private string setFocus = "";
+    private string focusCheck = "";
+    private string oldZoomText = "";
+    private string descriptionClass = "fmi-descS";
+
+    // Agent / Level assignment state
+    private bool showAgentPanel = true;
+    private bool showLevelPanel = true;
+    private string selectedAgentId = "";
+    private string selectedLevelId = "";
+    private string newAgentName = "";
+    private string newLevelName = "";
+
+    // Autocomplete state
+    private string openDropdownType = "";
+    private string openDropdownId = "";
+    private string aspectFilterText = "";
+    private List<string> suggestionsActiveList = new();
+    private int suggestionsActiveIndex = -1;
+
+    // Blur-Schutz für den Dreiecksknopf
+    private readonly HashSet<string> pendingBlurIgnore = new();
+    // Schutz vor Löschung eines leeren Aspekts, solange eine Neuanlage im Gange ist
+    private readonly Dictionary<string, bool> pendingAspectCreation = new();
+
+    private IEnumerable<string> GetExistingAspectNames(string type)
+    {
+        if (type == "Output")
+            return stateContainer.outputsList
+                .Where(o => !string.IsNullOrEmpty(o.IDName))
+                .Select(o => o.IDName)
+                .Distinct();
+        else
+            return stateContainer.aspectsList
+                .Where(a => a.Type == type && !string.IsNullOrEmpty(a.IDName))
+                .Select(a => a.IDName)
+                .Distinct();
+    }
+
+    private List<string> GetFilteredExisting(string type, string filter)
+    {
+        var all = GetExistingAspectNames(type).ToList();
+        if (string.IsNullOrWhiteSpace(filter))
+            return all.OrderBy(s => s).ToList();
+        return all.Where(s => s.StartsWith(filter, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(s => s).ToList();
+    }
+
+    private bool IsDropdownOpen(string type, string id) =>
+        openDropdownType == type && openDropdownId == id;
+
+    private void OpenDropdown(string type, string id)
+    {
+        openDropdownType = type;
+        openDropdownId = id;
+        UpdateSuggestions(type, id);
+    }
+
+    private void CloseDropdownDelayed()
+    {
+        _ = CloseAfterDelay();
+    }
+
+    private async Task CloseAfterDelay()
+    {
+        await Task.Delay(150);
+        if (openDropdownType != "")
+        {
+            openDropdownType = "";
+            openDropdownId = "";
+            suggestionsActiveList.Clear();
+            suggestionsActiveIndex = -1;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleDropdown(string type, string id)
+    {
+        if (IsDropdownOpen(type, id))
+            openDropdownType = "";
+        else
+            OpenDropdown(type, id);
+    }
+
+    private void HandleAspectInput(ChangeEventArgs e, string type, string id)
+    {
+        aspectFilterText = e.Value?.ToString() ?? "";
+        OpenDropdown(type, id);
+        UpdateSuggestions(type, id);
+    }
+
+    private void HandleAspectKeyDown(KeyboardEventArgs e, string type, string id)
+    {
+        if (!IsDropdownOpen(type, id)) return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                if (suggestionsActiveList.Count == 0) return;
+                suggestionsActiveIndex = Math.Min(suggestionsActiveIndex + 1, suggestionsActiveList.Count - 1);
+                break;
+            case "ArrowUp":
+                if (suggestionsActiveList.Count == 0) return;
+                suggestionsActiveIndex = Math.Max(suggestionsActiveIndex - 1, 0);
+                break;
+            case "Enter":
+                if (suggestionsActiveIndex >= 0 && suggestionsActiveIndex < suggestionsActiveList.Count)
+                {
+                    SelectSuggestionInternal(type, id, suggestionsActiveList[suggestionsActiveIndex]);
+                }
+                else if (suggestionsActiveList.Count == 1)
+                {
+                    SelectSuggestionInternal(type, id, suggestionsActiveList[0]);
+                }
+                else if (!string.IsNullOrWhiteSpace(aspectFilterText))
+                {
+                    AspectChangeCommitt(aspectFilterText, id, type);
+                    openDropdownType = "";
+                    openDropdownId = "";
+                    suggestionsActiveList.Clear();
+                    suggestionsActiveIndex = -1;
+                    checkForBackground();
+                    refreshParent.InvokeAsync();
+                }
+                break;
+            case "Escape":
+                openDropdownType = "";
+                openDropdownId = "";
+                suggestionsActiveList.Clear();
+                suggestionsActiveIndex = -1;
+                break;
+        }
+    }
+
+    private void SuggestionKeyDown(KeyboardEventArgs e, string type, string id)
+    {
+        HandleAspectKeyDown(e, type, id);
+    }
+
+    private void SelectSuggestion(string type, string id, string item)
+    {
+        SelectSuggestionInternal(type, id, item);
+    }
+
+    private void SelectSuggestionInternal(string type, string id, string item)
+    {
+        aspectFilterText = item;
+        AspectChangeCommitt(item, id, type);
+        openDropdownType = "";
+        openDropdownId = "";
+        suggestionsActiveList.Clear();
+        suggestionsActiveIndex = -1;
+        refreshParent.InvokeAsync();
+    }
+
+    private void UpdateSuggestions(string type, string id)
+    {
+        suggestionsActiveList = GetFilteredExisting(type, aspectFilterText);
+        suggestionsActiveIndex = suggestionsActiveList.Count > 0 ? 0 : -1;
+        StateHasChanged();
+    }
+
+    private void CommitAspect(ChangeEventArgs e, string type, string id)
+    {
+        var value = e.Value?.ToString() ?? "";
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            AspectChangeCommitt(value, id, type);
+        }
+        else
+        {
+            DeleteAspect(type, id);
+        }
+        checkForBackground();
+        refreshParent.InvokeAsync();
+    }
+
+    private async Task ButtonClick(string type, string id, ElementReference inputRef)
+    {
+        pendingBlurIgnore.Add($"{type}|{id}");
+        await inputRef.FocusAsync();
+        if (IsDropdownOpen(type, id))
+        {
+            openDropdownType = "";
+            openDropdownId = "";
+        }
+        else
+        {
+            OpenDropdown(type, id);
+        }
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(200);
+            pendingBlurIgnore.Remove($"{type}|{id}");
+            await InvokeAsync(StateHasChanged);
+        });
+        StateHasChanged();
+    }
+
+    private async Task HandleBlur(string type, string id)
+    {
+        if (pendingBlurIgnore.Contains($"{type}|{id}") || pendingAspectCreation.TryGetValue(type, out var val) && val)
+        {
+            return;
+        }
+        AspectBlank(type, id);
+        CloseDropdownDelayed();
+    }
+
+    private void ToggleAgentPanel() => showAgentPanel = !showAgentPanel;
+    private void ToggleLevelPanel() => showLevelPanel = !showLevelPanel;
+
+    private void AssignAgent()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrEmpty(selectedAgentId)) return;
+        stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, selectedAgentId);
+        selectedAgentId = "";
+        refreshParent.InvokeAsync();
+    }
+    private void ClearAgent()
+    {
+        if (stateContainer.selectedFunction is null) return;
+        stateContainer.ClearAgentFromFunction(stateContainer.selectedFunction);
+        refreshParent.InvokeAsync();
+    }
+    private void CreateAndAssignAgent()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrWhiteSpace(newAgentName)) return;
+        var agent = stateContainer.CreateAgent(newAgentName.Trim());
+        stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, agent.IDNr);
+        newAgentName = "";
+        refreshParent.InvokeAsync();
+    }
+
+    private void AssignLevel()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrEmpty(selectedLevelId)) return;
+        stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, selectedLevelId);
+        selectedLevelId = "";
+        refreshParent.InvokeAsync();
+    }
+    private void ClearLevel()
+    {
+        if (stateContainer.selectedFunction is null) return;
+        stateContainer.ClearLevelFromFunction(stateContainer.selectedFunction);
+        refreshParent.InvokeAsync();
+    }
+    private void CreateAndAssignLevel()
+    {
+        if (stateContainer.selectedFunction is null || string.IsNullOrWhiteSpace(newLevelName)) return;
+        var level = stateContainer.CreateLevel(newLevelName.Trim());
+        stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, level.IDNr);
+        newLevelName = "";
+        refreshParent.InvokeAsync();
+    }
+
+    protected void updateAll()
+    {
+        refreshParent.InvokeAsync();
+    } 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            if (setFocus != "")
+            {
+                try
+                {
+                    if (setFocus == "Output")
+                    {
+                        await stateContainer.outputsList.FindLast(x => x.Type == setFocus && x.FunctionIDNr == stateContainer.selectedFn)!.elementReference.FocusAsync();
+                    }
+                    else
+                    {
+                        await stateContainer.aspectsList.FindLast(x => x.Type == setFocus && x.FunctionIDNr == stateContainer.selectedFn)!.elementReference.FocusAsync();
+                    }
+                }
+                catch { }
+                setFocus = "";
+            }
+        }
+    }
+    private void changeFnProfile(ChangeEventArgs e, string type)
+    {
+        if (stateContainer.selectedFunction is not null)
+        {
+            stateContainer.updateUndo();
+            var tempFnProfile = e.Value?.ToString() ?? "";
+            stateContainer.selectedFunction.profileFn = tempFnProfile;
+            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={stateContainer.selectedFn}]/@profileFn")!.InnerText = tempFnProfile;
+        }
+    }
+    private void changeProfile(string type)
+    {
+        if (stateContainer.selectedFunction is not null)
+        {
+            stateContainer.updateUndo();
+            // T button stays rendered but does nothing
+            if (type == "T") return;
+            var getProfile = "";
+            switch (type)
+            {
+                case "Fn": getProfile = stateContainer.selectedFunction.profileFn; break;
+                case "I": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrInputs); break;
+                case "P": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrPreconditions); break;
+                case "R": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrResources); break;
+                case "C": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrControls); break;
+                default: getProfile = ""; break;
+            }
+            switch (getProfile)
+            {
+                case "All": getProfile = "Any"; break;
+                case "Any": if (type == "I") { getProfile = ""; } else { getProfile = "None"; } break;
+                case "None": getProfile = ""; break;
+                case "": getProfile = "All"; break;
+                default: getProfile = ""; break;
+            }
+            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{stateContainer.selectedFn}\"]/@profile{type}")!.InnerText = getProfile;
+            switch (type)
+            {
+                case "Fn": stateContainer.selectedFunction.profileFn = getProfile; break;
+                case "I": stateContainer.selectedFunction.PrInputs = Function.ParseProfile(getProfile); break;
+                case "P": stateContainer.selectedFunction.PrPreconditions = Function.ParseProfile(getProfile); break;
+                case "R": stateContainer.selectedFunction.PrResources = Function.ParseProfile(getProfile); break;
+                case "C": stateContainer.selectedFunction.PrControls = Function.ParseProfile(getProfile); break;
+            }
+        }
+    }
+    private string profileTooltip()
+    {
+        return Loc["FMI_PROFILE_SHORT"] + System.Environment.NewLine + Loc["FMI_ALL"] + System.Environment.NewLine + Loc["FMI_ANY"] + System.Environment.NewLine + Loc["FMI_NONE"];
+    }
+    private string profileITooltip()
+    {
+        return Loc["FMI_PROFILE_SHORT"] + System.Environment.NewLine + Loc["FMI_ALL"] + System.Environment.NewLine + Loc["FMI_ANY"];
+    }
+    private string profileFnTooltip()
+    {
+        return Loc["FMI_PROFILE_SHORT"] + System.Environment.NewLine + Loc["FMI_INITIAL_ONLY"] + System.Environment.NewLine + Loc["FMI_EVERY_NTH"] + System.Environment.NewLine + Loc["FMI_RANDOM"];
+    }
+    private bool disableFnProfile()
+    {
+        var returnFnDisabled = true;
+        if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null)
+        {
+            if (stateContainer.selectedFunction.fmiType == "Entry") returnFnDisabled = false;
+        }
+        return returnFnDisabled;
+    }
+    private bool disableAspectProfile()
+    {
+        var returnAspectDisabled = true;
+        if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null)
+        {
+            var checkType = stateContainer.selectedFunction.fmiType;
+            if (checkType == "Exit" || checkType == "Passthrough" || checkType == "Foreground") returnAspectDisabled = false;
+        }
+        return returnAspectDisabled;
+    }
+    private string showFnProfile()
+    {
+        if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null)
+        {
+            if (!string.IsNullOrEmpty(stateContainer.selectedFunction.profileFn))
+                return stateContainer.selectedFunction.profileFn;
+        }
+        return "";
+    }
+    RenderFragment showProfile(string type)
+    {
+        if (stateContainer.selectedFunction is not null)
+        {
+            // T button renders but has no associated enum property
+            if (type == "T") return @<a></a>;
+            var getProfile = "";
+            switch (type)
+            {
+                case "I": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrInputs); break;
+                case "P": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrPreconditions); break;
+                case "R": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrResources); break;
+                case "C": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrControls); break;
+                default: getProfile = ""; break;
+            }
+            switch (getProfile)
+            {
+                case "All": return @<a>&forall;</a>;
+                case "Any": return @<a>&exist;</a>;
+                case "None": return @<a>&empty;</a>;
+                case "": return @<a></a>;
+                default: return @<a></a>;
+            }
+        }
+        else
+        {
+            return @<a></a>;
+        }
+    }
+    private void ModalColor()
+    {
+        if (stateContainer.selectedMulti.Count > 0)
+        {
+            stateContainer.showColorPicker = true;
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void ModalKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            stateContainer.showColorPicker = false;
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void FnNameChange(ChangeEventArgs e)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            var tempFnName = e.Value?.ToString() ?? stateContainer.selectedFn;
+            if (tempFnName == "")
+            {
+                stateContainer.deleteFn();
+                SetElement("fnNameText", stateContainer.fnName);
+            }
+            else
+            {
+                stateContainer.sFnIDName(tempFnName);
+            }
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void FnDescChange(ChangeEventArgs e)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            stateContainer.sFnDesc(e.Value?.ToString() ?? "");
+            refreshParent.InvokeAsync();
+        }
+    }
+
+    // MudBlazor ValueChanged wrappers (string value instead of ChangeEventArgs)
+    private void OnFnNameChanged(string value)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            var tempFnName = value ?? stateContainer.selectedFn;
+            if (tempFnName == "")
+            {
+                stateContainer.deleteFn();
+            }
+            else
+            {
+                stateContainer.sFnIDName(tempFnName);
+            }
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void OnFnDescChanged(string value)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            stateContainer.sFnDesc(value ?? "");
+            refreshParent.InvokeAsync();
+        }
+    }
+    private void NextFn(KeyboardEventArgs e)
+    {
+        if (!e.Repeat && !e.MetaKey && !e.AltKey && !e.CtrlKey)
+        {
+            if (e.Key == "Escape")
+            {
+                if (focusCheck == "zoomF") { stateContainer.tempZoomF = 1; refreshParent.InvokeAsync(); }
+                else if (focusCheck == "zoomA") { stateContainer.tempZoomA = 1; refreshParent.InvokeAsync(); }
+                else { FocusElement("newFnButton"); }
+            }
+            else { nextFn.InvokeAsync(e); }
+        }
+    }
+    public async void FocusElement(string elementName) => await JSRuntime.InvokeVoidAsync("focusInput", elementName);
+    public async void SetElement(string elementName, string textValue) => await JSRuntime.InvokeVoidAsync("setInput", elementName, textValue);
+
+    private void NewAspect(MouseEventArgs e, string type)
+    {
+        if (stateContainer.projectData_Undo[0] is not null && stateContainer.selectedFn != "-1")
+        {
+            pendingAspectCreation[type] = true;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(300);
+                pendingAspectCreation[type] = false;
+                await InvokeAsync(StateHasChanged);
+            });
+
+            setFocus = type;
+            if (stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{type}s") == null)
+                stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement($"{type}s"));
+            int id;
+            if (stateContainer.projectData_Undo[0].SelectNodes($"//FM/{type}s/{type}")?.Count == 0) id = 0;
+            else id = Convert.ToInt32(stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{type}s/{type}[not(../{type}/IDNr > IDNr)]/IDNr")?.InnerText ?? "0") + 1;
+            XmlNode itemA = stateContainer.projectData_Undo[0].CreateElement(type);
+            itemA.InnerXml = $"<IDNr>{id}</IDNr><IDName></IDName><FunctionIDNr>{stateContainer.selectedFn}</FunctionIDNr><Description/>";
+            XmlAttribute newOrphan = stateContainer.projectData_Undo[0].CreateAttribute("orphan");
+            newOrphan.Value = "false";
+            itemA.Attributes!.Append(newOrphan);
+            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{type}s")!.AppendChild(itemA);
+            if (type != "Output")
+            {
+                stateContainer.aspectsList.Add(new Aspect(type, id.ToString(), "", "", stateContainer.selectedFn));
+                if (type == "Input") stateContainer.sFnIsInput("true");
+            }
+            else stateContainer.outputsList.Add(new Aspect(type, id.ToString(), "", "", stateContainer.selectedFn));
+        }
+    }
+
+    private void DeleteAspect(string tempType, string tempId)
+    {
+        if (tempType == "Output")
+        {
+            if (stateContainer.outputsList.Find(x => x.IDNr == tempId && x.Type == tempType) is not null)
+                stateContainer.outputsList.RemoveAll(x => x.IDNr == tempId && x.Type == tempType);
+        }
+        else
+        {
+            if (stateContainer.aspectsList.Find(x => x.IDNr == tempId && x.Type == tempType) is not null)
+                stateContainer.aspectsList.RemoveAll(x => x.IDNr == tempId && x.Type == tempType);
+        }
+        var child = stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]")!;
+        stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s")!.RemoveChild(child);
+        if (tempType == "Input")
+        {
+            if (stateContainer.projectData_Undo[0].SelectNodes($"//FM//Inputs/Input[FunctionIDNr=\"{stateContainer.selectedFn}\"]")?.Count == 0)
+                stateContainer.sFnIsInput("false");
+        }
+    }
+
+    private void AspectBlank(string tempType, string tempId)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            string oldName = stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]/IDName")?.InnerText ?? "NULL";
+            if (oldName == "")
+            {
+                DeleteAspect(tempType, tempId);
+                checkForBackground();
+                refreshParent.InvokeAsync();
+            }
+        }
+    }
+
+    private void AspectChange(ChangeEventArgs e, string tempType, string tempId)
+    {
+        if (stateContainer.selectedFn != "-1")
+        {
+            stateContainer.updateUndo();
+            var tempNewName = e.Value?.ToString() ?? "";
+            AspectChangeCommitt(tempNewName, tempId, tempType);
+            if (tempNewName == "")
+            {
+                DeleteAspect(tempType, tempId);
+            }
+            checkForBackground();
+            refreshParent.InvokeAsync();
+        }
+    }
+
+    private void AspectChangeCommitt(string tempNewName, string tempId, string tempType)
+    {
+        string oldName = stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]/IDName")?.InnerText ?? "";
+        int orphans;
+        stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]/IDName")!.InnerText = tempNewName;
+        if (tempNewName == "")
+        {
+            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]/@orphan")!.Value = "false";
+        }
+        else
+        {
+            stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]/@orphan")!.Value = "true";
+        }
+        if (tempType == "Output")
+        {
+            var getOutput = stateContainer.outputsList.Find(x => x.IDNr == tempId && x.Type == tempType);
+            if (getOutput is not null)
+            {
+                getOutput.Orphan = "true";
+                getOutput.IDName = tempNewName;
+            }
+            XmlNodeList oldChildren = stateContainer.projectData_Undo[0].SelectNodes($"//FM/Aspects/Aspect[starts-with(Name,\"{stateContainer.selectedFn}|{oldName}|\")]")!;
+            bool oldOrphans = stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[IDName=\"{oldName}\"]")?.Count == 0;
+            bool hasOrphan;
+            if (tempNewName == "")
+            {
+                hasOrphan = false;
+            }
+            else
+            {
+                hasOrphan = true;
+            }
+            foreach (var aspect in stateContainer.aspectsList.FindAll(x => x.FunctionIDNr != stateContainer.selectedFn))
+            {
+                if (aspect.IDName == tempNewName)
+                {
+                    string[] dictArray = new string[4] { stateContainer.selectedFn, tempNewName, aspect.FunctionIDNr, aspect.Type.Substring(0, 1) };
+                    if (tempNewName != "")
+                    {
+                        stateContainer.reSetAspect(dictArray, double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:O"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:O"]!, CultureInfo.InvariantCulture),
+                            double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:{dictArray[3]}"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:{dictArray[3]}"]!, CultureInfo.InvariantCulture),
+                            int.Parse(render[$"{stateContainer.newFnStyle}:aspect-font-wrap"]!));
+                    }
+                    hasOrphan = false;
+                    aspect.Orphan = "false";
+                    stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{aspect.Type}s/{aspect.Type}[IDNr=\"{aspect.IDNr}\"]/@orphan")!.Value = "false";
+                    if (getOutput is not null)
+                    {
+                        getOutput.Orphan = "false";
+                    }
+                    stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Outputs/Output[IDNr=\"{tempId}\"]/@orphan")!.Value = "false";
+                    bool subNotOrphan = true;
+                    foreach (XmlNode checkO in stateContainer.projectData_Undo[0].SelectNodes($"//FM/{aspect.Type}s/{aspect.Type}[FunctionIDNr=\"{aspect.FunctionIDNr}\"]")!)
+                    {
+                        if (stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[IDName=\"{checkO.SelectSingleNode("IDName")?.InnerText}\"]")?.Count == 0)
+                        {
+                            subNotOrphan = false;
+                        }
+                    }
+                    if (subNotOrphan)
+                    {
+                        orphans = Convert.ToInt32(stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{aspect.FunctionIDNr}\"]/@orphans")?.Value);
+                        switch (aspect.Type)
+                        { //orphans |= 1 << 0; //orphans &= ~(1 << 0); //if (1 >> 0) & 1 == 1;
+                            case "Input": orphans &= ~(1 << 0); break;
+                            case "Precondition": orphans &= ~(1 << 2); break;
+                            case "Resource": orphans &= ~(1 << 3); break;
+                            case "Control": orphans &= ~(1 << 4); break;
+                            case "Time": orphans &= ~(1 << 5); break;
+                        }
+                        stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{aspect.FunctionIDNr}\"]/@orphans")!.Value = orphans.ToString();
+                        stateContainer.functionList.Find(x => x.IDNr == aspect.FunctionIDNr)!.orphans = orphans;
+                    }
+                }
+                else if (aspect.IDName == oldName)
+                {
+                    if (oldOrphans)
+                    {
+                        aspect.Orphan = "true";
+                        stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{aspect.Type}s/{aspect.Type}[IDNr=\"{aspect.IDNr}\"]/@orphan")!.Value = "true";
+                    }
+                }
+            }
+            foreach (XmlNode oldChild in oldChildren)
+            {
+                if (oldOrphans)
+                {
+                    string toFnID = oldChild.SelectSingleNode("@toFn")?.Value ?? "";
+                    orphans = stateContainer.functionList.Find(x => x.IDNr == toFnID)!.orphans;
+                    switch (oldChild.SelectSingleNode("Name")!.InnerText.Substring(oldChild.SelectSingleNode("Name")!.InnerText.Length - 1, 1))
+                    { //orphans |= 1 << 0; //orphans &= ~(1 << 0); //if (1 >> 0) & 1 == 1;
+                        case "I": orphans |= 1 << 0; break;
+                        case "P": orphans |= 1 << 2; break;
+                        case "R": orphans |= 1 << 3; break;
+                        case "C": orphans |= 1 << 4; break;
+                        case "T": orphans |= 1 << 5; break;
+                    }
+                    stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{toFnID}\"]/@orphans")!.Value = orphans.ToString();
+                    stateContainer.functionList.Find(x => x.IDNr == toFnID)!.orphans = orphans;
+                }
+                stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects")!.RemoveChild(oldChild);
+                stateContainer.couplingList.RemoveAll(x => x.Name == oldChild.SelectSingleNode("Name")?.InnerText);
+            }
+            orphans = stateContainer.selectedFunction!.orphans;
+            if (hasOrphan)
+            {
+                stateContainer.sFnOrphans(orphans |= 1 << 1);
+            }
+            else
+            {
+                foreach (XmlNode itemO in stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[FunctionIDNr=\"{stateContainer.selectedFn}\" and IDNr!=\"{tempId}\"]")!)
+                {
+                    if (stateContainer.aspectsList.FindAll(x => x.IDName == itemO.SelectSingleNode("IDName")?.InnerText).Count == 0)
+                    {
+                        hasOrphan = true;
+                    }
+                }
+                if (hasOrphan)
+                {
+                    stateContainer.sFnOrphans(orphans |= 1 << 1);
+                }
+                else
+                {
+                    stateContainer.sFnOrphans(orphans &= ~(1 << 1));
+                }
+            }
+        }
+        else
+        {
+            var getAspect = stateContainer.aspectsList.Find(x => x.IDNr == tempId && x.Type == tempType);
+            if (getAspect is not null)
+            {
+                getAspect.Orphan = "true";
+                getAspect.IDName = tempNewName;
+            }
+            XmlNodeList oldChildren = stateContainer.projectData_Undo[0].SelectNodes($"//FM/Aspects/Aspect[contains(Name,\"|{oldName}|{stateContainer.selectedFn}|{tempType.Substring(0, 1)}\")]")!;
+            foreach (XmlNode itemI in stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[IDName=\"{tempNewName}\" and FunctionIDNr!=\"{stateContainer.selectedFn}\"]")!)
+            {
+                string itemI_IDNr = itemI.SelectSingleNode("FunctionIDNr")?.InnerText ?? "";
+                string[] dictArray = new string[4] { itemI_IDNr, tempNewName, stateContainer.selectedFn, tempType.Substring(0, 1) };
+                if (tempNewName != "")
+                {
+                    stateContainer.reSetAspect(dictArray, double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:O"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:O"]!, CultureInfo.InvariantCulture),
+                        double.Parse(render[$"{stateContainer.newFnStyle}:aspectX:{dictArray[3]}"]!, CultureInfo.InvariantCulture), double.Parse(render[$"{stateContainer.newFnStyle}:aspectY:{dictArray[3]}"]!, CultureInfo.InvariantCulture),
+                        int.Parse(render[$"{stateContainer.newFnStyle}:aspect-font-wrap"]!));
+                }
+                itemI.SelectSingleNode("@orphan")!.Value = "false";
+                foreach (var itemIget in stateContainer.outputsList.FindAll(x => x.IDName == tempNewName))
+                {
+                    itemIget.Orphan = "false";
+                }
+                stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/{tempType}s/{tempType}[IDNr=\"{tempId}\"]/@orphan")!.Value = "false";
+                if (getAspect is not null)
+                {
+                    getAspect.Orphan = "false";
+                }
+                bool subNotOrphan = true;
+                foreach (XmlNode checkO in stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[FunctionIDNr=\"{itemI_IDNr}\"]")!)
+                {
+                    if (stateContainer.aspectsList.FindAll(x => x.IDName == checkO.SelectSingleNode("IDName")?.InnerText).Count == 0)
+                    {
+                        subNotOrphan = false;
+                    }
+                }
+                if (subNotOrphan)
+                {
+                    orphans = Convert.ToInt32(stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{itemI_IDNr}\"]/@orphans")?.Value);
+                    stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{itemI_IDNr}\"]/@orphans")!.Value = (orphans &= ~(1 << 1)).ToString();
+                    stateContainer.functionList.Find(x => x.IDNr == itemI_IDNr)!.orphans = orphans &= ~(1 << 1);
+                }
+            }
+            bool oldOrphans = stateContainer.aspectsList.FindAll(x => x.IDName == oldName).Count == 0;
+            foreach (XmlNode oldChild in oldChildren)
+            {
+                if (oldOrphans)
+                {
+                    string fromFnID = oldChild.SelectSingleNode("@outputFn")?.Value ?? "";
+                    orphans = Convert.ToInt32(stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{fromFnID}\"]/@orphans")!.Value);
+                    stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr=\"{fromFnID}\"]/@orphans")!.Value = (orphans |= 1 << 1).ToString();
+                    stateContainer.functionList.Find(x => x.IDNr == fromFnID)!.orphans = orphans |= 1 << 1;
+                }
+                stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects")!.RemoveChild(oldChild);
+                stateContainer.couplingList.RemoveAll(x => x.Name == oldChild.SelectSingleNode("Name")?.InnerText);
+            }
+            if (oldOrphans)
+            {
+                foreach (XmlNode oldO in stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[IDName=\"{oldName}\"]")!)
+                {
+                    oldO.SelectSingleNode("@orphan")!.Value = "true";
+                }
+                foreach (var oldOget in stateContainer.outputsList.FindAll(x => x.IDName == oldName))
+                {
+                    oldOget.Orphan = "true";
+                }
+            }
+            orphans = stateContainer.selectedFunction!.orphans;
+            if (tempNewName != "" && stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[IDName=\"{tempNewName}\" and FunctionIDNr!=\"{stateContainer.selectedFn}\"]")?.Count == 0)
+            {
+                switch (tempType)
+                { //orphans |= 1 << 0; //orphans &= ~(1 << 0); //if (1 >> 0) & 1 == 1;
+                    case "Input": orphans |= 1 << 0; break;
+                    case "Precondition": orphans |= 1 << 2; break;
+                    case "Resource": orphans |= 1 << 3; break;
+                    case "Control": orphans |= 1 << 4; break;
+                    case "Time": orphans |= 1 << 5; break;
+                }
+                stateContainer.sFnOrphans(orphans);
+            }
+            else
+            {
+                bool hasOrphan = false;
+                foreach (XmlNode itemA in stateContainer.projectData_Undo[0].SelectNodes($"//FM/{tempType}s/{tempType}[FunctionIDNr=\"{stateContainer.selectedFn}\" and IDNr!=\"{tempId}\"]")!)
+                {
+                    if (stateContainer.projectData_Undo[0].SelectNodes($"//FM/Outputs/Output[IDName=\"{itemA.SelectSingleNode("IDName")?.InnerText}\"]")?.Count == 0)
+                    {
+                        hasOrphan = true;
+                    }
+                }
+                if (hasOrphan)
+                {
+                    switch (tempType)
+                    { //orphans |= 1 << 0; //orphans &= ~(1 << 0); //if (1 >> 0) & 1 == 1;
+                        case "Input": orphans |= 1 << 0; break;
+                        case "Precondition": orphans |= 1 << 2; break;
+                        case "Resource": orphans |= 1 << 3; break;
+                        case "Control": orphans |= 1 << 4; break;
+                        case "Time": orphans |= 1 << 5; break;
+                    }
+                    stateContainer.sFnOrphans(orphans);
+                }
+                else
+                {
+                    switch (tempType)
+                    { //orphans |= 1 << 0; //orphans &= ~(1 << 0); //if (1 >> 0) & 1 == 1;
+                        case "Input": orphans &= ~(1 << 0); break;
+                        case "Precondition": orphans &= ~(1 << 2); break;
+                        case "Resource": orphans &= ~(1 << 3); break;
+                        case "Control": orphans &= ~(1 << 4); break;
+                        case "Time": orphans &= ~(1 << 5); break;
+                    }
+                    stateContainer.sFnOrphans(orphans);
+                }
+            }
+        }
+    }
+
+    private void checkForBackground()
+    {
+        stateContainer.sFnFunctionType();
+    }
+
+    private void zoomFin()
+    {
+        if (stateContainer.projectData_Undo[0] is not null)
+        {
+            focusCheck = "zoomF";
+            oldZoomText = stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleFunction")?.Value ?? "1.0";
+        }
+    }
+
+    private void zoomFout()
+    {
+        focusCheck = "";
+        var newZoomText = stateContainer.tempZoomF.ToString("0.##", CultureInfo.InvariantCulture);
+        if (newZoomText != oldZoomText && stateContainer.projectData_Undo[0] is not null)
+        {
+            stateContainer.updateUndo();
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleFunction")!.Value = newZoomText;
+        }
+    }
+
+    private void zoomFs()
+    {
+        if (stateContainer.tempZoomF >= 0.1) stateContainer.tempZoomF -= 0.1;
+        else stateContainer.tempZoomF = 0;
+        refreshParent.InvokeAsync();
+    }
+
+    private void zoomFl()
+    {
+        if (stateContainer.tempZoomF < 5) stateContainer.tempZoomF += 0.1;
+        else stateContainer.tempZoomF = 5;
+        refreshParent.InvokeAsync();
+    }
+
+    private void zoomAin()
+    {
+        if (stateContainer.projectData_Undo[0] is not null)
+        {
+            focusCheck = "zoomA";
+            oldZoomText = stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleAspect")?.Value ?? "1.0";
+        }
+    }
+
+    private void zoomAout()
+    {
+        focusCheck = "";
+        var newZoomText = stateContainer.tempZoomA.ToString("0.##", CultureInfo.InvariantCulture);
+        if (newZoomText != oldZoomText && stateContainer.projectData_Undo[0] is not null)
+        {
+            stateContainer.updateUndo();
+            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleAspect")!.Value = newZoomText;
+        }
+    }
+
+    private void zoomAs()
+    {
+        if (stateContainer.tempZoomA >= 0.1) stateContainer.tempZoomA -= 0.1;
+        else stateContainer.tempZoomA = 0;
+        refreshParent.InvokeAsync();
+    }
+
+    private void zoomAl()
+    {
+        if (stateContainer.tempZoomA < 5) stateContainer.tempZoomA += 0.1;
+        else stateContainer.tempZoomA = 5;
+        refreshParent.InvokeAsync();
+    }
+
+    private void expandDesc()
+    {
+        descriptionClass = descriptionClass == "fmi-descS" ? "fmi-descE" : "fmi-descS";
+        StateHasChanged();
+    }
+}

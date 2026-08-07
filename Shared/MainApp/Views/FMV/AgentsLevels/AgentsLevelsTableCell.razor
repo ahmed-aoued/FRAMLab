@@ -1,0 +1,47 @@
+@using FRAMLab.Shared.MainApp.Models
+@inject AgentLevelService agentLevelService
+@inject SvgUtilsInterop svgUtils
+
+<g class="agents-levels-cell">
+    <rect x="@Format(Cell.X)"
+          y="@Format(Cell.Y)"
+          width="@Format(Cell.Width)"
+          height="@Format(Cell.Height)"
+          rx="12"
+          ry="12"
+          fill="@Cell.FillColor"
+          fill-opacity="0.12"
+          stroke="@Cell.FillColor"
+          stroke-opacity="0.55"
+          stroke-width="2"
+          @ref="cellRef" />
+    <FunctionDisplay Functions="Functions" refreshParent="refreshParent" />
+</g>
+
+@code {
+    private ElementReference cellRef;
+    private bool _hasMeasured;
+
+    [Parameter] public TableCellLayout Cell { get; set; } = default!;
+    [Parameter] public IEnumerable<Function> Functions { get; set; } = Array.Empty<Function>();
+    [Parameter] public bool ShouldMeasure { get; set; }
+    [Parameter] public EventCallback refreshParent { get; set; }
+    [Parameter] public EventCallback<TableCellMeasurement> OnMeasured { get; set; }
+
+    private static string Format(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_hasMeasured || !ShouldMeasure || cellRef.Context is null)
+        {
+            return;
+        }
+        var (width, height) = await svgUtils.GetSvgElementSize(cellRef);
+        if (width <= 0 && height <= 0)
+        {
+            return;
+        }
+        await OnMeasured.InvokeAsync(new TableCellMeasurement(Cell.LevelId, Cell.AgentId, width, height));
+        _hasMeasured = true;
+    }
+}

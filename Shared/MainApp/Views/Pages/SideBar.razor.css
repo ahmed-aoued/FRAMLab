@@ -1,0 +1,137 @@
+/* ---------- Aspect autocomplete (coupling editor) ---------- */
+.autocomplete-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+}
+.aspect-input {
+    flex: 1;
+    padding-right: 24px;      /* room for the dropdown button */
+    height: 2rem;
+    font-size: smaller;
+    font-family: 'Inter', sans-serif;
+    color: #103A42;
+    background: #fff;
+    border: 1px solid #CBDDE0;
+    border-radius: 8px;
+    padding-left: 8px;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.aspect-input:focus {
+    outline: none;
+    border-color: #49BECC;
+    box-shadow: 0 0 0 3px rgba(73, 190, 204, 0.25);
+}
+.aspect-input:disabled {
+    background: #F7FBFC;
+    color: #5E7A80;
+}
+.dropdown-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 22px;
+    height: 100%;
+    background: transparent;
+    border: 1px solid #CBDDE0;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    padding: 0 2px;
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5E7A80;
+    outline: none;
+    user-select: none;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.dropdown-btn:hover {
+    background: #F0FAFB;
+    color: #2A8693;
+}
+.dropdown-btn:focus {
+    outline: none;
+}
+.suggestion-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #CBDDE0;
+    border-radius: 0 0 8px 8px;
+    border-top: none;
+    box-shadow: 0 6px 18px rgba(16, 58, 66, 0.10);
+    z-index: 1000;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.suggestion-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #103A42;
+}
+.suggestion-item.active,
+.suggestion-item:hover {
+    background: #C5E9EE;
+}
+.aspect-orphan {
+    border-color: #FF6B6B;
+    background-color: #FFE4E4;
+}
+
+/* ---------- Profile symbol toggle (teal) ---------- */
+.profile-symbol-btn {
+    color: #2A8693 !important;
+    background-color: #F0FAFB !important;
+    border: 1px solid #9BDAE2;
+    font-weight: bold;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    min-width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+.profile-symbol-btn a {
+    color: #2A8693;
+    text-decoration: none;
+    font-size: 16px;
+}
+/* Prevent the disabled button from rendering grey */
+.profile-symbol-btn:disabled,
+.profile-symbol-btn.btn:disabled {
+    opacity: 1;
+    background-color: #F0FAFB !important;
+    color: #2A8693 !important;
+    border-color: #9BDAE2 !important;
+}
+
+/* ---------- New MudBlazor field sizing in the sidebar ---------- */
+.sidebar-btn-col {
+    align-items: stretch;
+}
+.sidebar-new-fn {
+    width: 100%;
+}
+.sidebar-fn-name,
+.sidebar-fn-desc {
+    width: 100%;
+}
+    /* tighten MudBlazor outlined inputs to the narrow sidebar */
+    .sidebar-fn-name .mud-input-control,
+    .sidebar-fn-desc .mud-input-control {
+        margin-top: 0;
+    }
+.sidebar-desc-toggle {
+    margin-top: 4px;
+}

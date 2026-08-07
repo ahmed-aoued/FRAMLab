@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FM Version="0,3,0,0">
+  <Functions colour_10="-1" colour_11="0" colour_12="0.5" colour_13="1" colour_14="2" colour_20="-1" colour_21="0" colour_22="0.5" colour_23="1" colour_24="2" colour_30="-1" colour_31="0" colour_32="0.5" colour_33="1" colour_34="2" colour_40="-1" colour_41="0" colour_42="0.5" colour_43="1" colour_44="2" colour_50="-1" colour_51="0" colour_52="0.5" colour_53="1" colour_54="2" colour_60="-1" colour_61="0" colour_62="0.5" colour_63="1" colour_64="2" tracer_1="Variability" tracer_2="ETTO_Pressure" tracer_3="Safety_Margin" tracer_4="Resonance" tracer_5="" tracer_6="" c_10_value="#8FD3FF" c_12_value="#FFE96A" c_14_value="#F05A5A" c_20_value="#90D8A4" c_22_value="#FFD36E" c_24_value="#E45A44" c_30_value="#F05A5A" c_32_value="#FFE96A" c_34_value="#8FD3FF" c_40_value="#8FD3FF" c_42_value="#FFE96A" c_44_value="#F05A5A" c_50_value="#40CFFF" c_52_value="#FFFF00" c_54_value="#F00000" c_60_value="#40CFFF" c_62_value="#FFFF00" c_64_value="#F00000" hideFMIhighlight="false" hideFMIdisplaytext="false" typeFMIdisplay="|Blend|Blend|Blend|Blend|Blend|Blend">
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="2" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="80" y="180" agentId="0" levelId="0">
+      <IDNr>0</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Observe emerging demand</IDName>
+      <metadata>
+        <Activate active="false" equation="">Demand signal</Activate>
+        <Demand active="true" equation="round(rnd(0.45,0.95),2)">0.70</Demand>
+        <Variability active="true" equation="Demand">0.70</Variability>
+        <ETTO_Pressure active="true" equation="Demand">0.70</ETTO_Pressure>
+      </metadata>
+      <Description>Entry function representing changing operational conditions. In FRAM terms this is the normal upstream variability that starts each interpretation.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="80" y="360" agentId="1" levelId="1">
+      <IDNr>1</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Maintain work-as-imagined guidance</IDName>
+      <metadata>
+        <Activate active="false" equation="">WAI constraints</Activate>
+        <Protocol_Fit active="false" equation="">0.82</Protocol_Fit>
+        <Damping active="false" equation="">0.25</Damping>
+        <Variability active="false" equation="">0.18</Variability>
+      </metadata>
+      <Description>Background function. Guidance, rules and procedures are continuously present as controls, but they only partially match local conditions.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="80" y="540" agentId="2" levelId="0">
+      <IDNr>2</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Provide team capacity</IDName>
+      <metadata>
+        <Activate active="false" equation="">Available capacity</Activate>
+        <Capacity active="true" equation="round(rnd(0.55,0.95),2)">0.75</Capacity>
+        <Variability active="true" equation="round(1-Capacity,2)">0.25</Variability>
+      </metadata>
+      <Description>Background resource. Capacity varies normally; the point is not failure but approximate, adjustable performance.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="All" profileP="All" profileR="Any" profileC="All" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="340" y="250" agentId="0" levelId="0">
+      <IDNr>3</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Make sense of the situation</IDName>
+      <metadata>
+        <Hold active="false" equation="">WAI constraints</Hold>
+        <Demand_Load active="true" equation="I0_Demand">0</Demand_Load>
+        <Protocol_Fit active="true" equation="C1_Protocol_Fit">0</Protocol_Fit>
+        <Capacity_Seen active="true" equation="R2_Capacity">0</Capacity_Seen>
+        <ETTO_Pressure active="true" equation="round(max(0,Demand_Load-Capacity_Seen),2)">0</ETTO_Pressure>
+        <Safety_Margin active="true" equation="round(min(1,Protocol_Fit+Capacity_Seen-Demand_Load),2)">0</Safety_Margin>
+        <Variability active="true" equation="round(max(0,ETTO_Pressure+(1-Safety_Margin)/2),2)">0</Variability>
+        <Resonance active="true" equation="round(Variability*Demand_Load,2)">0</Resonance>
+      </metadata>
+      <Description>Foreground function. Sensemaking depends on the incoming signal, available resources and controls. The Hold metadata keeps the guidance active as a standing condition.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="All" profileP="All" profileR="Any" profileC="All" profileT="Any" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="600" y="250" agentId="0" levelId="0">
+      <IDNr>4</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Coordinate adaptive response</IDName>
+      <metadata>
+        <Hold active="false" equation="">WAI constraints</Hold>
+        <Perceived_Risk active="true" equation="I3_Resonance">0</Perceived_Risk>
+        <Time_Pressure active="true" equation="T5_Time_Pressure">0</Time_Pressure>
+        <ETTO_Pressure active="true" equation="round(max(0,Perceived_Risk+Time_Pressure-C1_Damping),2)">0</ETTO_Pressure>
+        <Variability active="true" equation="round(min(1,ETTO_Pressure+0.15),2)">0</Variability>
+        <Resonance active="true" equation="round(max(Perceived_Risk,Variability),2)">0</Resonance>
+        <Activate active="true" equation="Resonance&gt;0.35?&quot;Adapted response|Escalation marker&quot;:&quot;Adapted response&quot;">Adapted response</Activate>
+      </metadata>
+      <Description>Foreground function showing the efficiency-thoroughness trade-off. High resonance selectively activates an escalation output.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="1" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="340" y="70" agentId="3" levelId="1">
+      <IDNr>5</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Clock and queue pressure</IDName>
+      <metadata>
+        <Activate active="false" equation="">Time pressure</Activate>
+        <Time_Pressure active="true" equation="round(rnd(0.15,0.85),2)">0.45</Time_Pressure>
+        <ETTO_Pressure active="true" equation="Time_Pressure">0.45</ETTO_Pressure>
+        <Variability active="true" equation="round(Time_Pressure/2,2)">0.22</Variability>
+      </metadata>
+      <Description>Entry function for temporal pressure. FRAM analyses often treat timing as a condition that changes performance rather than as a simple failure trigger.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="Any" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="860" y="170" agentId="1" levelId="1">
+      <IDNr>6</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Escalate to supervisory control</IDName>
+      <metadata>
+        <Governance_Load active="true" equation="I4_Resonance">0</Governance_Load>
+        <Variability active="true" equation="round(Governance_Load/2,2)">0</Variability>
+        <Resonance active="true" equation="Governance_Load">0</Resonance>
+      </metadata>
+      <Description>Exit function that is only reached when the adaptive response marks resonance high enough to require escalation.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="All" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="860" y="360" agentId="0" levelId="0">
+      <IDNr>7</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Stabilise work-as-done</IDName>
+      <metadata>
+        <Outcome_Quality active="true" equation="round(max(0,1-I4_Variability),2)">0</Outcome_Quality>
+        <Safety_Margin active="true" equation="Outcome_Quality">0</Safety_Margin>
+        <Variability active="true" equation="round(1-Outcome_Quality,2)">0</Variability>
+      </metadata>
+      <Description>Exit function. The result is not binary success or failure; it records how much variability remains after adaptation.</Description>
+    </Function>
+  </Functions>
+  <Inputs>
+    <Input orphan="true"><IDNr>0</IDNr><IDName>Demand signal</IDName><FunctionIDNr>3</FunctionIDNr></Input>
+    <Input orphan="true"><IDNr>1</IDNr><IDName>Situation framing</IDName><FunctionIDNr>4</FunctionIDNr></Input>
+    <Input orphan="true"><IDNr>2</IDNr><IDName>Escalation marker</IDName><FunctionIDNr>6</FunctionIDNr></Input>
+    <Input orphan="true"><IDNr>3</IDNr><IDName>Adapted response</IDName><FunctionIDNr>7</FunctionIDNr></Input>
+  </Inputs>
+  <Preconditions>
+    <Precondition orphan="true"><IDNr>0</IDNr><IDName>Minimum shared picture</IDName><FunctionIDNr>4</FunctionIDNr></Precondition>
+  </Preconditions>
+  <Resources>
+    <Resource orphan="true"><IDNr>0</IDNr><IDName>Available capacity</IDName><FunctionIDNr>3</FunctionIDNr></Resource>
+    <Resource orphan="true"><IDNr>1</IDNr><IDName>Available capacity</IDName><FunctionIDNr>4</FunctionIDNr></Resource>
+  </Resources>
+  <Controls>
+    <Control orphan="true"><IDNr>0</IDNr><IDName>WAI constraints</IDName><FunctionIDNr>3</FunctionIDNr></Control>
+    <Control orphan="true"><IDNr>1</IDNr><IDName>WAI constraints</IDName><FunctionIDNr>4</FunctionIDNr></Control>
+  </Controls>
+  <Times>
+    <Time orphan="true"><IDNr>0</IDNr><IDName>Time pressure</IDName><FunctionIDNr>4</FunctionIDNr></Time>
+  </Times>
+  <Outputs>
+    <Output orphan="true"><IDNr>0</IDNr><IDName>Demand signal</IDName><FunctionIDNr>0</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>1</IDNr><IDName>WAI constraints</IDName><FunctionIDNr>1</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>2</IDNr><IDName>Available capacity</IDName><FunctionIDNr>2</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>3</IDNr><IDName>Situation framing</IDName><FunctionIDNr>3</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>4</IDNr><IDName>Adapted response</IDName><FunctionIDNr>4</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>5</IDNr><IDName>Escalation marker</IDName><FunctionIDNr>4</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>6</IDNr><IDName>Time pressure</IDName><FunctionIDNr>5</FunctionIDNr></Output>
+    <Output orphan="true"><IDNr>7</IDNr><IDName>Minimum shared picture</IDName><FunctionIDNr>3</FunctionIDNr></Output>
+  </Outputs>
+  <Aspects scaleFunction="1" scaleAspect="1" scaleZoom="1.5" Enhanced="false" WebEnhanced=""></Aspects>
+  <Groups></Groups>
+  <Agents>
+    <Agent>
+      <IDNr>0</IDNr>
+      <Name>Frontline practitioner</Name>
+      <AgentType>Human</AgentType>
+      <Description>Performs adaptive, situated work-as-done.</Description>
+    </Agent>
+    <Agent>
+      <IDNr>1</IDNr>
+      <Name>Supervisor</Name>
+      <AgentType>Organisational</AgentType>
+      <Description>Owns work-as-imagined constraints and escalation decisions.</Description>
+    </Agent>
+    <Agent>
+      <IDNr>2</IDNr>
+      <Name>Team and local resources</Name>
+      <AgentType>Human/Organisational</AgentType>
+      <Description>Represents capacity, staffing and informal support.</Description>
+    </Agent>
+    <Agent>
+      <IDNr>3</IDNr>
+      <Name>Operating environment</Name>
+      <AgentType>Context</AgentType>
+      <Description>Produces time and queue pressure.</Description>
+    </Agent>
+  </Agents>
+  <Levels>
+    <Level color="#C7E7FF" isActive="true">
+      <IDNr>0</IDNr>
+      <Name>Operational</Name>
+      <Description>Local work-as-done.</Description>
+      <LevelType>Operational</LevelType>
+      <Hierarchy>0</Hierarchy>
+      <TimeScale>Minutes</TimeScale>
+      <DecisionScope>Local adaptation</DecisionScope>
+    </Level>
+    <Level color="#FFE0A8" isActive="true">
+      <IDNr>1</IDNr>
+      <Name>Tactical</Name>
+      <Description>Coordination and procedural control.</Description>
+      <LevelType>Tactical</LevelType>
+      <Hierarchy>1</Hierarchy>
+      <TimeScale>Shift</TimeScale>
+      <DecisionScope>Escalation and resource balancing</DecisionScope>
+    </Level>
+  </Levels>
+</FM>
