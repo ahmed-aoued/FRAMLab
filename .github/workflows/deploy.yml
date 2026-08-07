@@ -43,13 +43,13 @@ jobs:
           print(f'Set <base> href to "/{repo_name}/"')
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore FRAMLab.csproj
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build FRAMLab.csproj --configuration Release --no-restore
 
       - name: Publish
-        run: dotnet publish --configuration Release --no-build -o publish
+        run: dotnet publish FRAMLab.csproj --configuration Release --no-build -o publish
 
       - name: Add .nojekyll
         run: touch publish/wwwroot/.nojekyll
