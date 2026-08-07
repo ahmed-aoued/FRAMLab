@@ -125,22 +125,22 @@
   </data>
   <data name="ASPECT_LABEL" xml:space="preserve">
     <value>Bestandteilebeschriftungen</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="COLOUR" xml:space="preserve">
     <value>Farbe</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="CONTROL" xml:space="preserve">
     <value>Control</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="COUPLING_NAME" xml:space="preserve">
     <value>Coupling Name</value>
   </data>
   <data name="DESCRIPTION" xml:space="preserve">
     <value>Beschreibung</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="FMI_ACTIVATED" xml:space="preserve">
     <value>Aktiviert</value>
@@ -199,7 +199,7 @@
   </data>
   <data name="FN_COLOUR" xml:space="preserve">
     <value>Farbe der Funktion</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="FN_FONT_DECREASE" xml:space="preserve">
     <value>Decrease Function text (Esc=default)</value>
@@ -224,7 +224,7 @@
   </data>
   <data name="IMAGE_TOOLTIP" xml:space="preserve">
     <value>Bild speichern</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="INFO_TOOLTIP" xml:space="preserve">
     <value>Info</value>
@@ -232,7 +232,7 @@
   </data>
   <data name="INPUT" xml:space="preserve">
     <value>Input</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="LOGIN" xml:space="preserve">
     <value>Login</value>
@@ -244,23 +244,23 @@
   </data>
   <data name="NAME_FN" xml:space="preserve">
     <value>Name der Funktion</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="NEW_TOOLTIP" xml:space="preserve">
     <value>Neue Funktion</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="OPEN_TOOLTIP" xml:space="preserve">
     <value>Öffnen (upload)</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="OUTPUT" xml:space="preserve">
     <value>Output</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="PRECONDITION" xml:space="preserve">
     <value>Precondition</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="REDO_TOOLTIP" xml:space="preserve">
     <value>Redo</value>
@@ -272,15 +272,15 @@
   </data>
   <data name="RENDER" xml:space="preserve">
     <value>Modelldarstellung</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="RESOURCE" xml:space="preserve">
     <value>Resource</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="SAVE_TOOLTIP" xml:space="preserve">
     <value>Speichern (download)</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="SEARCH_CONTAINS" xml:space="preserve">
     <value>enthält...</value>
@@ -288,11 +288,11 @@
   </data>
   <data name="SHOW_LABEL" xml:space="preserve">
     <value>Anzeigen der Funktionsbeschriftungen</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="S_ASPECTS" xml:space="preserve">
     <value>Bestandteile</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="S_PROPERTIES" xml:space="preserve">
     <value>Eigenschaften</value>
@@ -313,7 +313,7 @@
   </data>
   <data name="TIME" xml:space="preserve">
     <value>Time</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="UNDO_TOOLTIP" xml:space="preserve">
     <value>Rückgängig machen</value>
@@ -325,10 +325,10 @@
   </data>
   <data name="ZOOM_MINUS_TOOLTIP" xml:space="preserve">
     <value>Verkleinern</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="ZOOM_PLUS_TOOLTIP" xml:space="preserve">
     <value>Vergrößern</value>
-    <comment>Source: FMV v2.2</comment>
+    <comment>Source: FRAMLab v0.6</comment>
   </data>
 </root>
