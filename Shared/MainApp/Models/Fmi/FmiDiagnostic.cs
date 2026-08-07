@@ -1,4 +1,4 @@
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public enum FmiDiagnosticSeverity { Info, Warning, Error }
 

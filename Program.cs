@@ -1,6 +1,6 @@
-using FMV_OG;
-using FMV_OG.Shared;
-using FMV_OG.Shared.MainApp.Services;
+using FRAMLab;
+using FRAMLab.Shared;
+using FRAMLab.Shared.MainApp.Services;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;

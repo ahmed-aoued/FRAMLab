@@ -3,7 +3,7 @@ using Microsoft.JSInterop;
 using System;
 using System.Threading.Tasks;
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public class SvgUtilsInterop : IAsyncDisposable
     {

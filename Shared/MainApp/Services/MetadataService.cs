@@ -7,7 +7,7 @@ using System.Xml;
 //CalcVariables()
 //
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public class MetadataService : IMetadataService
     {

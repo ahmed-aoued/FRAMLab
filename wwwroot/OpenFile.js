@@ -24,6 +24,6 @@
         blob.handle = fileHandle;
         const content = await blob.text();
 
-        DotNet.invokeMethodAsync('FMV_OG', 'FileContent', content, fileHandle.name);
+        DotNet.invokeMethodAsync('FRAMLab', 'FileContent', content, fileHandle.name);
     }
 }

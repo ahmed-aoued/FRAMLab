@@ -1,4 +1,4 @@
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     /// <summary>
     /// Structured runtime state of an FMI run. During the transition the legacy

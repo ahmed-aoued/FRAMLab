@@ -1,6 +1,6 @@
 using System.Xml;
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public class FmiDefinitionService : IFmiDefinitionService
     {

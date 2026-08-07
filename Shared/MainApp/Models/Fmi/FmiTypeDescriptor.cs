@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     /// <summary>
     /// Parsed representation of a variable type string from the &lt;FMI&gt; section,

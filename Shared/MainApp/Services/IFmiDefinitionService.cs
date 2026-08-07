@@ -1,6 +1,6 @@
 using System.Xml;
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     /// <summary>
     /// Owns reading and writing the &lt;FMI&gt; section of the project XML

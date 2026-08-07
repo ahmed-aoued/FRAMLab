@@ -1,7 +1,7 @@
 ﻿using Microsoft.JSInterop;
 using System.Threading.Tasks;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public class BrowserService
     {

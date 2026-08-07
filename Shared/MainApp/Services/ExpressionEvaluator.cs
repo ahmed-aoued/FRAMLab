@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public class ExpressionEvaluator : IExpressionEvaluator
     {

@@ -1,6 +1,6 @@
 using System.Xml;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public class Agent
     {

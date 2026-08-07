@@ -1,7 +1,7 @@
 using System.Data;
 using System.Xml;
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public interface IMetadataService
     {

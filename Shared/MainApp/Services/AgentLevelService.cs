@@ -1,10 +1,10 @@
 using System.Globalization;
 using System.Xml;
-using FMV_OG.Shared;
-using FMV_OG.Shared.MainApp.Models;
+using FRAMLab.Shared;
+using FRAMLab.Shared.MainApp.Models;
 using Microsoft.Extensions.Configuration;
 
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public class AgentLevelService
     {

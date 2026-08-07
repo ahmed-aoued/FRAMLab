@@ -1,4 +1,4 @@
-using FMV_OG.Shared;
+using FRAMLab.Shared;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Generic;
 using System.Xml;
@@ -9,7 +9,7 @@ using System.ComponentModel.Design;
 using System.Dynamic;
 using System.Linq;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public enum variableType : ushort
     {

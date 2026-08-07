@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Linq;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public enum FmiValueType { Empty, Number, Boolean, String, Array, List, Dictionary } //Table reserved for a later phase
 

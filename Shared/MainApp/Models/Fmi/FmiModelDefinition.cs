@@ -1,4 +1,4 @@
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     /// <summary>
     /// The parsed model-level FMI definition from the &lt;FMI&gt; section.

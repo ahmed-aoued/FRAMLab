@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using System.Xml;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public enum FmiVariableScope { Cycle, Function, Model, Input, Output }
 

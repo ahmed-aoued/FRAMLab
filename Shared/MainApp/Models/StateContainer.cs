@@ -1,9 +1,9 @@
-﻿using FMV_OG.Shared.MainApp.Services;
+﻿using FRAMLab.Shared.MainApp.Services;
 using System.Data;
 using System.Globalization;
 using System.Xml;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public class StateContainer
     {

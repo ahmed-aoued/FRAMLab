@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace FMV_OG.Shared.MainApp.Models
+namespace FRAMLab.Shared.MainApp.Models
 {
     public record Position(double X, double Y, double Width, double Height);
 

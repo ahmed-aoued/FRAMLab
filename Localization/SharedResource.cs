@@ -1,4 +1,4 @@
-﻿namespace FMV_OG.Localization
+﻿namespace FRAMLab.Localization
 {
     public class SharedResource
     {

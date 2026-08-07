@@ -1,4 +1,4 @@
-namespace FMV_OG.Shared.MainApp.Services
+namespace FRAMLab.Shared.MainApp.Services
 {
     public interface IExpressionEvaluator
     {

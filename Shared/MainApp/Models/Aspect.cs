@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 
-namespace FMV_OG.Shared
+namespace FRAMLab.Shared
 {
     public class Aspect
     {
