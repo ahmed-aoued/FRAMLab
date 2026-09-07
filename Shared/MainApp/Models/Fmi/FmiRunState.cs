@@ -28,13 +28,18 @@ namespace FRAMLab.Shared
     {
         public string FunctionId { get; init; } = "";
         public Dictionary<string, FmiValue> CycleVariables { get; } = new();      //scope=cycle: cleared + reseeded every BeginCycle
-        public Dictionary<string, FmiValue> PersistentVariables { get; } = new(); //scope=function persist=true: survive cycles
+        public Dictionary<string, FmiValue> PersistentVariables { get; } = new(); //scope=function persist=true: survive cycles; on Reset they return to their declared InitialValue
         public Dictionary<string, FmiValue> IncomingValues { get; } = new();      //mirror of I3_*/In_*/Isum_* aspect variables
         public Dictionary<string, FmiValue> PreviousCycleValues { get; } = new(); //last cycle's OutputValues
         public Dictionary<string, FmiValue> OutputValues { get; } = new();        //current metadata key values (published values)
         public bool WasActivatedThisCycle { get; set; }
         public bool WasEverActive { get; set; }
 
+        /// <summary>
+        /// Full wipe of all per-function stores including <see cref="PersistentVariables"/>.
+        /// FmiInterpreter.Reset re-seeds persistent variables from their declared InitialValue
+        /// immediately after calling this, so "reset" semantics are: persistence returns to initial.
+        /// </summary>
         public void Clear()
         {
             CycleVariables.Clear();
@@ -51,6 +56,8 @@ namespace FRAMLab.Shared
     {
         public int Cycle { get; init; }
         public Dictionary<string, Dictionary<string, FmiValue>> FunctionValues { get; init; } = new(); //functionId -> OutputValues copy
+        public Dictionary<string, Dictionary<string, FmiValue>> PersistentValues { get; init; } = new(); //functionId -> PersistentVariables copy at end of cycle
+        public Dictionary<string, FmiValue> GlobalValues { get; init; } = new(); //model-scope variables at end of cycle
         public List<string> ActivatedFunctions { get; init; } = new();
     }
 

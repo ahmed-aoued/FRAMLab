@@ -56,6 +56,13 @@ namespace FRAMLab.Shared.MainApp.Services
                 state.Clear();
                 SeedFunctionState(state);
             }
+            //Drop stale Global_* runtime values; declared model variables are re-seeded above
+            //and legacy Global_* keys are re-populated on the next EvaluateFunction pass.
+            var staleGlobalKeys = metadataService.MetaDataKeys.Keys.Where(k => k.StartsWith("Global_")).ToList();
+            foreach (var key in staleGlobalKeys)
+            {
+                metadataService.MetaDataKeys.Remove(key);
+            }
         }
 
         private void SeedFunctionState(FmiFunctionState state)
@@ -240,24 +247,7 @@ namespace FRAMLab.Shared.MainApp.Services
                 foreach (var md in fn.metadata)
                 {
                     declaredByName.TryGetValue(md[0], out var def);
-                    var value = FmiValue.FromLegacyString(md[1], def?.Type, out var coerced);
-                    state.OutputValues[md[0]] = value;
-                    if (def is not null)
-                    {
-                        if (!coerced)
-                        {
-                            result.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Warning, $"Fn {fn.IDNr} / key {md[0]}",
-                                $"Value '{md[1]}' does not match declared type '{def.Type}'."));
-                        }
-                        if (def.Persist && def.Scope == FmiVariableScope.Function)
-                        {
-                            state.PersistentVariables[def.Name] = value;
-                        }
-                        else if (def.Persist && def.Scope == FmiVariableScope.Model)
-                        {
-                            RunState.GlobalVariables[def.Name] = value;
-                        }
-                    }
+                    WriteBackDeclared(md[0], md[1], def, state, result);
                 }
             }
             foreach (var variable in fn.variableList)
@@ -267,17 +257,66 @@ namespace FRAMLab.Shared.MainApp.Services
                 {
                     state.IncomingValues[variable.Name] = FmiValue.FromLegacyString(val);
                 }
-                else if (declaredByName.TryGetValue(variable.Name, out var def) && def.Persist && def.Scope == FmiVariableScope.Function)
+                else if (declaredByName.TryGetValue(variable.Name, out var def) && def.Persist)
                 {
-                    state.PersistentVariables[def.Name] = FmiValue.FromLegacyString(val, def.Type);
+                    //variableList entries for keys already handled by the metadata loop are overwritten with identical values
+                    WriteBackDeclared(variable.Name, val, def, state, result);
                 }
             }
             foreach (var globalKey in metadataService.MetaDataKeys)
             {
                 if (globalKey.Key.StartsWith("Global_"))
                 {
-                    RunState.GlobalVariables[globalKey.Key] = FmiValue.FromLegacyString(globalKey.Value);
+                    var def = FindModelDefinition(globalKey.Key);
+                    var value = FmiValue.FromLegacyString(globalKey.Value, def?.Type, out var coerced);
+                    if (def is not null && !coerced)
+                    {
+                        result.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Warning, $"Fn {fn.IDNr} / key {globalKey.Key}",
+                            $"Value '{globalKey.Value}' does not match declared type '{def.Type}'."));
+                    }
+                    RunState.GlobalVariables[globalKey.Key] = value;
                 }
+            }
+        }
+
+        private FmiVariableDefinition? FindModelDefinition(string name)
+        {
+            foreach (var def in Definition.Variables)
+            {
+                if (def.Scope == FmiVariableScope.Model && def.Name == name)
+                {
+                    return def;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Single write-back path shared by the legacy metadata loop and the variableList loop:
+        /// coerces the raw legacy string against the declared type (warning diagnostic on mismatch),
+        /// always mirrors into OutputValues, and routes persisted values to PersistentVariables
+        /// (function scope) or GlobalVariables (model scope).
+        /// </summary>
+        private void WriteBackDeclared(string name, string rawValue, FmiVariableDefinition? def, FmiFunctionState state, FmiEvaluationResult result)
+        {
+            var value = FmiValue.FromLegacyString(rawValue, def?.Type, out var coerced);
+            state.OutputValues[name] = value;
+            if (def is null)
+            {
+                return;
+            }
+            if (!coerced)
+            {
+                result.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Warning, $"Fn {state.FunctionId} / key {name}",
+                    $"Value '{rawValue}' does not match declared type '{def.Type}'."));
+            }
+            if (def.Persist && def.Scope == FmiVariableScope.Function)
+            {
+                state.PersistentVariables[def.Name] = value;
+            }
+            else if (def.Persist && def.Scope == FmiVariableScope.Model)
+            {
+                RunState.GlobalVariables[def.Name] = value;
             }
         }
 
@@ -294,11 +333,16 @@ namespace FRAMLab.Shared.MainApp.Services
                     snapshot.ActivatedFunctions.Add(fn.IDNr);
                 }
                 snapshot.FunctionValues[fn.IDNr] = new Dictionary<string, FmiValue>(state.OutputValues);
+                snapshot.PersistentValues[fn.IDNr] = new Dictionary<string, FmiValue>(state.PersistentVariables);
                 state.PreviousCycleValues.Clear();
                 foreach (var output in state.OutputValues)
                 {
                     state.PreviousCycleValues[output.Key] = output.Value;
                 }
+            }
+            foreach (var global in RunState.GlobalVariables)
+            {
+                snapshot.GlobalValues[global.Key] = global.Value;
             }
             RunState.History.Add(snapshot);
             RunState.ActiveCouplings.Clear();
