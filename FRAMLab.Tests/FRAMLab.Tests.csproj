@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="xunit" Version="2.7.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
+    <!-- ElementReference in Function.cs/Aspect.cs -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <!--
+    FRAMLab.csproj is a Blazor WebAssembly (net8.0-browser) project; a direct
+    <ProjectReference> fails in a plain net8.0 test project. The FMI engine is
+    plain C# with no WASM dependencies, so the engine sources are compiled
+    directly (same approach the throwaway .verify harness used).
+  -->
+  <ItemGroup>
+    <Compile Include="..\Shared\MainApp\Models\Fmi\*.cs" LinkBase="Engine\Models\Fmi" />
+    <Compile Include="..\Shared\MainApp\Models\Function.cs" Link="Engine\Models\Function.cs" />
+    <Compile Include="..\Shared\MainApp\Models\Coupling.cs" Link="Engine\Models\Coupling.cs" />
+    <Compile Include="..\Shared\MainApp\Models\Aspect.cs" Link="Engine\Models\Aspect.cs" />
+    <Compile Include="..\Shared\MainApp\Services\FmiInterpreter.cs" Link="Engine\Services\FmiInterpreter.cs" />
+    <Compile Include="..\Shared\MainApp\Services\IFmiInterpreter.cs" Link="Engine\Services\IFmiInterpreter.cs" />
+    <Compile Include="..\Shared\MainApp\Services\ExpressionEvaluator.cs" Link="Engine\Services\ExpressionEvaluator.cs" />
+    <Compile Include="..\Shared\MainApp\Services\IExpressionEvaluator.cs" Link="Engine\Services\IExpressionEvaluator.cs" />
+    <Compile Include="..\Shared\MainApp\Services\MetadataService.cs" Link="Engine\Services\MetadataService.cs" />
+    <Compile Include="..\Shared\MainApp\Services\IMetadataService.cs" Link="Engine\Services\IMetadataService.cs" />
+    <Compile Include="..\Shared\MainApp\Services\FmiDefinitionService.cs" Link="Engine\Services\FmiDefinitionService.cs" />
+    <Compile Include="..\Shared\MainApp\Services\IFmiDefinitionService.cs" Link="Engine\Services\IFmiDefinitionService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\TestFiles\*.xfmv" Link="TestFiles\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
