@@ -11,6 +11,7 @@ namespace FRAMLab.Shared.MainApp.Services
             {
                 return definition; //old files without <FMI> load to an empty definition
             }
+            var seen = new HashSet<string>(StringComparer.Ordinal); //case-sensitive (Name,FunctionId), matching legacy metadata keys
             foreach (XmlNode node in variablesRoot.ChildNodes)
             {
                 if (node is XmlElement el && el.Name == "Variable")
@@ -18,11 +19,47 @@ namespace FRAMLab.Shared.MainApp.Services
                     var def = FmiVariableDefinition.FromXml(el, definition.LoadDiagnostics);
                     if (def is not null)
                     {
+                        if (!seen.Add(def.Name + "\n" + def.FunctionId))
+                        {
+                            definition.LoadDiagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error,
+                                $"FMI/Variables/Variable[{def.Name}]",
+                                $"Duplicate definition for name '{def.Name}' (function '{def.FunctionId}'); the first definition is kept."));
+                            continue;
+                        }
                         definition.Variables.Add(def);
                     }
                 }
             }
             return definition;
+        }
+
+        /// <summary>
+        /// Merges implicit definitions (derived from legacy metadata) into the declared
+        /// definition. Declared variables win by name (a declared template also wins over
+        /// function-bound implicits of the same name); implicits only fill gaps.
+        /// Comparison is case-sensitive, matching legacy metadata keys.
+        /// </summary>
+        public FmiModelDefinition MergeWithImplicit(FmiModelDefinition declared, List<Function> functions)
+        {
+            var merged = new FmiModelDefinition();
+            var declaredNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var def in declared.Variables)
+            {
+                declaredNames.Add(def.Name);
+                merged.Variables.Add(def);
+            }
+            foreach (var def in BuildImplicitDefinitions(functions).Variables)
+            {
+                if (declaredNames.Add(def.Name))
+                {
+                    merged.Variables.Add(def);
+                }
+            }
+            foreach (var diagnostic in declared.LoadDiagnostics)
+            {
+                merged.LoadDiagnostics.Add(diagnostic);
+            }
+            return merged;
         }
 
         public XmlNode EnsureFmiRoot(XmlDocument projectData)
@@ -90,23 +127,33 @@ namespace FRAMLab.Shared.MainApp.Services
         public FmiModelDefinition BuildImplicitDefinitions(List<Function> functions)
         {
             var definition = new FmiModelDefinition();
+            var seen = new HashSet<string>(StringComparer.Ordinal); //case-sensitive (Name,FunctionId), matching legacy metadata keys
             foreach (var fn in functions)
             {
                 if (fn.metadata is null) continue;
                 foreach (var md in fn.metadata)
                 {
-                    var inferred = FmiValue.FromLegacyString(md[4]);
+                    var name = md.ElementAtOrDefault(0) ?? "";
+                    if (name == "") continue;
+                    //md[4] is the raw initial value; legacy rows are always 5 columns, guard short rows defensively
+                    var initialRaw = md.ElementAtOrDefault(4) ?? "";
+                    //Untyped inference only detects number/bool/string; collections are never guessed from commas
+                    //(would change legacy equation semantics) — users opt in by declaring an explicit <Variable>.
+                    var inferred = FmiValue.FromLegacyString(initialRaw);
+                    var isGlobal = name.StartsWith("Global_");
+                    var functionId = isGlobal ? "" : fn.IDNr;
+                    if (!seen.Add(name + "\n" + functionId)) continue; //duplicate legacy key: keep first
                     definition.Variables.Add(new FmiVariableDefinition
                     {
-                        Name = md[0],
+                        Name = name,
                         Type = inferred.Type == FmiValueType.Number ? FmiTypeDescriptor.Number
                              : inferred.Type == FmiValueType.Boolean ? FmiTypeDescriptor.Boolean
                              : FmiTypeDescriptor.String,
-                        Scope = md[0].StartsWith("Global_") ? FmiVariableScope.Model : FmiVariableScope.Function,
-                        InitialRaw = md[4],
+                        Scope = isGlobal ? FmiVariableScope.Model : FmiVariableScope.Function,
+                        InitialRaw = initialRaw,
                         InitialValue = inferred,
                         Persist = false,
-                        FunctionId = md[0].StartsWith("Global_") ? "" : fn.IDNr,
+                        FunctionId = functionId,
                         IsImplicit = true
                     });
                 }
