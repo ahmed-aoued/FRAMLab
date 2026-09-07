@@ -454,6 +454,14 @@ namespace FRAMLab.Shared
         public void fmiBeginCycle()
         {
             fmiInterpreter.BeginCycle(buildFmiContext());
+            if (fmiInterpreter is FmiInterpreter interpreter && interpreter.PendingDiagnostics.Count > 0)
+            {
+                foreach (var diagnostic in interpreter.PendingDiagnostics)
+                {
+                    Console.WriteLine($"FMI {diagnostic.Severity}: {diagnostic.Source}: {diagnostic.Message}");
+                }
+                interpreter.PendingDiagnostics.Clear();
+            }
         }
         public FmiEvaluationResult fmiEvaluate(Function fn)
         {
