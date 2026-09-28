@@ -298,10 +298,16 @@ text {
 
 /* --- Script IDE --- */
 .script-ide-page {
+    /* The page is a standalone full-window route. Size to the viewport directly,
+       not the flex parent (Blazor's layout wrapper is display:block and would
+       otherwise shrink-wrap the content). */
+    width: 100vw;
     height: 100vh;
+    max-width: 100vw;
     display: flex;
     flex-direction: column;
     background-color: #f8f9fa;
+    overflow: hidden;
 }
 .script-ide-missing {
     padding: 2rem;
@@ -315,7 +321,9 @@ text {
 .script-ide {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
     overflow: hidden;
 }
 .script-ide-header {
@@ -347,6 +355,8 @@ text {
     display: flex;
     flex: 1 1 auto;
     min-height: 0;
+    min-width: 0;
+    width: 100%;
 }
 .script-ide-vars {
     width: 520px;
@@ -373,11 +383,13 @@ text {
 .script-ide-editor {
     flex: 1 1 auto;
     min-width: 0;
+    min-height: 0;
     display: flex;
     background-color: #ffffff;
 }
 .script-code-editor {
     flex: 1 1 auto;
+    min-width: 0;
     min-height: 200px;
 }
 .script-code-fallback {
