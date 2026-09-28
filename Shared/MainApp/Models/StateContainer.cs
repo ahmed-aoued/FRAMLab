@@ -236,10 +236,25 @@ namespace FMV_OG.Shared
         public bool scriptIDEVisible { get; set; } = false;
         public string scriptTargetFn { get; set; } = "-1";
         public List<FMV_OG.Shared.MainApp.Models.ScriptVariable> globalScriptVariables { get; set; } = new List<FMV_OG.Shared.MainApp.Models.ScriptVariable>();
+        /// <summary>Scripting engine facade (set from Program.cs after construction to avoid a DI cycle).</summary>
+        public FMV_OG.Shared.MainApp.Services.Scripting.ScriptingService? Scripting { get; set; }
         public void sFnScript(FMV_OG.Shared.MainApp.Models.ScriptModel script, string functionId)
         {
             updateUndo();
             projectDocumentService.SetFunctionScript(projectData_Undo[0], functionId, script);
+        }
+        /// <summary>Re-derive every function's aspect variables from the current coupling list.</summary>
+        public void SyncScriptAspects()
+        {
+            foreach (var fn in functionList)
+            {
+                fn.Script.SyncAspects(couplingList, fn.IDNr);
+            }
+        }
+        /// <summary>Type-consistency warnings across all coupled functions (aspect type mismatches).</summary>
+        public List<string> ScriptTypeMismatches()
+        {
+            return FMV_OG.Shared.MainApp.Models.AspectVariable.FindTypeMismatches(functionList, couplingList);
         }
         public double selectX { get; set; } = 0;
         public double selectY { get; set; } = 0;

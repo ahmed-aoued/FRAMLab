@@ -15,6 +15,12 @@
 	  <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
 	</PropertyGroup>
 
+  <!-- TestFiles holds sample .xfmv models and the standalone script-language test
+       harness; it is not part of the app and must not be compiled. -->
+  <ItemGroup>
+    <Compile Remove="TestFiles\**\*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.QuickGrid" Version="8.0.2" />

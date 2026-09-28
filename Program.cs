@@ -18,6 +18,7 @@ builder.Services.AddSingleton<IFMIDisplayConfigService, FMIDisplayConfigService>
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
 builder.Services.AddSingleton<IProjectDocumentService, ProjectDocumentService>();
 builder.Services.AddSingleton<AgentLevelService>();
+builder.Services.AddSingleton<FMV_OG.Shared.MainApp.Services.Scripting.ScriptingService>();
 builder.Services.AddScoped<SvgUtilsInterop>();
 
 builder.Services.AddBlazoredLocalStorage();
@@ -33,4 +34,10 @@ using var response = await http.GetAsync("renderoptions.json");
 using var stream = await response.Content.ReadAsStreamAsync();
 builder.Configuration.AddJsonStream(stream);
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+// link the scripting engine to the central state (avoids a constructor DI cycle)
+var stateContainer = host.Services.GetRequiredService<StateContainer>();
+stateContainer.Scripting = host.Services.GetRequiredService<FMV_OG.Shared.MainApp.Services.Scripting.ScriptingService>();
+
+await host.RunAsync();

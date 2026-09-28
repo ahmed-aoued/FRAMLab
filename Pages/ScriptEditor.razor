@@ -46,6 +46,51 @@
 
             <div class="script-ide-body">
                 <div class="script-ide-vars">
+                    @* --- Aspect variables, derived from couplings, grouped by category --- *@
+                    <div class="script-ide-section-title">
+                        Aspect variables
+                        <span class="vt-hint">from couplings · set each data type</span>
+                    </div>
+                    @if (script.AspectVariables.Count == 0)
+                    {
+                        <div class="vt-empty">No aspects coupled to this function.</div>
+                    }
+                    else
+                    {
+                        @foreach (var group in script.AspectVariables.GroupBy(a => a.Category).OrderBy(g => g.Key))
+                        {
+                            <div class="av-category">
+                                <span class="av-cat-badge @AspectCatClass(group.Key)">@AspectCatLetter(group.Key)</span>
+                                @group.Key.ToString()
+                            </div>
+                            <table class="av-grid">
+                                <tbody>
+                                    @foreach (var av in group.OrderBy(a => a.Label))
+                                    {
+                                        <tr class="av-row" @key="av">
+                                            <td class="av-label" title="@av.Label">
+                                                <span class="av-human">@av.Label</span>
+                                                <span class="av-id">@av.Identifier</span>
+                                            </td>
+                                            <td class="av-dir">@(av.Category == AspectCategory.Output ? "→ out" : "in →")</td>
+                                            <td class="av-type">
+                                                <select class="vt-select" value="@(av.Type?.ToString() ?? "")"
+                                                        @onchange="@((e) => SetAspectType(av, e.Value?.ToString() ?? ""))">
+                                                    <option value="">ANY</option>
+                                                    @foreach (ScriptVarType t in Enum.GetValues(typeof(ScriptVarType)))
+                                                    {
+                                                        <option value="@t">@t</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    }
+
+                    @* --- Declared local/static variables --- *@
                     <div class="script-ide-section-title">
                         Local variables
                         <span class="vt-hint">Temp = per cycle · Static = per FMI run</span>
@@ -63,6 +108,24 @@
                                 ElementId="@EditorElementId"
                                 InitialValue="@script.Source"
                                 OnChanged="OnSourceChanged" />
+                    @* --- diagnostics / type-mismatch panel --- *@
+                    @if (diagnostics.Count > 0 || typeMismatches.Count > 0)
+                    {
+                        <div class="script-diagnostics">
+                            @foreach (var w in typeMismatches)
+                            {
+                                <div class="diag diag-warning" title="Cross-function type mismatch">
+                                    <span class="oi oi-warning"></span> @w
+                                </div>
+                            }
+                            @foreach (var d in diagnostics)
+                            {
+                                <div class="diag @DiagClass(d.Severity)" @onclick="@(() => RevealLine(d.StartLine))" title="Click to reveal">
+                                    <span class="diag-pos">@d.StartLine:@d.StartColumn</span> @d.Message
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
             <div class="script-ide-footer">
@@ -111,6 +174,9 @@
                 stateContainer.projectData_Undo[0] = new XmlDocument();
                 stateContainer.projectData_Undo[0].LoadXml(data.xml);
 
+                // reconstruct minimal couplings from the Aspects XML so aspect variables can be derived
+                stateContainer.couplingList = AspectVariable.CouplingsFromXml(stateContainer.projectData_Undo[0]);
+
                 var fnId = string.IsNullOrEmpty(data.fnId) ? FunctionId : data.fnId;
                 var fnNode = stateContainer.projectData_Undo[0]
                     .SelectSingleNode($"//FM/Functions/Function[IDNr={fnId}]");
@@ -121,7 +187,10 @@
                     return;
                 }
                 TargetFunction = new Function(fnNode);
+                // merge persisted aspect types into the freshly-derived aspect set
+                TargetFunction.Script.SyncAspects(stateContainer.couplingList, TargetFunction.IDNr);
                 script = TargetFunction.Script;
+                Recompile();
                 StateHasChanged();
             }
             catch (Exception)
@@ -132,23 +201,138 @@
         }
     }
 
+    // ---- live compilation + diagnostics ----
+    private List<FMV_OG.Shared.MainApp.Services.Scripting.ScriptDiagnostic> diagnostics = new();
+    private List<string> typeMismatches = new();
+
+    private void Recompile()
+    {
+        if (TargetFunction is null || stateContainer.Scripting is null) return;
+        var compiled = stateContainer.Scripting.Compile(TargetFunction);
+        diagnostics = compiled.Diagnostics.ToList();
+        _ = PushMarkers(compiled.Diagnostics);
+    }
+
+    private async Task PushMarkers(IEnumerable<FMV_OG.Shared.MainApp.Services.Scripting.ScriptDiagnostic> diags)
+    {
+        try
+        {
+            var markers = diags.Select(d => new
+            {
+                severity = d.Severity,
+                message = d.Message,
+                startLine = d.StartLine,
+                startColumn = d.StartColumn,
+                endLine = d.EndLine,
+                endColumn = d.EndColumn
+            }).ToArray();
+            await JSRuntime.InvokeVoidAsync("ScriptEditor.setMarkers", EditorElementId, markers);
+        }
+        catch { /* editor not ready yet */ }
+    }
+
+    private void RecomputeTypeMismatches()
+    {
+        // write this function's current aspect types into its XML node view, then check the whole model
+        if (TargetFunction is null) return;
+        var fnNode = stateContainer.projectData_Undo[0]
+            .SelectSingleNode($"//FM/Functions/Function[IDNr={TargetFunction.IDNr}]");
+        if (fnNode is not null)
+        {
+            script.WriteXml(stateContainer.projectData_Undo[0], fnNode);
+        }
+        // rebuild function list view of aspect types for the mismatch check
+        var functions = new List<Function>();
+        foreach (XmlNode n in stateContainer.projectData_Undo[0].SelectNodes("//FM/Functions/Function")!)
+        {
+            functions.Add(new Function(n));
+        }
+        foreach (var f in functions)
+        {
+            f.Script.SyncAspects(stateContainer.couplingList, f.IDNr);
+        }
+        // keep the current in-memory script (with unsaved aspect types) for the target function
+        var current = functions.FirstOrDefault(f => f.IDNr == TargetFunction.IDNr);
+        if (current is not null)
+        {
+            current.Script.AspectVariables = script.AspectVariables;
+        }
+        typeMismatches = AspectVariable.FindTypeMismatches(functions, stateContainer.couplingList);
+    }
+
+    private string DiagClass(string severity) => severity switch
+    {
+        "Error" => "diag-error",
+        "Warning" => "diag-warning",
+        _ => "diag-info",
+    };
+
+    private string AspectCatLetter(AspectCategory cat) => cat switch
+    {
+        AspectCategory.Input => "I",
+        AspectCategory.Precondition => "P",
+        AspectCategory.Resource => "R",
+        AspectCategory.Control => "C",
+        AspectCategory.Time => "T",
+        AspectCategory.Output => "O",
+        _ => "?",
+    };
+
+    private string AspectCatClass(AspectCategory cat) => cat switch
+    {
+        AspectCategory.Input => "av-cat-i",
+        AspectCategory.Precondition => "av-cat-p",
+        AspectCategory.Resource => "av-cat-r",
+        AspectCategory.Control => "av-cat-c",
+        AspectCategory.Time => "av-cat-t",
+        AspectCategory.Output => "av-cat-o",
+        _ => "",
+    };
+
+    private async Task SetAspectType(AspectVariable av, string typeStr)
+    {
+        av.Type = Enum.TryParse<ScriptVarType>(typeStr, true, out var t) ? t : null;
+        dirty = true;
+        RecomputeTypeMismatches();
+        Recompile();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RevealLine(int line)
+    {
+        try { await JSRuntime.InvokeVoidAsync("ScriptEditor.revealLine", EditorElementId, line); }
+        catch { }
+    }
+
     private void OnSourceChanged(string value)
     {
         script.Source = value;
         dirty = true;
+        Recompile();
         StateHasChanged();
     }
 
     private Task OnVariablesChanged()
     {
         dirty = true;
+        Recompile();
         return InvokeAsync(StateHasChanged);
     }
 
     private Task OnGlobalsChanged()
     {
         dirty = true;
+        SyncGlobalDeclarations();
+        Recompile();
         return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Push the editor's global variable declarations into the scripting service symbol table.</summary>
+    private void SyncGlobalDeclarations()
+    {
+        if (stateContainer.Scripting is null) return;
+        stateContainer.Scripting.GlobalVariableDeclarations.Clear();
+        stateContainer.Scripting.GlobalVariableDeclarations.AddRange(stateContainer.globalScriptVariables);
     }
 
     private async Task ToggleEnabled(ChangeEventArgs e)

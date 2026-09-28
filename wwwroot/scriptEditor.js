@@ -21,6 +21,7 @@
                 { open: "(", close: ")" },
                 { open: "[", close: "]" },
                 { open: "'", close: "'", notIn: ["string", "comment"] },
+                { open: "\"", close: "\"", notIn: ["string", "comment"] },
                 { open: "(*", close: "*)" }
             ]
         });
@@ -53,6 +54,7 @@
                     [/\d+\.\d+([eE][+-]?\d+)?/, "number.float"],
                     [/\d+/, "number"],
                     [/'([^'\\]|\\.)*'/, "string"],
+                    [/"([^"\\]|\\.)*"/, "string"],
                     [/:=|\.\.|[+\-*/=<>]+/, "operator"],
                     [/[a-zA-Z_][\w]*/, {
                         cases: {

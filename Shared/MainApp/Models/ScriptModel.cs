@@ -14,8 +14,60 @@ namespace FMV_OG.Shared.MainApp.Models
         public string Language { get; set; } = "ST";
         public string Source { get; set; } = "";
         public List<ScriptVariable> Variables { get; set; } = new List<ScriptVariable>();
+        /// <summary>
+        /// Aspect variables derived from the model's couplings (Input/Output/Precondition/
+        /// Resource/Control/Time). Only their user-assigned data types are persisted; the
+        /// set of aspects itself is always re-derived from couplings via SyncAspects.
+        /// </summary>
+        public List<AspectVariable> AspectVariables { get; set; } = new List<AspectVariable>();
 
-        public bool HasContent => !string.IsNullOrWhiteSpace(Source) || Variables.Count > 0;
+        public bool HasContent =>
+            !string.IsNullOrWhiteSpace(Source)
+            || Variables.Count > 0
+            || AspectVariables.Any(a => a.Type is not null);
+
+        /// <summary>
+        /// Re-derive the aspect set from couplings and merge with the persisted type
+        /// assignments, keeping any types the user already set for aspects that still exist.
+        /// </summary>
+        public void SyncAspects(IEnumerable<Coupling> couplings, string functionIdNr)
+        {
+            var derived = AspectVariable.DeriveFor(functionIdNr, couplings);
+            foreach (var d in derived)
+            {
+                var existing = AspectVariables.FirstOrDefault(a => a.Category == d.Category && a.Label == d.Label);
+                if (existing is not null)
+                {
+                    d.Type = existing.Type; // preserve user-assigned type
+                }
+            }
+            AspectVariables = derived;
+        }
+
+        /// <summary>Persisted type assignments read from the XML (aspect label+category -> type).</summary>
+        private void ReadAspectTypes(XmlNode fn)
+        {
+            if (fn.SelectSingleNode("aspectTypes") is XmlNode atNode)
+            {
+                foreach (XmlNode a in atNode.SelectNodes("aspect")!)
+                {
+                    var cat = a.SelectSingleNode("@category")?.Value ?? "";
+                    var label = a.SelectSingleNode("@label")?.Value ?? "";
+                    var typeStr = a.SelectSingleNode("@type")?.Value ?? "";
+                    if (label == "" || !Enum.TryParse<AspectCategory>(cat, true, out var category)) continue;
+                    if (!Enum.TryParse<ScriptVarType>(typeStr, true, out var type)) continue;
+                    var existing = AspectVariables.FirstOrDefault(x => x.Category == category && x.Label == label);
+                    if (existing is not null)
+                    {
+                        existing.Type = type;
+                    }
+                    else
+                    {
+                        AspectVariables.Add(new AspectVariable { Category = category, Label = label, Type = type });
+                    }
+                }
+            }
+        }
 
         /// <summary>Parse the &lt;script&gt; and &lt;variables&gt; children of a function XML node. Never returns null.</summary>
         public static ScriptModel FromXml(XmlNode fn)
@@ -54,6 +106,7 @@ namespace FMV_OG.Shared.MainApp.Models
                 }
             }
 
+            model.ReadAspectTypes(fn);
             return model;
         }
 
@@ -65,62 +118,98 @@ namespace FMV_OG.Shared.MainApp.Models
         {
             var existingScript = fn.SelectSingleNode("script");
             var existingVars = fn.SelectSingleNode("variables");
+            var existingAspectTypes = fn.SelectSingleNode("aspectTypes");
 
             if (!HasContent)
             {
                 if (existingScript is not null) fn.RemoveChild(existingScript);
                 if (existingVars is not null) fn.RemoveChild(existingVars);
+                if (existingAspectTypes is not null) fn.RemoveChild(existingAspectTypes);
                 return;
             }
 
-            XmlNode scriptNode;
-            if (existingScript is null)
+            // Only materialise the <script> node when there is actual source text,
+            // so a function with just aspect types doesn't get an empty script element.
+            if (!string.IsNullOrWhiteSpace(Source))
             {
-                scriptNode = doc.CreateElement("script");
-                fn.AppendChild(scriptNode);
-            }
-            else
-            {
-                scriptNode = existingScript;
-                scriptNode.RemoveAll();
-            }
-
-            var enabledAttr = doc.CreateAttribute("enabled");
-            enabledAttr.Value = Enabled ? "true" : "false";
-            scriptNode.Attributes!.Append(enabledAttr);
-            var langAttr = doc.CreateAttribute("language");
-            langAttr.Value = Language;
-            scriptNode.Attributes.Append(langAttr);
-            var versionAttr = doc.CreateAttribute("version");
-            versionAttr.Value = "1";
-            scriptNode.Attributes.Append(versionAttr);
-            scriptNode.AppendChild(doc.CreateCDataSection(Source));
-
-            XmlNode varsNode;
-            if (existingVars is null)
-            {
-                varsNode = doc.CreateElement("variables");
-                fn.AppendChild(varsNode);
-            }
-            else
-            {
-                varsNode = existingVars;
-                varsNode.RemoveAll();
-            }
-
-            foreach (var v in Variables)
-            {
-                if (string.IsNullOrWhiteSpace(v.Name)) continue;
-                var varNode = doc.CreateElement("var");
-                AppendAttr(doc, varNode, "name", v.Name);
-                AppendAttr(doc, varNode, "scope", v.Scope.ToString());
-                AppendAttr(doc, varNode, "type", v.Type.ToString());
-                AppendAttr(doc, varNode, "init", v.InitialValue);
-                if (v.IsOutput)
+                XmlNode scriptNode;
+                if (existingScript is null)
                 {
-                    AppendAttr(doc, varNode, "output", "true");
+                    scriptNode = doc.CreateElement("script");
+                    fn.AppendChild(scriptNode);
                 }
-                varsNode.AppendChild(varNode);
+                else
+                {
+                    scriptNode = existingScript;
+                    scriptNode.RemoveAll();
+                }
+
+                var enabledAttr = doc.CreateAttribute("enabled");
+                enabledAttr.Value = Enabled ? "true" : "false";
+                scriptNode.Attributes!.Append(enabledAttr);
+                var langAttr = doc.CreateAttribute("language");
+                langAttr.Value = Language;
+                scriptNode.Attributes.Append(langAttr);
+                var versionAttr = doc.CreateAttribute("version");
+                versionAttr.Value = "1";
+                scriptNode.Attributes.Append(versionAttr);
+                scriptNode.AppendChild(doc.CreateCDataSection(Source));
+            }
+            else if (existingScript is not null)
+            {
+                fn.RemoveChild(existingScript);
+            }
+
+            // Same for <variables>: only write when there are declared variables.
+            var declaredVars = Variables.Where(v => !string.IsNullOrWhiteSpace(v.Name)).ToList();
+            if (declaredVars.Count > 0)
+            {
+                XmlNode varsNode;
+                if (existingVars is null)
+                {
+                    varsNode = doc.CreateElement("variables");
+                    fn.AppendChild(varsNode);
+                }
+                else
+                {
+                    varsNode = existingVars;
+                    varsNode.RemoveAll();
+                }
+
+                foreach (var v in declaredVars)
+                {
+                    var varNode = doc.CreateElement("var");
+                    AppendAttr(doc, varNode, "name", v.Name);
+                    AppendAttr(doc, varNode, "scope", v.Scope.ToString());
+                    AppendAttr(doc, varNode, "type", v.Type.ToString());
+                    AppendAttr(doc, varNode, "init", v.InitialValue);
+                    if (v.IsOutput)
+                    {
+                        AppendAttr(doc, varNode, "output", "true");
+                    }
+                    varsNode.AppendChild(varNode);
+                }
+            }
+            else if (existingVars is not null)
+            {
+                fn.RemoveChild(existingVars);
+            }
+
+            // persist user-assigned aspect data types (the aspect set itself is re-derived from couplings)
+            var typedAspects = AspectVariables.Where(a => a.Type is not null).ToList();
+            if (existingAspectTypes is not null) fn.RemoveChild(existingAspectTypes);
+            if (typedAspects.Count > 0)
+            {
+                var atNode = doc.CreateElement("aspectTypes");
+                foreach (var a in typedAspects)
+                {
+                    var aEl = doc.CreateElement("aspect");
+                    AppendAttr(doc, aEl, "category", a.Category.ToString());
+                    AppendAttr(doc, aEl, "label", a.Label);
+                    AppendAttr(doc, aEl, "type", a.Type!.Value.ToString());
+                    atNode.AppendChild(aEl);
+                }
+                fn.AppendChild(atNode);
             }
         }
 

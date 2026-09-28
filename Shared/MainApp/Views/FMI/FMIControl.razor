@@ -707,6 +707,7 @@
             coupling.wasActive = false;
             coupling.fmiHighlight = "";
         }
+        stateContainer.Scripting?.Reset(); //clear Static + Global script variable stores for a fresh FMI run
         if (stateContainer.metadataDS.Tables.Contains("Metadata"))
         {
             foreach (var row in stateContainer.metadataDS.Tables["Metadata"]!.Select("Cycle > -1"))
@@ -1338,6 +1339,7 @@
     {
         var showVariability = false;
         stateContainer.calcVariables(iBG); //calculate the new variable values for the given function
+        ExecuteFunctionScript(iBG); //run the per-cycle ST script (if any), after inputs are calculated
         if (iBG.metadata is not null)
         {
             foreach (string[] md3Key in iBG.metadata) //[0]=key name, [1]=key value, [2]=active attribute, [3]=equation attribute
@@ -1445,6 +1447,39 @@
             checkVariability_DrawResults(iBG);
         }
         stateContainer.addMetadataResults(iBG); //this adds a new row to the Metadata table for the results of the evaluated Function (for the current Cycle)
+    }
+
+    /// <summary>Run the function's ST script for this cycle (M3). Executes after inputs are
+    /// calculated, surfaces runtime issues to the FMI log, and flags the function on errors.</summary>
+    private void ExecuteFunctionScript(Function fn)
+    {
+        if (stateContainer.Scripting is null || fn.Script is null) return;
+        if (!fn.Script.Enabled || string.IsNullOrWhiteSpace(fn.Script.Source)) return;
+        try
+        {
+            // keep the scripting service's global declarations in sync with the editor's globals
+            stateContainer.Scripting.GlobalVariableDeclarations.Clear();
+            stateContainer.Scripting.GlobalVariableDeclarations.AddRange(stateContainer.globalScriptVariables);
+            var ctx = stateContainer.Scripting.ExecuteCycle(fn, stateContainer.cycleFMI);
+            if (ctx is null) return;
+            foreach (var issue in ctx.RuntimeIssues)
+            {
+                stateContainer.fmiMessage += $"Script [{fn.IDName}] {issue.StartLine}:{issue.StartColumn} {issue.Message}\n";
+                if (issue.Severity == "Error")
+                {
+                    fn.fmiHighlight = "hold-fill";
+                }
+            }
+            foreach (var trace in ctx.Trace)
+            {
+                stateContainer.fmiMessage += trace + "\n";
+            }
+        }
+        catch (Exception ex)
+        {
+            stateContainer.fmiMessage += $"Script [{fn.IDName}] runtime error: {ex.Message}\n";
+            fn.fmiHighlight = "hold-fill";
+        }
     }
     private void checkVariability_DrawResults(Function iBG)
     {

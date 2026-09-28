@@ -540,6 +540,101 @@ text {
     background: #fce8e6;
     border-top: 1px solid #f5c6c2;
 }
+.vt-empty {
+    color: #9aa0a6;
+    font-size: 0.8rem;
+    font-style: italic;
+    padding: 0.4rem 0.2rem 0.8rem;
+}
+
+/* --- aspect variables (av) --- */
+.av-category {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #3c4043;
+    margin: 0.5rem 0 0.15rem;
+}
+.av-cat-badge {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #fff;
+}
+.av-cat-i { background: #1a73e8; }
+.av-cat-o { background: #188038; }
+.av-cat-p { background: #e37400; }
+.av-cat-r { background: #9334e6; }
+.av-cat-c { background: #d93025; }
+.av-cat-t { background: #5f6368; }
+.av-grid {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e4e6e8;
+    border-radius: 5px;
+    background: #fff;
+    margin-bottom: 0.4rem;
+    overflow: hidden;
+    font-size: 0.8rem;
+}
+.av-row:hover { background: #f6fafd; }
+.av-row td {
+    border-bottom: 1px solid #f0f1f2;
+    padding: 0.15rem 0.4rem;
+    vertical-align: middle;
+}
+.av-row:last-child td { border-bottom: none; }
+.av-label {
+    color: #3c4043;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+}
+.av-label .av-human { display: block; }
+.av-label .av-id {
+    display: block;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.7rem;
+    color: #1a73e8;
+}
+.av-dir { width: 44px; color: #9aa0a6; font-size: 0.72rem; white-space: nowrap; }
+.av-type { width: 92px; }
+
+/* --- diagnostics panel --- */
+.script-ide-editor {
+    position: relative;
+    flex-direction: column;
+}
+.script-diagnostics {
+    flex: 0 0 auto;
+    max-height: 180px;
+    overflow-y: auto;
+    border-top: 1px solid #e0e0e0;
+    background: #fff;
+    font-size: 0.78rem;
+}
+.diag {
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f4f4f4;
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+}
+.diag:hover { background: #f6fafd; }
+.diag-pos { color: #9aa0a6; font-family: ui-monospace, monospace; white-space: nowrap; }
+.diag-error { color: #c5221f; }
+.diag-warning { color: #e37400; }
+.diag-info { color: #1a73e8; }
+.diag .oi { font-size: 0.8em; }
 .sidebar {
     width: 175px;
     height: 100vh;

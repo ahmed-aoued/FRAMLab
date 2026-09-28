@@ -841,6 +841,8 @@
             agentLevelService.ApplyAgentsLevelsView();
         }
         stateContainer.debugOutput = "";
+        // derive script aspect variables (Input/Output/Precondition/...) from couplings
+        stateContainer.SyncScriptAspects();
         //spreadsheet?.InitialState();
         FocusElement("openFileBtn");
     }
