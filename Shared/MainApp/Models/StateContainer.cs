@@ -232,6 +232,15 @@ namespace FMV_OG.Shared
         public bool isBackup { get; set; } = false;
         public int cycleDelay { get; set; } = 750;
         public string showVariables { get; set; } = "";
+        // --- Script IDE state ---
+        public bool scriptIDEVisible { get; set; } = false;
+        public string scriptTargetFn { get; set; } = "-1";
+        public List<FMV_OG.Shared.MainApp.Models.ScriptVariable> globalScriptVariables { get; set; } = new List<FMV_OG.Shared.MainApp.Models.ScriptVariable>();
+        public void sFnScript(FMV_OG.Shared.MainApp.Models.ScriptModel script, string functionId)
+        {
+            updateUndo();
+            projectDocumentService.SetFunctionScript(projectData_Undo[0], functionId, script);
+        }
         public double selectX { get; set; } = 0;
         public double selectY { get; set; } = 0;
         public double selectWidth { get; set; } = 0;

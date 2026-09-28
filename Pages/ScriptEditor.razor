@@ -1,0 +1,197 @@
+@page "/scripteditor/{FunctionId}"
+@layout MainLayout
+@inject IJSRuntime JSRuntime
+@inject ILocalStorageService localStorage
+@inject StateContainer stateContainer
+@inject NavigationManager Nav
+@using FMV_OG.Shared.MainApp.Models
+
+<PageTitle>Script (ST) - FRAM</PageTitle>
+
+<div class="script-ide-page">
+    @if (loadError is not null)
+    {
+        <div class="script-ide-missing">
+            <p>@loadError</p>
+            <p class="text-muted">Open the Script IDE from the FRAM editor's left menu (the "Script (ST)" button) so the model is passed to this tab.</p>
+        </div>
+    }
+    else if (TargetFunction is null)
+    {
+        <div class="script-ide-missing">
+            <p>Loading model…</p>
+        </div>
+    }
+    else
+    {
+        <div class="script-ide">
+            <div class="script-ide-header">
+                <span class="oi oi-puzzle-piece" aria-hidden="true"></span>
+                <span class="script-ide-title">Script (ST):</span>
+                <span class="script-ide-fnname text-truncate">@TargetFunction.IDName</span>
+                <span class="script-ide-idnr">IDNr @TargetFunction.IDNr</span>
+                <label class="mb-0 ml-2 d-flex align-items-center" style="gap:0.25rem;">
+                    <input type="checkbox" checked="@script.Enabled" @onchange="ToggleEnabled" /> Enabled
+                </label>
+                @if (dirty)
+                {
+                    <span class="badge badge-warning">unsaved changes</span>
+                }
+                <span style="flex:1 1 auto;"></span>
+                <button class="btn btn-sm btn-primary" title="Save and notify the editor tab" @onclick="SaveAsync">
+                    <span class="oi oi-check" aria-hidden="true"></span> Save
+                </button>
+                <button class="btn btn-menu oi oi-x script-ide-close" title="Save and close this tab" @onclick="CloseAsync"></button>
+            </div>
+
+            <div class="script-ide-body">
+                <div class="script-ide-vars">
+                    <div class="script-ide-section-title">
+                        Local variables
+                        <span class="vt-hint">Temp = per cycle · Static = per FMI run</span>
+                    </div>
+                    <VariableTable Variables="@script.Variables" OnChanged="OnVariablesChanged" />
+
+                    <div class="script-ide-section-title">
+                        Global variables
+                        <span class="vt-hint">shared by all functions · per FMI run</span>
+                    </div>
+                    <VariableTable Variables="@stateContainer.globalScriptVariables" IsGlobal="true" OnChanged="OnGlobalsChanged" />
+                </div>
+                <div class="script-ide-editor">
+                    <CodeEditor @ref="editor"
+                                ElementId="@EditorElementId"
+                                InitialValue="@script.Source"
+                                OnChanged="OnSourceChanged" />
+                </div>
+            </div>
+            <div class="script-ide-footer">
+                Per-cycle behaviour of this function, programmed in IEC 61131-3 Structured Text. Save writes the model back to the editor tab.
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? FunctionId { get; set; }
+
+    private Function? TargetFunction { get; set; }
+    private ScriptModel script = new();
+    private CodeEditor? editor;
+    private bool dirty = false;
+    private string? loadError;
+    private string loadedFileName = "";
+    private string EditorElementId => $"script-monaco-{FunctionId}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Load the model the main tab stashed for us. The prepare() call in the main tab
+            // is async, so poll briefly in case this tab wins the race.
+            ScriptIdeData data = new ScriptIdeData();
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                data = await JSRuntime.InvokeAsync<ScriptIdeData>("ScriptSync.take");
+                if (!string.IsNullOrEmpty(data.xml)) break;
+                await Task.Delay(100);
+            }
+            loadedFileName = data.fileName;
+            if (string.IsNullOrEmpty(data.xml))
+            {
+                loadError = "No model was passed to this tab.";
+                StateHasChanged();
+                return;
+            }
+            try
+            {
+                stateContainer.undoIndex = 0;
+                stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+                stateContainer.projectData_Undo[0] = new XmlDocument();
+                stateContainer.projectData_Undo[0].LoadXml(data.xml);
+
+                var fnId = string.IsNullOrEmpty(data.fnId) ? FunctionId : data.fnId;
+                var fnNode = stateContainer.projectData_Undo[0]
+                    .SelectSingleNode($"//FM/Functions/Function[IDNr={fnId}]");
+                if (fnNode is null)
+                {
+                    loadError = $"Function {fnId} was not found in the model.";
+                    StateHasChanged();
+                    return;
+                }
+                TargetFunction = new Function(fnNode);
+                script = TargetFunction.Script;
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                loadError = "The model passed to this tab could not be read.";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void OnSourceChanged(string value)
+    {
+        script.Source = value;
+        dirty = true;
+        StateHasChanged();
+    }
+
+    private Task OnVariablesChanged()
+    {
+        dirty = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task OnGlobalsChanged()
+    {
+        dirty = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleEnabled(ChangeEventArgs e)
+    {
+        script.Enabled = (bool)(e.Value ?? true);
+        dirty = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task WriteBackAsync()
+    {
+        if (TargetFunction is null) return;
+        if (editor is not null)
+        {
+            script.Source = await editor.GetValueAsync();
+        }
+        TargetFunction.Script = script;
+        var fnNode = stateContainer.projectData_Undo[0]
+            .SelectSingleNode($"//FM/Functions/Function[IDNr={TargetFunction.IDNr}]");
+        if (fnNode is not null)
+        {
+            script.WriteXml(stateContainer.projectData_Undo[0], fnNode);
+        }
+        await JSRuntime.InvokeVoidAsync("ScriptSync.save", stateContainer.projectData_Undo[0].OuterXml);
+        dirty = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        await WriteBackAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CloseAsync()
+    {
+        await WriteBackAsync();
+        await JSRuntime.InvokeVoidAsync("close");
+    }
+
+    private class ScriptIdeData
+    {
+        public string xml { get; set; } = "";
+        public string fnId { get; set; } = "-1";
+        public string fileName { get; set; } = "";
+    }
+}

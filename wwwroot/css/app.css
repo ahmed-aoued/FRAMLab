@@ -295,6 +295,239 @@ text {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* --- Script IDE --- */
+.script-ide-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f9fa;
+}
+.script-ide-missing {
+    padding: 2rem;
+}
+.script-ide-wrapper {
+    /* The fixed-top navbar is ~5rem (80px) tall; .main only adds 48px padding.
+       Push the IDE below the navbar so its header/close button are clickable. */
+    margin-top: calc(5rem - 48px);
+    height: calc(100% - (5rem - 48px));
+}
+.script-ide {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+.script-ide-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    flex: 0 0 auto;
+}
+.script-ide-header .script-ide-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.script-ide-header .script-ide-fnname {
+    font-weight: 600;
+    color: #1a73e8;
+}
+.script-ide-header .script-ide-idnr {
+    color: #9aa0a6;
+    font-size: 0.8rem;
+}
+.script-ide-close {
+    margin-left: 0.25rem;
+}
+.script-ide-body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.script-ide-vars {
+    width: 520px;
+    flex: 0 0 auto;
+    overflow-y: auto;
+    padding: 0.75rem;
+    border-right: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+}
+.script-ide-section-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #3c4043;
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.script-ide-section-title .vt-hint {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: #9aa0a6;
+}
+.script-ide-editor {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    background-color: #ffffff;
+}
+.script-code-editor {
+    flex: 1 1 auto;
+    min-height: 200px;
+}
+.script-code-fallback {
+    flex: 1 1 auto;
+    min-height: 200px;
+    font-family: monospace;
+    font-size: 13px;
+    border: none;
+    resize: none;
+    padding: 0.5rem;
+}
+.script-ide-footer {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+    color: #6c757d;
+    border-top: 1px solid #e0e0e0;
+    background-color: #ffffff;
+}
+
+/* --- Excel-style variable grid (vt) --- */
+.vt {
+    border: 1px solid #d6d9dc;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    margin-bottom: 1rem;
+}
+.vt-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.82rem;
+}
+/* column width distribution (name flexes, others fixed) */
+.vt-col-name { width: 26%; }
+.vt-col-init { width: 22%; }
+.vt-grid thead th {
+    background: #f1f3f4;
+    color: #5f6368;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.3rem 0.45rem;
+    border-bottom: 1px solid #d6d9dc;
+    border-right: 1px solid #e4e6e8;
+    user-select: none;
+    white-space: nowrap;
+}
+.vt-grid thead th:last-child { border-right: none; }
+.vt-rownum-head, .vt-rownum {
+    width: 30px;
+    text-align: center;
+    color: #9aa0a6;
+    background: #f8f9fa;
+    font-size: 0.72rem;
+}
+.vt-rownum { border-right: 1px solid #e4e6e8; border-bottom: 1px solid #eceef0; }
+.vt-col-out, .vt-cell-out { width: 36px; text-align: center; }
+.vt-col-del, .vt-cell-del { width: 30px; text-align: center; }
+.vt-col-scope { width: 92px; }
+.vt-col-type { width: 80px; }
+.vt-row:hover .vt-cell { background: #f6fafd; }
+.vt-cell {
+    border-bottom: 1px solid #eceef0;
+    border-right: 1px solid #f0f1f2;
+    padding: 0.1rem 0.15rem;
+    vertical-align: middle;
+    overflow: hidden;
+}
+.vt-cell:last-child { border-right: none; }
+.vt-input {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 0.18rem 0.3rem;
+    font-size: 0.82rem;
+    border-radius: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vt-input:hover { border-color: #d6d9dc; }
+.vt-input:focus {
+    outline: none;
+    border-color: #1a73e8;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+}
+.vt-mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.vt-select {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 0.18rem 0.15rem;
+    font-size: 0.82rem;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.vt-select:hover { border-color: #d6d9dc; }
+.vt-select:focus { outline: none; border-color: #1a73e8; background: #fff; }
+.vt-invalid .vt-input { border-color: #d93025; background: #fce8e6; }
+.vt-check { cursor: pointer; }
+/* scope badge + select combo */
+.vt-cell-scope { position: relative; }
+.vt-badge {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #fff;
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+.vt-badge-temp { background: #188038; }
+.vt-badge-static { background: #e37400; }
+.vt-badge-global { background: #9334e6; }
+.vt-scope-select { padding-left: 26px; }
+/* Excel-style new-row line */
+.vt-row-new { cursor: pointer; }
+.vt-row-new .vt-cell, .vt-row-new .vt-rownum { background: #fff; }
+.vt-row-new:hover .vt-cell, .vt-row-new:hover .vt-rownum { background: #e8f0fe; }
+.vt-add-glyph { color: #1a73e8; font-weight: 700; }
+.vt-new-label { color: #5f6368; font-style: italic; padding: 0.3rem 0.45rem; }
+.vt-del {
+    border: none;
+    background: transparent;
+    color: #c5221f;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 0 0.3rem;
+    opacity: 0;
+}
+.vt-row:hover .vt-del { opacity: 1; }
+.vt-del:hover { background: #fce8e6; }
+.vt-error {
+    color: #c5221f;
+    font-size: 0.78rem;
+    padding: 0.4rem 0.5rem;
+    background: #fce8e6;
+    border-top: 1px solid #f5c6c2;
+}
 .sidebar {
     width: 175px;
     height: 100vh;

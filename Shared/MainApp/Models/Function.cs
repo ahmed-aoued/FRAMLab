@@ -54,7 +54,9 @@ namespace FMV_OG.Shared
             this.AgentId = fn.SelectSingleNode("@agentId")?.Value ?? "";
             this.LevelId = fn.SelectSingleNode("@levelId")?.Value ?? "";
             this.Description = fn.SelectSingleNode("Description")?.InnerText ?? "";
+            this.Script = FMV_OG.Shared.MainApp.Models.ScriptModel.FromXml(fn);
         }
+        public FMV_OG.Shared.MainApp.Models.ScriptModel Script { get; set; } = new FMV_OG.Shared.MainApp.Models.ScriptModel();
         public List<string[]> metadata { get; set; }
         public string options { get; set; }
         public string IDNr { get; set; }

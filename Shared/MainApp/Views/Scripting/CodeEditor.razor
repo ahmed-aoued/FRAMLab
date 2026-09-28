@@ -1,0 +1,97 @@
+@inject StateContainer stateContainer
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+@if (loadFailed)
+{
+    @* Fallback if the Monaco loader is unavailable (e.g. first run without lib/monaco). *@
+    <textarea class="script-code-fallback" spellcheck="false"
+              @bind="fallbackValue" @bind:event="oninput"
+              @onblur="NotifyFallback"></textarea>
+}
+else
+{
+    <div id="@ElementId" class="script-code-editor"></div>
+}
+
+@code {
+    [Parameter]
+    public string ElementId { get; set; } = "script-monaco-editor";
+
+    [Parameter]
+    public string InitialValue { get; set; } = "";
+
+    /// <summary>Debounced (300 ms) notification with the full editor text.</summary>
+    [Parameter]
+    public EventCallback<string> OnChanged { get; set; }
+
+    private DotNetObjectReference<CodeEditor>? dotNetRef;
+    private bool created = false;
+    private bool loadFailed = false;
+    private string fallbackValue = "";
+
+    protected override void OnInitialized()
+    {
+        fallbackValue = InitialValue;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !created && !loadFailed)
+        {
+            try
+            {
+                dotNetRef = DotNetObjectReference.Create(this);
+                await JSRuntime.InvokeVoidAsync("ScriptEditor.create", ElementId, dotNetRef, InitialValue, false);
+                created = true;
+            }
+            catch (JSException)
+            {
+                loadFailed = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnEditorChanged(string value)
+    {
+        if (OnChanged.HasDelegate)
+        {
+            await OnChanged.InvokeAsync(value);
+        }
+    }
+
+    private async Task NotifyFallback()
+    {
+        if (OnChanged.HasDelegate)
+        {
+            await OnChanged.InvokeAsync(fallbackValue);
+        }
+    }
+
+    /// <summary>Pull the current text straight out of Monaco (used when flushing on close).</summary>
+    public async Task<string> GetValueAsync()
+    {
+        if (loadFailed) return fallbackValue;
+        if (!created) return InitialValue;
+        return await JSRuntime.InvokeAsync<string>("ScriptEditor.getValue", ElementId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (created)
+        {
+            created = false;
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("ScriptEditor.dispose", ElementId);
+            }
+            catch (JSDisconnectedException)
+            {
+                // circuit gone - nothing to dispose in the browser
+            }
+        }
+        dotNetRef?.Dispose();
+    }
+}

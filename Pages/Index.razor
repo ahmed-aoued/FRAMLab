@@ -206,6 +206,29 @@
         //    await spreadsheet.UpdateState();
         //}
     }
+
+    private DotNetObjectReference<Index>? scriptSyncRef;
+
+    /// <summary>Called (from JS) when the Script IDE browser tab saves the model back.</summary>
+    [JSInvokable]
+    public async Task OnScriptSavedFromTab()
+    {
+        var xml = await JSRuntime.InvokeAsync<string>("ScriptSync.result");
+        if (string.IsNullOrEmpty(xml)) return;
+        try
+        {
+            stateContainer.undoIndex = 0;
+            stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+            stateContainer.projectData_Undo[0] = new XmlDocument();
+            stateContainer.projectData_Undo[0].LoadXml(xml);
+            FileIsLoaded();
+            StateHasChanged();
+        }
+        catch
+        {
+            // Ignore malformed content from the other tab.
+        }
+    }
     private void ModalClose(bool state)
     {
         stateContainer.showModal = state;
@@ -220,6 +243,9 @@
         {
             FocusElement("openFileBtn");
             UpdateFileContent = OpenFileContent;
+            // Listen for the Script IDE tab saving the model back.
+            scriptSyncRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("ScriptSync.listen", scriptSyncRef, nameof(OnScriptSavedFromTab));
             var content = await JSRuntime.InvokeAsync<string>("fileOpenAs");
             if (content != "waiting")
             {

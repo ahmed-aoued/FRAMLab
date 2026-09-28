@@ -127,6 +127,16 @@ namespace FMV_OG.Shared.MainApp.Services
             projectData.SelectSingleNode($"//FM/Functions/Function[IDNr={functionId}]/@y")!.InnerText = y.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
+        public void SetFunctionScript(XmlDocument projectData, string functionId, FMV_OG.Shared.MainApp.Models.ScriptModel script)
+        {
+            var fnNode = projectData.SelectSingleNode($"//FM/Functions/Function[IDNr={functionId}]");
+            if (fnNode is null)
+            {
+                return;
+            }
+            script.WriteXml(projectData, fnNode);
+        }
+
         public void UpdateAspectXY(XmlDocument projectData, string selectedLabel, double x, double y, string directionX, string directionY)
         {
             projectData.SelectSingleNode($"//FM/Aspects/Aspect[Name=\"{selectedLabel}\"]/@x")!.InnerText = x.ToString("0.##", CultureInfo.InvariantCulture);

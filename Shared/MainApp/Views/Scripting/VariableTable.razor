@@ -1,0 +1,212 @@
+@inject StateContainer stateContainer
+@using FMV_OG.Shared.MainApp.Models
+
+<div class="vt @(IsGlobal ? "vt-global" : "")">
+    <table class="vt-grid">
+        <thead>
+            <tr>
+                <th class="vt-rownum-head"></th>
+                <th class="vt-col-name">Name</th>
+                @if (!IsGlobal)
+                {
+                    <th class="vt-col-scope">Scope</th>
+                }
+                <th class="vt-col-type">Type</th>
+                <th class="vt-col-init">Initial value</th>
+                <th class="vt-col-out" title="Write this variable back to the function each cycle">Out</th>
+                <th class="vt-col-del"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < Variables.Count; i++)
+            {
+                var index = i;
+                var v = Variables[index];
+                <tr class="vt-row" @key="v">
+                    <td class="vt-rownum">@(index + 1)</td>
+                    <td class="vt-cell vt-cell-name @(NameInvalid(v) ? "vt-invalid" : "")">
+                        <input class="vt-input vt-mono"
+                               value="@v.Name" spellcheck="false" placeholder="name"
+                               @onchange="@((e) => Rename(v, e.Value?.ToString() ?? ""))" />
+                    </td>
+                    @if (!IsGlobal)
+                    {
+                        <td class="vt-cell vt-cell-scope">
+                            <span class="vt-badge @ScopeBadgeClass(v.Scope)">@ScopeShort(v.Scope)</span>
+                            <select class="vt-select vt-scope-select"
+                                    value="@v.Scope.ToString()"
+                                    title="@ScopeLabel(v.Scope)"
+                                    @onchange="@((e) => SetScope(v, e.Value?.ToString() ?? "Temp"))">
+                                <option value="Temp">Temp</option>
+                                <option value="Static">Static</option>
+                            </select>
+                        </td>
+                    }
+                    <td class="vt-cell vt-cell-type">
+                        <select class="vt-select"
+                                value="@v.Type.ToString()"
+                                @onchange="@((e) => SetType(v, e.Value?.ToString() ?? "REAL"))">
+                            @foreach (ScriptVarType t in Enum.GetValues(typeof(ScriptVarType)))
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </select>
+                    </td>
+                    <td class="vt-cell vt-cell-init @(InitInvalid(v) ? "vt-invalid" : "")">
+                        <input class="vt-input vt-mono"
+                               value="@v.InitialValue" spellcheck="false" placeholder="@ScriptVariable.DefaultInit(v.Type)"
+                               @onchange="@((e) => SetInit(v, e.Value?.ToString() ?? ""))" />
+                    </td>
+                    <td class="vt-cell vt-cell-out">
+                        <input type="checkbox" class="vt-check" checked="@v.IsOutput"
+                               @onchange="@((e) => SetOutput(v, (bool)(e.Value ?? false)))" />
+                    </td>
+                    <td class="vt-cell vt-cell-del">
+                        <button class="vt-del" title="Delete row" @onclick="@(() => Delete(v))">&times;</button>
+                    </td>
+                </tr>
+            }
+            @* Excel-style "new row" line *@
+            <tr class="vt-row vt-row-new" @onclick="Add">
+                <td class="vt-rownum"><span class="vt-add-glyph">+</span></td>
+                <td class="vt-cell vt-new-label" colspan="@(IsGlobal ? 5 : 6)">
+                    @(IsGlobal ? "Add global variable…" : "Add variable…")
+                </td>
+                <td class="vt-cell-del"></td>
+            </tr>
+        </tbody>
+    </table>
+    @if (duplicateName is not null)
+    {
+        <div class="vt-error">A variable named '@duplicateName' already exists.</div>
+    }
+</div>
+
+@code {
+    /// <summary>The live variable list of the ScriptModel being edited (local scopes only).</summary>
+    [Parameter]
+    public List<ScriptVariable> Variables { get; set; } = new();
+
+    /// <summary>Raised after any structural change (add/delete/rename) or value edit.</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    /// <summary>When true this table edits the model-wide globals (scope column hidden, scope locked to Global).</summary>
+    [Parameter]
+    public bool IsGlobal { get; set; } = false;
+
+    private string? duplicateName;
+
+    private string ScopeLabel(ScriptScope scope) => scope switch
+    {
+        ScriptScope.Temp => "Temp — re-initialised every cycle, only this function",
+        ScriptScope.Static => "Static — kept for a whole FMI run, only this function",
+        ScriptScope.Global => "Global — kept for a whole FMI run, all functions",
+        _ => scope.ToString()
+    };
+
+    private string ScopeShort(ScriptScope scope) => scope switch
+    {
+        ScriptScope.Temp => "T",
+        ScriptScope.Static => "S",
+        ScriptScope.Global => "G",
+        _ => "?"
+    };
+
+    private string ScopeBadgeClass(ScriptScope scope) => scope switch
+    {
+        ScriptScope.Temp => "vt-badge-temp",
+        ScriptScope.Static => "vt-badge-static",
+        ScriptScope.Global => "vt-badge-global",
+        _ => ""
+    };
+
+    private bool NameInvalid(ScriptVariable v)
+        => string.IsNullOrWhiteSpace(v.Name)
+           || !Regex.IsMatch(v.Name, "^[A-Za-z_][A-Za-z0-9_]*$")
+           || Variables.Count(x => x.Name == v.Name) > 1;
+
+    private bool InitInvalid(ScriptVariable v)
+        => !ScriptVariable.IsValidInit(v.Type, v.InitialValue);
+
+    private async Task Add()
+    {
+        duplicateName = null;
+        var baseName = "NewVar";
+        var name = baseName;
+        var i = 1;
+        while (Variables.Any(v => v.Name == name))
+        {
+            name = baseName + i++;
+        }
+        Variables.Add(new ScriptVariable
+        {
+            Name = name,
+            Scope = IsGlobal ? ScriptScope.Global : ScriptScope.Temp,
+            Type = ScriptVarType.REAL,
+            InitialValue = ScriptVariable.DefaultInit(ScriptVarType.REAL)
+        });
+        await NotifyChanged();
+    }
+
+    private async Task Delete(ScriptVariable v)
+    {
+        duplicateName = null;
+        Variables.Remove(v);
+        await NotifyChanged();
+    }
+
+    private async Task Rename(ScriptVariable v, string newName)
+    {
+        duplicateName = null;
+        if (newName != v.Name && Variables.Any(x => x.Name == newName))
+        {
+            duplicateName = newName;
+            return; // keep the old name, show the message
+        }
+        v.Name = newName;
+        await NotifyChanged();
+    }
+
+    private async Task SetScope(ScriptVariable v, string scope)
+    {
+        if (Enum.TryParse<ScriptScope>(scope, out var s))
+        {
+            v.Scope = s;
+        }
+        await NotifyChanged();
+    }
+
+    private async Task SetType(ScriptVariable v, string type)
+    {
+        if (Enum.TryParse<ScriptVarType>(type, out var t))
+        {
+            v.Type = t;
+            if (!ScriptVariable.IsValidInit(t, v.InitialValue))
+            {
+                v.InitialValue = ScriptVariable.DefaultInit(t);
+            }
+        }
+        await NotifyChanged();
+    }
+
+    private async Task SetInit(ScriptVariable v, string init)
+    {
+        v.InitialValue = init;
+        await NotifyChanged();
+    }
+
+    private async Task SetOutput(ScriptVariable v, bool isOutput)
+    {
+        v.IsOutput = isOutput;
+        await NotifyChanged();
+    }
+
+    private async Task NotifyChanged()
+    {
+        if (OnChanged.HasDelegate)
+        {
+            await OnChanged.InvokeAsync();
+        }
+    }
+}

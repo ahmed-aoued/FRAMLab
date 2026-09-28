@@ -307,6 +307,17 @@
             <button class="btn btn-half btn-half-s" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
             <button class="btn btn-half btn-half-l" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
             <button class="btn btn-menu oi oi-brush ml-1" title=@Loc["FN_COLOUR"] tabindex="25" @onclick="ModalColor" @onkeyup="ModalKey"></button>
+            @if (stateContainer.selectedFn != "-1")
+            {
+                @* A real anchor is not popup-blocked; prepare the model for the IDE tab on pointer-down. *@
+                <a class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27"
+                   href="@ScriptEditorUrl" target="_blank" rel="noopener"
+                   @onpointerdown="PrepareScriptIDE" @onclick:preventDefault="false"></a>
+            }
+            else
+            {
+                <button class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27" disabled></button>
+            }
         </div>
         @if (stateContainer.showKeys == "")
         {
@@ -345,6 +356,17 @@
 
     private void ToggleAgentPanel() => showAgentPanel = !showAgentPanel;
     private void ToggleLevelPanel() => showLevelPanel = !showLevelPanel;
+
+    private string ScriptEditorUrl => $"scripteditor/{stateContainer.selectedFn}";
+
+    // Runs synchronously on pointer-down (before the anchor opens the new tab),
+    // stashing the current model in localStorage for the IDE tab to load.
+    private void PrepareScriptIDE()
+    {
+        if (stateContainer.selectedFn == "-1") return;
+        var xml = stateContainer.projectData_Undo[0].OuterXml;
+        _ = JSRuntime.InvokeVoidAsync("ScriptSync.prepare", xml, stateContainer.selectedFn, stateContainer.fileName);
+    }
 
     private void AssignAgent()
     {
