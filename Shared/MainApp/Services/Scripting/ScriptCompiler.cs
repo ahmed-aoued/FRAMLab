@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace FMV_OG.Shared.MainApp.Services.Scripting
 {
@@ -20,12 +21,12 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
     /// <summary>Lex + parse + semantic-analyze a script source against a symbol table.</summary>
     public static class ScriptCompiler
     {
-        public static CompiledScript Compile(string source, SymbolTable symbols)
+        public static CompiledScript Compile(string source, SymbolTable symbols, ILogger? logger = null)
         {
             var lexer = new STLexer(source);
             var tokens = lexer.Tokenize();
 
-            var parser = new STParser(tokens);
+            var parser = new STParser(tokens, logger);
             var program = parser.ParseProgram();
 
             var diagnostics = new List<ScriptDiagnostic>();

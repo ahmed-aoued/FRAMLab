@@ -1,6 +1,7 @@
 window.SvgUtils = {
     getSvgElementSize: function (element) {
         if (!element) {
+            console.warn("[FRAMLab] SvgUtils.getSvgElementSize called without an element.");
             return null;
         }
 
@@ -8,6 +9,7 @@ window.SvgUtils = {
         const ctm = element.getCTM();
 
         if (!bbox || !ctm) {
+            console.warn("[FRAMLab] SvgUtils.getSvgElementSize: element has no bounding box/CTM (not laid out yet?).");
             return null;
         }
 

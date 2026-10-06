@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using FMV_OG.Shared.MainApp.Services.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace FMV_OG.Shared.MainApp.Services.Scripting
 {
@@ -12,10 +14,12 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
         private readonly List<Token> tokens;
         private int pos = 0;
         private readonly List<ScriptDiagnostic> diagnostics = new();
+        private readonly ILogger? logger;
 
-        public STParser(List<Token> tokens)
+        public STParser(List<Token> tokens, ILogger? logger = null)
         {
             this.tokens = tokens;
+            this.logger = logger;
         }
 
         public IReadOnlyList<ScriptDiagnostic> Diagnostics => diagnostics;
@@ -85,9 +89,16 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                 Error(Current, $"Unexpected token '{Current.Text}'.");
                 return null;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return null; // error already recorded; recover
+                // Expected parse errors are recorded by Error(...) above. Reaching here means an
+                // unexpected parser failure - surface it instead of silently dropping the statement.
+                logger?.LogError(LogEvents.ScriptCompile, ex,
+                    "Unexpected error while parsing a statement at {Line}:{Column}.", Current.Line, Current.Column);
+                diagnostics.Add(new ScriptDiagnostic("Error",
+                    $"Internal parser error: {ex.Message}",
+                    Current.Line, Current.Column, Current.Line, Current.Column + 1));
+                return null; // recover
             }
         }
 

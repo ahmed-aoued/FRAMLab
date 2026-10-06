@@ -4,6 +4,7 @@
 @inject ILocalStorageService localStorage
 @inject StateContainer stateContainer
 @inject NavigationManager Nav
+@inject ILogger<ScriptEditor> Logger
 @using FMV_OG.Shared.MainApp.Models
 
 <PageTitle>Script (ST) - FRAM</PageTitle>
@@ -163,6 +164,7 @@
             loadedFileName = data.fileName;
             if (string.IsNullOrEmpty(data.xml))
             {
+                Logger.LogWarning(LogEvents.ScriptIde, "No model was passed to the Script IDE tab (fnId={FunctionId}).", FunctionId);
                 loadError = "No model was passed to this tab.";
                 StateHasChanged();
                 return;
@@ -182,6 +184,7 @@
                     .SelectSingleNode($"//FM/Functions/Function[IDNr={fnId}]");
                 if (fnNode is null)
                 {
+                    Logger.LogWarning(LogEvents.ScriptIde, "Function {FunctionId} was not found in the model passed to the Script IDE tab.", fnId);
                     loadError = $"Function {fnId} was not found in the model.";
                     StateHasChanged();
                     return;
@@ -193,8 +196,11 @@
                 Recompile();
                 StateHasChanged();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.LogError(LogEvents.ScriptIde, ex,
+                    "Model handed to the Script IDE tab could not be read (fnId={FunctionId}, {Length} chars).",
+                    data.fnId, data.xml?.Length ?? 0);
                 loadError = "The model passed to this tab could not be read.";
                 StateHasChanged();
             }
@@ -228,7 +234,10 @@
             }).ToArray();
             await JSRuntime.InvokeVoidAsync("ScriptEditor.setMarkers", EditorElementId, markers);
         }
-        catch { /* editor not ready yet */ }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(LogEvents.ScriptIde, ex, "Could not push diagnostics into the Monaco editor (editor not ready yet).");
+        }
     }
 
     private void RecomputeTypeMismatches()
@@ -301,7 +310,10 @@
     private async Task RevealLine(int line)
     {
         try { await JSRuntime.InvokeVoidAsync("ScriptEditor.revealLine", EditorElementId, line); }
-        catch { }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(LogEvents.ScriptIde, ex, "Could not reveal line {Line} in the Monaco editor.", line);
+        }
     }
 
     private void OnSourceChanged(string value)

@@ -2,6 +2,7 @@
 @inject StateContainer stateContainer
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
+@inject ILogger<SideBar> Logger
 
 <div class="sidebar">
     <div class="v-panel pr-2">
@@ -433,9 +434,10 @@
                         await stateContainer.aspectsList.FindLast(x => x.Type == setFocus && x.FunctionIDNr == stateContainer.selectedFn)!.elementReference.FocusAsync();
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    Logger.LogTrace(LogEvents.JsInterop, ex,
+                        "Could not focus the {FocusTarget} element for function {FunctionId}.", setFocus, stateContainer.selectedFn);
                 }
                 setFocus = "";
             }

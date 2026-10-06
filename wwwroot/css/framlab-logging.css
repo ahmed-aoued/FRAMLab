@@ -1,0 +1,26 @@
+/* Fallback UI shown by LoggingErrorBoundary when an unhandled UI exception occurs. */
+.framlab-error-boundary {
+    margin: 2rem auto;
+    max-width: 40rem;
+    padding: 1.5rem;
+    border: 1px solid #e0b4b4;
+    border-radius: 0.5rem;
+    background: #fff6f6;
+    color: #4a1f1f;
+}
+
+.framlab-error-boundary h2 {
+    margin-top: 0;
+    font-size: 1.25rem;
+    color: #b03030;
+}
+
+.framlab-error-boundary p {
+    margin-bottom: 0.75rem;
+    word-break: break-word;
+}
+
+.framlab-error-boundary .framlab-error-hint {
+    font-size: 0.85rem;
+    color: #7a5252;
+}

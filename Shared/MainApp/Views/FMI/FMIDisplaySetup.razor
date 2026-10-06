@@ -1,6 +1,7 @@
 ﻿@inject StateContainer stateContainer
 @inject IJSRuntime JSRuntime
 @inject IConfiguration render
+@inject ILogger<FMIDisplaySetup> Logger
 
 <div id="myModal" class="modal fade show" style="display:block" aria-modal="true" role="dialog" tabindex="100" @onkeydown=checkforEsc @onclick=clickOut>
     <div class="modal-dialog modal-fmi" @onclick=clickNothing @onclick:stopPropagation>
@@ -225,8 +226,9 @@
         {
             await JSRuntime.InvokeVoidAsync("focusInput", elementName);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogTrace(LogEvents.JsInterop, ex, "Could not focus '{ElementName}' (element not present).", elementName);
         }
         await JSRuntime.InvokeVoidAsync("setInput", "selectKey", stateContainer.displaySetup["tracer_1"]);
         await JSRuntime.InvokeVoidAsync("setInput", "c0", stateContainer.displaySetup["c_10_value"]);

@@ -1,12 +1,30 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <PageTitle>Not found</PageTitle>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <RedirectToIndex />
-        </LayoutView>
-    </NotFound>
-</Router>
+﻿<LoggingErrorBoundary @ref="errorBoundary">
+    <ChildContent>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <PageTitle>Not found</PageTitle>
+                <LayoutView Layout="@typeof(MainLayout)">
+                    <RedirectToIndex />
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </ChildContent>
+    <ErrorContent Context="exception">
+        <div class="framlab-error-boundary">
+            <h2>Something went wrong</h2>
+            <p>@exception.Message</p>
+            <p class="framlab-error-hint">Details were written to the browser console.</p>
+            <button class="btn btn-primary" @onclick="RecoverBoundary">Try to recover</button>
+        </div>
+    </ErrorContent>
+</LoggingErrorBoundary>
+
+@code {
+    private LoggingErrorBoundary? errorBoundary;
+
+    private void RecoverBoundary() => errorBoundary?.Recover();
+}

@@ -1,5 +1,6 @@
 @inject StateContainer stateContainer
 @inject IJSRuntime JSRuntime
+@inject ILogger<CodeEditor> Logger
 @implements IAsyncDisposable
 
 @if (loadFailed)
@@ -45,8 +46,10 @@ else
                 await JSRuntime.InvokeVoidAsync("ScriptEditor.create", ElementId, dotNetRef, InitialValue, false);
                 created = true;
             }
-            catch (JSException)
+            catch (JSException ex)
             {
+                Logger.LogWarning(LogEvents.JsInterop, ex,
+                    "Monaco editor '{ElementId}' failed to load; falling back to a plain textarea.", ElementId);
                 loadFailed = true;
                 StateHasChanged();
             }
@@ -87,9 +90,10 @@ else
             {
                 await JSRuntime.InvokeVoidAsync("ScriptEditor.dispose", ElementId);
             }
-            catch (JSDisconnectedException)
+            catch (JSDisconnectedException ex)
             {
                 // circuit gone - nothing to dispose in the browser
+                Logger.LogDebug(LogEvents.JsInterop, ex, "JS runtime disconnected while disposing editor '{ElementId}'.", ElementId);
             }
         }
         dotNetRef?.Dispose();

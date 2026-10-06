@@ -99,7 +99,11 @@
                     }
                 });
             };
-            loader.onerror = () => reject(new Error("Failed to load Monaco loader from CDN."));
+            loader.onerror = () => {
+                const err = new Error("Failed to load the Monaco loader from " + loader.src);
+                console.error("[FRAMLab] " + err.message);
+                reject(err);
+            };
             document.head.appendChild(loader);
         });
         return loadPromise;
@@ -188,6 +192,7 @@
     try {
         syncChannel = ("BroadcastChannel" in window) ? new BroadcastChannel(SYNC_CHANNEL) : null;
     } catch (e) {
+        console.warn("[FRAMLab] BroadcastChannel unavailable; falling back to storage events for cross-tab sync.", e);
         syncChannel = null;
     }
 
@@ -198,7 +203,9 @@
                 localStorage.setItem("scriptIDE_data", xml);
                 localStorage.setItem("scriptIDE_fnId", fnId);
                 localStorage.setItem("scriptIDE_fileName", fileName || "");
-            } catch (e) { }
+            } catch (e) {
+                console.error("[FRAMLab] Could not stash the model for the Script IDE tab (localStorage).", e);
+            }
         },
         // Called by the IDE tab to read the stashed model.
         take: function () {
@@ -209,17 +216,26 @@
                     fileName: localStorage.getItem("scriptIDE_fileName") || ""
                 };
             } catch (e) {
+                console.error("[FRAMLab] Could not read the stashed model for the Script IDE tab (localStorage).", e);
                 return { xml: "", fnId: "-1", fileName: "" };
             }
         },
         // Called by the IDE tab on save/close: write back the merged model and notify the main tab.
         save: function (xml) {
-            try { localStorage.setItem("scriptIDE_result", xml); } catch (e) { }
+            try {
+                localStorage.setItem("scriptIDE_result", xml);
+            } catch (e) {
+                console.error("[FRAMLab] Could not store the saved model for the main tab (localStorage).", e);
+            }
             if (syncChannel) {
                 syncChannel.postMessage({ type: "script-saved" });
             } else {
                 // Fallback for browsers without BroadcastChannel: use the storage event.
-                try { localStorage.setItem("scriptIDE_ping", Date.now().toString()); } catch (e) { }
+                try {
+                    localStorage.setItem("scriptIDE_ping", Date.now().toString());
+                } catch (e) {
+                    console.error("[FRAMLab] Could not notify the main tab of the save (localStorage).", e);
+                }
             }
         },
         // Called by the MAIN tab: invokes dotNetCallback(fullMethodName) when the IDE tab saves.
@@ -237,7 +253,12 @@
         },
         // Called by the MAIN tab to read the saved (merged) model after a save notification.
         result: function () {
-            try { return localStorage.getItem("scriptIDE_result") || ""; } catch (e) { return ""; }
+            try {
+                return localStorage.getItem("scriptIDE_result") || "";
+            } catch (e) {
+                console.error("[FRAMLab] Could not read the model saved by the Script IDE tab (localStorage).", e);
+                return "";
+            }
         }
     };
 })();

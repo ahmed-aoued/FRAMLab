@@ -9,6 +9,7 @@
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
 @inject HttpClient Http
+@inject ILogger<Index> Logger
 
 <PageTitle>@ReturnTitle()</PageTitle>
 
@@ -224,9 +225,10 @@
             FileIsLoaded();
             StateHasChanged();
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore malformed content from the other tab.
+            Logger.LogError(LogEvents.ScriptIde, ex,
+                "Model saved by the Script IDE tab could not be applied ({Length} chars).", xml.Length);
         }
     }
     private void ModalClose(bool state)
@@ -260,9 +262,10 @@
                 await localStorage.SetItemAsync("backupData", stateContainer.projectData_Undo[0].OuterXml);
                 await localStorage.SetItemAsync("backupFileName", stateContainer.fileName);
             }
-            catch
+            catch (Exception ex)
             {
-
+                Logger.LogWarning(LogEvents.BackupRestore, ex,
+                    "Could not persist the session backup to localStorage (file '{FileName}').", stateContainer.fileName);
             }
         }
     }
@@ -276,27 +279,40 @@
                 await UpdateFileContent.Invoke(content, name);
             }
         }
-        catch
+        catch (Exception ex)
         {
-
+            StaticLog.For<Index>().LogError(LogEvents.FileOpen, ex,
+                "Failed to load '{FileName}' handed over by the operating system ({Length} chars).",
+                name, content?.Length ?? 0);
         }
     }
     private async Task OpenFileContent(string content, string name)
     {
         if (content.Length > 0 && name.Length > 0)
         {
-            stateContainer.debugOutput = "File loading ...";
-            stateContainer.fileLoaded = false;
-            stateContainer.viewWidth = 0;
-            stateContainer.viewHeight = 0;
-            stateContainer.undoIndex = 0;
-            stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
-            stateContainer.projectData_Undo[0] = new XmlDocument();
-            stateContainer.projectData_Undo[0].LoadXml(content);
-            stateContainer.fileName = name;
-            stateContainer.inputDropStatus = "file-input-zone-hide";
-            FileIsLoaded();
-            StateHasChanged();
+            try
+            {
+                stateContainer.debugOutput = "File loading ...";
+                stateContainer.fileLoaded = false;
+                stateContainer.viewWidth = 0;
+                stateContainer.viewHeight = 0;
+                stateContainer.undoIndex = 0;
+                stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+                stateContainer.projectData_Undo[0] = new XmlDocument();
+                stateContainer.projectData_Undo[0].LoadXml(content);
+                stateContainer.fileName = name;
+                stateContainer.inputDropStatus = "file-input-zone-hide";
+                FileIsLoaded();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(LogEvents.FileOpen, ex,
+                    "The selected file '{FileName}' is not a valid .xfmv model.", name);
+                stateContainer.fileLoaded = false;
+                stateContainer.debugOutput = $"Could not open '{name}': the file is not a valid model.";
+                StateHasChanged();
+            }
         }
         else
         {
@@ -446,15 +462,27 @@
         stateContainer.fileLoaded = false;
         stateContainer.viewWidth = 0;
         stateContainer.viewHeight = 0;
-        var buffer = new byte[e.File.Size];
-        await e.File.OpenReadStream(1050000).ReadAsync(buffer);
-        stateContainer.undoIndex = 0;
-        stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
-        stateContainer.projectData_Undo[0] = new XmlDocument();
-        stateContainer.projectData_Undo[0].LoadXml(Encoding.UTF8.GetString(buffer));
-        stateContainer.fileName = e.File.Name;
-        stateContainer.inputDropStatus = "file-input-zone-hide";
-        FileIsLoaded();
+        try
+        {
+            var buffer = new byte[e.File.Size];
+            await e.File.OpenReadStream(1050000).ReadAsync(buffer);
+            stateContainer.undoIndex = 0;
+            stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+            stateContainer.projectData_Undo[0] = new XmlDocument();
+            stateContainer.projectData_Undo[0].LoadXml(Encoding.UTF8.GetString(buffer));
+            stateContainer.fileName = e.File.Name;
+            stateContainer.inputDropStatus = "file-input-zone-hide";
+            FileIsLoaded();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(LogEvents.FileOpen, ex,
+                "The selected file '{FileName}' could not be read as a model ({Size} bytes).",
+                e.File.Name, e.File.Size);
+            stateContainer.fileLoaded = false;
+            stateContainer.debugOutput = $"Could not open '{e.File.Name}': the file is not a valid model.";
+            StateHasChanged();
+        }
     }
     private void FileIsLoaded()
     {
@@ -1166,8 +1194,9 @@
                 StateHasChanged();
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(LogEvents.BackupRestore, ex, "Restoring the previous session backup failed.");
             stateContainer.debugOutput = "";
         }
     }

@@ -1,6 +1,7 @@
 ﻿@inject IJSRuntime JSRuntime
 @inject StateContainer stateContainer
 @inject IStringLocalizer<Localization.SharedResource> Loc
+@inject ILogger<FMIControl> Logger
 
 <div class="navbar p-0 pt-2">
     <div>
@@ -1477,6 +1478,9 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(LogEvents.FmiScript, ex,
+                "Script runtime error in function {FunctionName} ({FunctionId}) at cycle {Cycle}.",
+                fn.IDName, fn.IDNr, stateContainer.cycleFMI);
             stateContainer.fmiMessage += $"Script [{fn.IDName}] runtime error: {ex.Message}\n";
             fn.fmiHighlight = "hold-fill";
         }

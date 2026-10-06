@@ -1,5 +1,6 @@
 ﻿@inject StateContainer stateContainer
 @inject IConfiguration render
+@inject ILogger<FunctionSelected> Logger
 
 <!--This fragment is for all of the Functions that are selected and highlighted. There is only one of these on the main index and it draws all selected functions and their couplings.-->
 @foreach (var function in stateContainer.functionList.FindAll(x => stateContainer.selectedMulti.Contains(x.IDNr)))
@@ -468,7 +469,7 @@
     }
     private void MoveFnStart(MouseEventArgs e, string IDNr)
     {
-        Console.WriteLine($"Instance: {e.GetType()} | Event: {e.Type}");
+        Logger.LogTrace("MoveFnStart: instance={Instance} event={EventType}", e.GetType().Name, e.Type);
         if ((e.CtrlKey || e.MetaKey))
         {
             unselectMulti = IDNr;

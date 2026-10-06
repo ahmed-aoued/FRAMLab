@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using FMV_OG.Shared.MainApp.Models;
+using FMV_OG.Shared.MainApp.Services.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace FMV_OG.Shared.MainApp.Services.Scripting
 {
@@ -12,6 +14,10 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
     /// </summary>
     public sealed class ScriptingService
     {
+        private readonly ILogger<ScriptingService> logger;
+
+        public ScriptingService(ILogger<ScriptingService> logger) => this.logger = logger;
+
         /// <summary>Per-function Static scope stores, kept for a whole FMI run (key = function IDNr).</summary>
         private readonly Dictionary<string, Dictionary<string, STValue>> staticStores = new();
         /// <summary>Global scope store, shared across all functions, kept for a whole FMI run.</summary>
@@ -73,7 +79,7 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
         public CompiledScript Compile(Function fn)
         {
             var symbols = BuildSymbols(fn);
-            return ScriptCompiler.Compile(fn.Script.Source, symbols);
+            return ScriptCompiler.Compile(fn.Script.Source, symbols, logger);
         }
 
         /// <summary>
@@ -113,7 +119,7 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
             }
 
             var ctx = new ScriptExecutionContext(fn, cycle, globalStore);
-            var interpreter = new STInterpreter(ctx, staticStore);
+            var interpreter = new STInterpreter(ctx, staticStore, logger);
             interpreter.Run(compiled.Program, fn.Script);
 
             // write Output-category variables and SetOutput calls back to the function
@@ -135,7 +141,7 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
             }
         }
 
-        private static STValue InitialOf(ScriptVariable v)
+        private STValue InitialOf(ScriptVariable v)
         {
             try
             {
@@ -149,7 +155,13 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                     _ => STValue.FromReal(0),
                 };
             }
-            catch { return STValue.FromReal(0); }
+            catch (System.Exception ex)
+            {
+                logger.LogWarning(LogEvents.ScriptInitialValue, ex,
+                    "Invalid initial value '{InitialValue}' for {Scope} variable '{Name}' (type {Type}); defaulting to 0.",
+                    v.InitialValue, v.Scope, v.Name, v.Type);
+                return STValue.FromReal(0);
+            }
         }
     }
 }

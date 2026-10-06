@@ -7,6 +7,7 @@
 @inject AgentLevelService agentLevelService
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
+@inject ILogger<MenuBar> Logger
 <!-- here -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display: none">
     <defs>
@@ -162,8 +163,10 @@
         {
             importDoc.LoadXml(content);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(LogEvents.SelectionImport, ex,
+                "Selection file '{FileName}' could not be parsed ({Length} bytes).", e.File.Name, buffer.Length);
             stateContainer.debugOutput = "Selection file could not be parsed.";
             return;
         }
@@ -781,16 +784,25 @@
                 stateContainer.undoIndex = 0;
                 stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
                 stateContainer.projectData_Undo[0] = new XmlDocument();
-                stateContainer.projectData_Undo[0].LoadXml(await localStorage.GetItemAsync<string>("backupData"));
-                stateContainer.fileName = await localStorage.GetItemAsync<string>("backupFileName");
+                var xml = await localStorage.GetItemAsync<string>("backupData");
+                if (!string.IsNullOrEmpty(xml))
+                {
+                    stateContainer.projectData_Undo[0].LoadXml(xml);
+                }
+                var bFilename = await localStorage.GetItemAsync<string>("backupFileName");
+                if (!string.IsNullOrEmpty(bFilename))
+                {
+                    stateContainer.fileName = bFilename;
+                }
                 stateContainer.inputDropStatus = "file-input-zone-hide";
                 stateContainer.isBackup = false;
                 await fileIsLoaded.InvokeAsync();
                 await localStorage.SetItemAsync("isBackup", false);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(LogEvents.BackupRestore, ex, "Restoring the session backup failed.");
             stateContainer.debugOutput = "";
         }
     }

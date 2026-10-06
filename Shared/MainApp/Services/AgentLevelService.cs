@@ -2,7 +2,9 @@ using System.Globalization;
 using System.Xml;
 using FMV_OG.Shared;
 using FMV_OG.Shared.MainApp.Models;
+using FMV_OG.Shared.MainApp.Services.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace FMV_OG.Shared.MainApp.Services
 {
@@ -17,6 +19,7 @@ namespace FMV_OG.Shared.MainApp.Services
         private const double DefaultFunctionSlotSpacing = 12;
 
         private readonly IConfiguration renderConfig;
+        private readonly ILogger<AgentLevelService> logger;
         private readonly List<TableRowLayout> _tableRows = new();
         private readonly List<TableColumnLayout> _tableColumns = new();
         private readonly List<TableCellLayout> _tableCells = new();
@@ -32,9 +35,10 @@ namespace FMV_OG.Shared.MainApp.Services
         private int _lastAgentCount;
         private int _lastLevelCount;
 
-        public AgentLevelService(IConfiguration renderConfig)
+        public AgentLevelService(IConfiguration renderConfig, ILogger<AgentLevelService> logger)
         {
             this.renderConfig = renderConfig;
+            this.logger = logger;
         }
 
         public void Bind(StateContainer stateContainer)
@@ -116,13 +120,13 @@ namespace FMV_OG.Shared.MainApp.Services
             var state = EnsureState();
             if (!state.fileLoaded || state.projectData_Undo[0] is null || state.functionList.Count == 0)
             {
-                Console.WriteLine("[AgentsLevels] Cannot enable view – no project loaded.");
+                logger.LogWarning(LogEvents.AgentsLevels, "Agents/Levels view cannot be enabled - no project is loaded.");
                 return;
             }
             _agentsLevelsBackup = BuildLayoutSnapshot();
             _agentsLevelsOriginalOrder = state.functionList.Select(fn => fn.IDNr).ToList();
             state.AgentsLevelsViewActive = true;
-            Console.WriteLine($"[AgentsLevels] View enabled. functions={state.functionList.Count}");
+            logger.LogInformation(LogEvents.AgentsLevels, "Agents/Levels view enabled. functions={FunctionCount}", state.functionList.Count);
             ApplyAgentsLevelsLayout();
         }
 
@@ -133,6 +137,7 @@ namespace FMV_OG.Shared.MainApp.Services
             var order = _agentsLevelsOriginalOrder;
             if (snapshot is null)
             {
+                logger.LogWarning(LogEvents.AgentsLevels, "Restore requested but no layout backup exists.");
                 state.debugOutput = "No layout backup found to restore.";
                 return;
             }
@@ -157,7 +162,7 @@ namespace FMV_OG.Shared.MainApp.Services
             FunctionPositions = new Dictionary<string, Position>();
             CouplingGeometries = new Dictionary<string, CouplingGeometry>();
             ResetAgentsLevelsViewState();
-            Console.WriteLine("[AgentsLevels] View disabled.");
+            logger.LogInformation(LogEvents.AgentsLevels, "Agents/Levels view disabled.");
         }
 
         public void ResetAgentsLevelsViewState()
@@ -176,7 +181,7 @@ namespace FMV_OG.Shared.MainApp.Services
             _measurementAgentId = string.Empty;
             MeasuredLargestCellWidth = 0;
             MeasuredLargestCellHeight = 0;
-            Console.WriteLine("[AgentsLevels] State reset to defaults.");
+            logger.LogInformation(LogEvents.AgentsLevels, "Agents/Levels view state reset to defaults.");
         }
 
         public void UpdateTableCellMeasurement(TableCellMeasurement measurement)

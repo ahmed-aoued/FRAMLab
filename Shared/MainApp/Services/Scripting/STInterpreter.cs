@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FMV_OG.Shared.MainApp.Services.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace FMV_OG.Shared.MainApp.Services.Scripting
 {
@@ -39,15 +41,17 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
         private readonly Dictionary<string, STValue> outputs = new(StringComparer.OrdinalIgnoreCase);
         /// <summary>Values of aspect variables read/written during this cycle's run.</summary>
         private readonly Dictionary<string, STValue> aspectCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ILogger? logger;
 
         private long statementCount = 0;
         private const long MaxStatements = 100_000;
         private const int MaxLoopIterations = 100_000;
 
-        public STInterpreter(ScriptExecutionContext ctx, Dictionary<string, STValue> staticStore)
+        public STInterpreter(ScriptExecutionContext ctx, Dictionary<string, STValue> staticStore, ILogger? logger = null)
         {
             this.ctx = ctx;
             this.staticStore = staticStore;
+            this.logger = logger;
         }
 
         /// <summary>Values written via SetOutput or to Output-category variables, read after the run.</summary>
@@ -95,7 +99,13 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                     _ => STValue.FromReal(0),
                 };
             }
-            catch { return STValue.FromReal(0); }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(LogEvents.ScriptInitialValue, ex,
+                    "Invalid initial value '{InitialValue}' for {Scope} variable '{Name}' (type {Type}); defaulting to 0.",
+                    v.InitialValue, v.Scope, v.Name, v.Type);
+                return STValue.FromReal(0);
+            }
         }
 
         private void Guard(AstNode node)
