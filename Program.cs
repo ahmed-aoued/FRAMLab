@@ -22,6 +22,7 @@ builder.Services.AddSingleton<IFmiDefinitionService, FmiDefinitionService>();
 builder.Services.AddSingleton<IMacroRegistry, MacroRegistry>();
 builder.Services.AddSingleton<IFmiInterpreter, FmiInterpreter>();
 builder.Services.AddSingleton<AgentLevelService>();
+builder.Services.AddSingleton<FRAMLab.Shared.MainApp.Services.Scripting.ScriptingService>();
 builder.Services.AddScoped<SvgUtilsInterop>();
 
 builder.Services.AddBlazoredLocalStorage();

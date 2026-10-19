@@ -11,6 +11,7 @@ namespace FRAMLab.Shared.MainApp.Services
         bool DeleteFunction(StateContainer stateContainer);
         void SetFunctionIdName(StateContainer stateContainer, string idName);
         void SetFunctionDescription(StateContainer stateContainer, string description);
+        void SetFunctionScript(XmlDocument projectData, string functionId, FRAMLab.Shared.MainApp.Models.ScriptModel script);
         void UpdateFunctionXY(XmlDocument projectData, string selectedFn, double x, double y, string? functionId = null);
         void UpdateAspectXY(XmlDocument projectData, string selectedLabel, double x, double y, string directionX, string directionY);
         void ResetAspect(StateContainer stateContainer, string[] dictArray, double xO, double yO, double aX, double aY, int aFW);

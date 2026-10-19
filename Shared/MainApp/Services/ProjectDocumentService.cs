@@ -116,6 +116,16 @@ namespace FRAMLab.Shared.MainApp.Services
             }
         }
 
+        public void SetFunctionScript(XmlDocument projectData, string functionId, FRAMLab.Shared.MainApp.Models.ScriptModel script)
+        {
+            var fnNode = projectData.SelectSingleNode($"//FM/Functions/Function[IDNr={functionId}]");
+            if (fnNode is null)
+            {
+                return;
+            }
+            script.WriteXml(projectData, fnNode);
+        }
+
         public void UpdateFunctionXY(XmlDocument projectData, string selectedFn, double x, double y, string? functionId = null)
         {
             if (functionId == null)

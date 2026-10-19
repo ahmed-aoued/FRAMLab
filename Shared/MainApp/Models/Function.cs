@@ -77,6 +77,7 @@ namespace FRAMLab.Shared
             this.AgentId = fn.SelectSingleNode("@agentId")?.Value ?? "";
             this.LevelId = fn.SelectSingleNode("@levelId")?.Value ?? "";
             this.Description = fn.SelectSingleNode("Description")?.InnerText ?? "";
+            this.Script = FRAMLab.Shared.MainApp.Models.ScriptModel.FromXml(fn);
         }
         public List<string[]> metadata { get; set; }
         
@@ -228,6 +229,38 @@ namespace FRAMLab.Shared
         public VariableInfo? getVariable(string variableName)
         {
             return variableList.FirstOrDefault(v => v.Name == variableName);
+        }
+
+        /// <summary>
+        /// Dictionary view over <see cref="variableList"/> for the ST scripting engine,
+        /// which reads the FMI pipeline's propagated values by key (e.g. "I0_Hazard_signal").
+        /// Values are stringified exactly like the legacy dictionary the scripting code was
+        /// written against; the typed variables remain authoritative for the engine.
+        /// </summary>
+        public Dictionary<string, string[]> getVariables()
+        {
+            var result = new Dictionary<string, string[]>();
+            foreach (var variable in variableList)
+            {
+                result[variable.Name] = new[] { variable.Value?.ToString() ?? "", variable.Type.ToString() };
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Legacy string-based write used by the ST scripting engine for script outputs.
+        /// Upserts into <see cref="variableList"/> so both the typed FMI engine and the
+        /// scripting layer see the same value.
+        /// </summary>
+        public void newVariable(string key, string[] value)
+        {
+            var existing = getVariable(key);
+            if (existing is null)
+            {
+                existing = new VariableInfo { Name = key, Type = variableType.String };
+                variableList.Add(existing);
+            }
+            existing.Value = value.Length > 0 ? value[0] : "";
         }
 
         public void resetVariables()
@@ -400,6 +433,8 @@ namespace FRAMLab.Shared
         }
         public string IDName { get; set; }
         public string Description { get; set; }
+        /// <summary>ST script attached to this function (source + declared variables + aspect types).</summary>
+        public FRAMLab.Shared.MainApp.Models.ScriptModel Script { get; set; } = new FRAMLab.Shared.MainApp.Models.ScriptModel();
         public List<string> ReturnTextLines(int length)
         {
             var textLines = new List<string>();
