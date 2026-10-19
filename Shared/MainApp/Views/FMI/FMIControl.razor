@@ -1,6 +1,9 @@
-﻿@inject IJSRuntime JSRuntime
+@using Microsoft.Extensions.Logging
+@using FRAMLab.Shared.MainApp.Services.Logging
+@inject IJSRuntime JSRuntime
 @inject StateContainer stateContainer
 @inject IStringLocalizer<Localization.SharedResource> Loc
+@inject ILogger<FMIControl> Logger
 
 <div class="navbar p-0 pt-2">
     <div>
@@ -671,6 +674,7 @@
         stateContainer.selectedLabel = "";
         stateContainer.cycleFMI = -1;
         stateContainer.fmiReset();
+        stateContainer.Scripting?.Reset(); //clear Static + Global script stores for a fresh FMI run
         stateContainer.fmiMessage = "";
         foreach (var fn in stateContainer.functionList)
         {
@@ -1345,6 +1349,7 @@
     {
         var showVariability = false;
         var result = stateContainer.fmiEvaluate(iBG); //CalcVariables + the metadata equation loop, moved into IFmiInterpreter
+        ExecuteFunctionScript(iBG); //run the per-cycle ST script (if any), after inputs are calculated
         foreach (var (key, value) in result.EvaluatedKeys)
         {
             for (var i = 1; i <= 6; i++)
@@ -1362,6 +1367,41 @@
             checkVariability_DrawResults(iBG);
         }
         stateContainer.addMetadataResults(iBG); //this adds a new row to the Metadata table for the results of the evaluated Function (for the current Cycle)
+    }
+    /// <summary>Run the function's ST script for this cycle. Executes after inputs are
+    /// calculated, surfaces runtime issues to the FMI log, and flags the function on errors.</summary>
+    private void ExecuteFunctionScript(Function fn)
+    {
+        if (stateContainer.Scripting is null || fn.Script is null) return;
+        if (!fn.Script.Enabled || string.IsNullOrWhiteSpace(fn.Script.Source)) return;
+        try
+        {
+            // keep the scripting service's global declarations in sync with the editor's globals
+            stateContainer.Scripting.GlobalVariableDeclarations.Clear();
+            stateContainer.Scripting.GlobalVariableDeclarations.AddRange(stateContainer.globalScriptVariables);
+            var ctx = stateContainer.Scripting.ExecuteCycle(fn, stateContainer.cycleFMI);
+            if (ctx is null) return;
+            foreach (var issue in ctx.RuntimeIssues)
+            {
+                stateContainer.fmiMessage += $"Script [{fn.IDName}] {issue.StartLine}:{issue.StartColumn} {issue.Message}\n";
+                if (issue.Severity == "Error")
+                {
+                    fn.fmiHighlight = "hold-fill";
+                }
+            }
+            foreach (var trace in ctx.Trace)
+            {
+                stateContainer.fmiMessage += trace + "\n";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(LogEvents.FmiScript, ex,
+                "Script runtime error in function {FunctionName} ({FunctionId}) at cycle {Cycle}.",
+                fn.IDName, fn.IDNr, stateContainer.cycleFMI);
+            stateContainer.fmiMessage += $"Script [{fn.IDName}] runtime error: {ex.Message}\n";
+            fn.fmiHighlight = "hold-fill";
+        }
     }
     private void checkVariability_DrawResults(Function iBG)
     {

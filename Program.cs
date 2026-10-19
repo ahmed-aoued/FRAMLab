@@ -39,4 +39,10 @@ using var response = await http.GetAsync("renderoptions.json");
 using var stream = await response.Content.ReadAsStreamAsync();
 builder.Configuration.AddJsonStream(stream);
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+// Link the scripting engine to the central state after construction (avoids a DI cycle).
+var stateContainer = host.Services.GetRequiredService<StateContainer>();
+stateContainer.Scripting = host.Services.GetRequiredService<FRAMLab.Shared.MainApp.Services.Scripting.ScriptingService>();
+
+await host.RunAsync();

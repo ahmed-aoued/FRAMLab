@@ -1,4 +1,4 @@
-﻿using FRAMLab.Shared.MainApp.Services;
+using FRAMLab.Shared.MainApp.Services;
 using System.Data;
 using System.Globalization;
 using System.Xml;
@@ -235,6 +235,52 @@ namespace FRAMLab.Shared
         public bool isBackup { get; set; } = false;
         public int cycleDelay { get; set; } = 750;
         public string showVariables { get; set; } = "";
+        // --- Script IDE / ST scripting state ---
+        public bool scriptIDEVisible { get; set; } = false;
+        public string scriptTargetFn { get; set; } = "-1";
+        public List<FRAMLab.Shared.MainApp.Models.ScriptVariable> globalScriptVariables { get; set; } = new List<FRAMLab.Shared.MainApp.Models.ScriptVariable>();
+        /// <summary>Scripting engine facade (set from Program.cs after construction to avoid a DI cycle).</summary>
+        public FRAMLab.Shared.MainApp.Services.Scripting.ScriptingService? Scripting { get; set; }
+        public void sFnScript(FRAMLab.Shared.MainApp.Models.ScriptModel script, string functionId)
+        {
+            updateUndo();
+            projectDocumentService.SetFunctionScript(projectData_Undo[0], functionId, script);
+        }
+        /// <summary>Re-derive every function's aspect variables from the current coupling list,
+        /// including the aspects the function declares in the model (orphan/unconnected ones).</summary>
+        public void SyncScriptAspects()
+        {
+            var declaredByFunction = new Dictionary<string, List<FRAMLab.Shared.MainApp.Models.AspectVariable>>();
+            void Collect(IEnumerable<Aspect> aspects, FRAMLab.Shared.MainApp.Models.AspectCategory category)
+            {
+                foreach (var a in aspects)
+                {
+                    if (!declaredByFunction.TryGetValue(a.FunctionIDNr, out var list))
+                    {
+                        list = new List<FRAMLab.Shared.MainApp.Models.AspectVariable>();
+                        declaredByFunction[a.FunctionIDNr] = list;
+                    }
+                    list.Add(new FRAMLab.Shared.MainApp.Models.AspectVariable { Category = category, Label = a.IDName });
+                }
+            }
+            Collect(aspectsList.Where(x => x.Type == "Input"), FRAMLab.Shared.MainApp.Models.AspectCategory.Input);
+            Collect(aspectsList.Where(x => x.Type == "Precondition"), FRAMLab.Shared.MainApp.Models.AspectCategory.Precondition);
+            Collect(aspectsList.Where(x => x.Type == "Resource"), FRAMLab.Shared.MainApp.Models.AspectCategory.Resource);
+            Collect(aspectsList.Where(x => x.Type == "Control"), FRAMLab.Shared.MainApp.Models.AspectCategory.Control);
+            Collect(aspectsList.Where(x => x.Type == "Time"), FRAMLab.Shared.MainApp.Models.AspectCategory.Time);
+            Collect(outputsList, FRAMLab.Shared.MainApp.Models.AspectCategory.Output);
+
+            foreach (var fn in functionList)
+            {
+                declaredByFunction.TryGetValue(fn.IDNr, out var declared);
+                fn.Script.SyncAspects(couplingList, fn.IDNr, declared);
+            }
+        }
+        /// <summary>Type-consistency warnings across all coupled functions (aspect type mismatches).</summary>
+        public List<string> ScriptTypeMismatches()
+        {
+            return FRAMLab.Shared.MainApp.Models.AspectVariable.FindTypeMismatches(functionList, couplingList);
+        }
         public double selectX { get; set; } = 0;
         public double selectY { get; set; } = 0;
         public double selectWidth { get; set; } = 0;
