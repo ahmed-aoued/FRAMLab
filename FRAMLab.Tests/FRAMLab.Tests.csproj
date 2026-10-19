@@ -35,10 +35,13 @@
     <Compile Include="..\Shared\MainApp\Services\IMetadataService.cs" Link="Engine\Services\IMetadataService.cs" />
     <Compile Include="..\Shared\MainApp\Services\FmiDefinitionService.cs" Link="Engine\Services\FmiDefinitionService.cs" />
     <Compile Include="..\Shared\MainApp\Services\IFmiDefinitionService.cs" Link="Engine\Services\IFmiDefinitionService.cs" />
+    <!-- Macro system: registry + expander (files added by the macro branch) -->
+    <Compile Include="..\Shared\MainApp\Services\*Macro*.cs" LinkBase="Engine\Services" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\TestFiles\*.xfmv" Link="TestFiles\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>

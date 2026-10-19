@@ -75,6 +75,9 @@ namespace FRAMLab.Shared
 
         public XmlElement ToXml(XmlDocument doc)
         {
+            //Implicit definitions are derived from legacy metadata and must never be serialized;
+            //FmiDefinitionService is the only writer and never passes implicit definitions here.
+            System.Diagnostics.Debug.Assert(!IsImplicit, "Implicit definitions are never serialized.");
             var el = doc.CreateElement("Variable");
             el.SetAttribute("name", Name);
             el.SetAttribute("type", Type.ToString());

@@ -9,6 +9,7 @@ namespace FRAMLab.Shared.MainApp.Services
     public interface IFmiDefinitionService
     {
         FmiModelDefinition Load(XmlDocument projectData);
+        FmiModelDefinition MergeWithImplicit(FmiModelDefinition declared, List<Function> functions);
         XmlNode EnsureFmiRoot(XmlDocument projectData);
         void UpsertVariable(XmlDocument projectData, FmiVariableDefinition def);
         void RemoveVariable(XmlDocument projectData, string name, string functionId);

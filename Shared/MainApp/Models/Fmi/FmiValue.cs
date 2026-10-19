@@ -137,13 +137,13 @@ namespace FRAMLab.Shared
                         foreach (var part in raw.Split(','))
                         {
                             var split = part.Split(':', 2);
-                            if (split.Length == 2)
+                            if (split.Length == 2 && split[0].Trim() != "")
                             {
                                 entries[split[0].Trim()] = FromLegacyString(split[1].Trim(), null, out _);
                             }
                             else
                             {
-                                coerced = false;
+                                coerced = false; //malformed or empty-key segment: flag it, skip storing
                             }
                         }
                     }

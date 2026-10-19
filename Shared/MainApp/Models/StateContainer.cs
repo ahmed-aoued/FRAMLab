@@ -441,7 +441,7 @@ namespace FRAMLab.Shared
         }
         public void initFmiRuntime()
         {
-            fmiInterpreter.Initialize(fmiDefinitionService.Load(projectData_Undo[0]), functionList);
+            fmiInterpreter.Initialize(fmiDefinitionService.MergeWithImplicit(fmiDefinitionService.Load(projectData_Undo[0]), functionList), functionList);
             foreach (var diagnostic in fmiInterpreter.Definition.LoadDiagnostics)
             {
                 Console.WriteLine($"FMI {diagnostic.Severity}: {diagnostic.Source}: {diagnostic.Message}");

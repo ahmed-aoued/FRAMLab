@@ -15,6 +15,8 @@ namespace FRAMLab.Shared
         public static readonly FmiTypeDescriptor Boolean = new() { Kind = FmiValueType.Boolean };
         public static readonly FmiTypeDescriptor String = new() { Kind = FmiValueType.String };
 
+        private static readonly Regex ArrayPattern = new(@"^array\s*<(.+)>$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public static bool TryParse(string typeString, out FmiTypeDescriptor? descriptor, out string? error)
         {
             descriptor = null;
@@ -28,7 +30,7 @@ namespace FRAMLab.Shared
                 case "string":
                     descriptor = String;
                     return true;
-                case "bool":
+                case "bool": //canonical emitted form; "boolean" is accepted as an alias on parse
                 case "boolean":
                     descriptor = Boolean;
                     return true;
@@ -39,7 +41,7 @@ namespace FRAMLab.Shared
                     descriptor = new FmiTypeDescriptor { Kind = FmiValueType.Dictionary };
                     return true;
             }
-            var arrayMatch = Regex.Match(trimmed, @"^array\s*<(.+)>$", RegexOptions.IgnoreCase);
+            var arrayMatch = ArrayPattern.Match(trimmed);
             if (arrayMatch.Success)
             {
                 if (!TryParse(arrayMatch.Groups[1].Value, out var element, out error))
@@ -63,6 +65,7 @@ namespace FRAMLab.Shared
                 FmiValueType.List => "list",
                 FmiValueType.Dictionary => "dictionary",
                 FmiValueType.Array => $"array<{ElementType}>",
+                // Empty is not a declarable type; the fallback keeps serialization total (never throws).
                 _ => "string"
             };
         }
