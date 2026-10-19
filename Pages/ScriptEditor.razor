@@ -190,8 +190,10 @@
                     return;
                 }
                 TargetFunction = new Function(fnNode);
-                // merge persisted aspect types into the freshly-derived aspect set
-                TargetFunction.Script.SyncAspects(stateContainer.couplingList, TargetFunction.IDNr);
+                // merge persisted aspect types into the freshly-derived aspect set (including
+                // the aspects the function declares in the model, even unconnected ones)
+                TargetFunction.Script.SyncAspects(stateContainer.couplingList, TargetFunction.IDNr,
+                    AspectVariable.DeclaredFromXml(stateContainer.projectData_Undo[0], TargetFunction.IDNr));
                 script = TargetFunction.Script;
                 Recompile();
                 StateHasChanged();
@@ -258,7 +260,8 @@
         }
         foreach (var f in functions)
         {
-            f.Script.SyncAspects(stateContainer.couplingList, f.IDNr);
+            f.Script.SyncAspects(stateContainer.couplingList, f.IDNr,
+                AspectVariable.DeclaredFromXml(stateContainer.projectData_Undo[0], f.IDNr));
         }
         // keep the current in-memory script (with unsaved aspect types) for the target function
         var current = functions.FirstOrDefault(f => f.IDNr == TargetFunction.IDNr);

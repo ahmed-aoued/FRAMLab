@@ -29,10 +29,13 @@ namespace FMV_OG.Shared.MainApp.Models
         /// <summary>
         /// Re-derive the aspect set from couplings and merge with the persisted type
         /// assignments, keeping any types the user already set for aspects that still exist.
+        /// <paramref name="declared"/> optionally supplies the aspects the function declares
+        /// in the model (including unconnected ones); without it only coupled aspects exist.
         /// </summary>
-        public void SyncAspects(IEnumerable<Coupling> couplings, string functionIdNr)
+        public void SyncAspects(IEnumerable<Coupling> couplings, string functionIdNr,
+            IEnumerable<AspectVariable>? declared = null)
         {
-            var derived = AspectVariable.DeriveFor(functionIdNr, couplings);
+            var derived = AspectVariable.DeriveFor(functionIdNr, couplings, declared);
             foreach (var d in derived)
             {
                 var existing = AspectVariables.FirstOrDefault(a => a.Category == d.Category && a.Label == d.Label);

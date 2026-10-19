@@ -187,14 +187,14 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
             var to = Eval(f.To).AsInt();
             var by = f.By is not null ? Eval(f.By).AsInt() : 1;
             if (by == 0) { ctx.RuntimeIssues.Add(ScriptDiagnostic.Error("FOR BY step cannot be 0.", f.Line, f.Column)); return; }
-            tempStore[f.Variable] = STValue.FromInt(from);
+            SetLoopVariable(f.Variable, STValue.FromInt(from));
             var iter = 0;
             if (by > 0)
             {
                 for (var i = from; i <= to; i += by)
                 {
                     if (++iter > MaxLoopIterations) { LoopGuard(f); break; }
-                    tempStore[f.Variable] = STValue.FromInt(i);
+                    SetLoopVariable(f.Variable, STValue.FromInt(i));
                     try { ExecuteBlock(f.Body.Statements); }
                     catch (ScriptSignal s) when (s.Kind == "Exit") { break; }
                 }
@@ -204,11 +204,20 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                 for (var i = from; i >= to; i += by)
                 {
                     if (++iter > MaxLoopIterations) { LoopGuard(f); break; }
-                    tempStore[f.Variable] = STValue.FromInt(i);
+                    SetLoopVariable(f.Variable, STValue.FromInt(i));
                     try { ExecuteBlock(f.Body.Statements); }
                     catch (ScriptSignal s) when (s.Kind == "Exit") { break; }
                 }
             }
+        }
+
+        /// <summary>Assign the FOR control variable in the store that owns it (Temp, Static
+        /// or Global), so a loop over a static/global counter keeps its declared lifetime.</summary>
+        private void SetLoopVariable(string name, STValue value)
+        {
+            if (staticStore.ContainsKey(name)) { staticStore[name] = value; return; }
+            if (ctx.Globals.ContainsKey(name)) { ctx.Globals[name] = value; return; }
+            tempStore[name] = value;
         }
 
         // ---- scope resolution: Temp > Static > Global > aspect variable ----
@@ -234,12 +243,16 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                 return false;
             }
 
-            // look for an FMI variable whose key ends with the aspect label, e.g. "I0_Hazard signal"
-            var label = aspect.Label;
+            // Look for the FMI variable the coupling pipeline created for this aspect.
+            // The pipeline names propagated values "{letter}{outputFn}_{key}" where the
+            // key is a metadata/key identifier, so match on the *sanitized* identifier
+            // ("Hazard signal" -> "Hazard_signal"), never on the raw label with spaces.
+            var identifier = aspect.Identifier;
             foreach (var kv in ctx.Function.getVariables())
             {
-                if (kv.Key.Equals($"Script_{label}", StringComparison.OrdinalIgnoreCase)
-                    || kv.Key.EndsWith("_" + label, StringComparison.OrdinalIgnoreCase))
+                if (kv.Key.Equals(identifier, StringComparison.OrdinalIgnoreCase)
+                    || kv.Key.Equals($"Script_{aspect.Label}", StringComparison.OrdinalIgnoreCase)
+                    || kv.Key.EndsWith("_" + identifier, StringComparison.OrdinalIgnoreCase))
                 {
                     var raw = kv.Value is { Length: > 0 } ? kv.Value[0] : "";
                     value = ParseValue(raw, aspect.Type);
@@ -461,7 +474,9 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                 case "GetTime": return HostGet("T", c);
                 case "SetOutput": return HostSetOutput(c);
                 case "Print": case "Trace":
-                    var msg = c.Arguments.Count > 0 ? Eval(c.Arguments[0]).AsString() : "";
+                    // Variadic: users log a label plus values, e.g. Print('hits=', n).
+                    // Concatenate the arguments in order (IEC CONCAT semantics).
+                    var msg = string.Concat(c.Arguments.Select(a => Eval(a).AsString()));
                     ctx.Trace.Add($"[fn {ctx.Function.IDNr} cycle {ctx.Cycle}] {msg}");
                     return STValue.Void;
             }
@@ -495,12 +510,17 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
         private STValue HostGet(string aspectLetter, CallExpr c)
         {
             var key = c.Arguments.Count > 0 ? Eval(c.Arguments[0]).AsString() : "";
+            // Accept either the raw key ("Hazard_signal") or the human aspect label
+            // ("Hazard signal"); FRAM labels usually contain spaces and are sanitized to
+            // identifiers, so normalize before matching.
+            var identifier = Models.AspectVariable.SanitizeIdentifier(key);
             // FMI variables are named like "{Type}{outputFn}_{Key}" on the target function
             var vars = ctx.Function.getVariables();
             foreach (var kv in vars)
             {
                 if (kv.Key.StartsWith(aspectLetter, StringComparison.OrdinalIgnoreCase)
-                    && kv.Key.EndsWith("_" + key, StringComparison.OrdinalIgnoreCase))
+                    && (kv.Key.EndsWith("_" + key, StringComparison.OrdinalIgnoreCase)
+                        || kv.Key.EndsWith("_" + identifier, StringComparison.OrdinalIgnoreCase)))
                 {
                     var raw = kv.Value is { Length: > 0 } ? kv.Value[0] : "";
                     if (double.TryParse(raw, System.Globalization.NumberStyles.Float,

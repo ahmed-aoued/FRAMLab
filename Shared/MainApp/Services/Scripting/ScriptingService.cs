@@ -99,12 +99,21 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
                 return null; // editor surfaces the compile diagnostics; don't run broken code
             }
 
-            // ensure globals exist in the store
+            // ensure globals exist in the store: both the shared declarations from the
+            // editor's Globals panel and any Global-scoped variable declared in this
+            // function's own variable table (the IDE offers Global as a per-variable scope).
             foreach (var gv in GlobalVariableDeclarations)
             {
                 if (!string.IsNullOrWhiteSpace(gv.Name) && !globalStore.ContainsKey(gv.Name))
                 {
                     globalStore[gv.Name] = InitialOf(gv);
+                }
+            }
+            foreach (var v in fn.Script.Variables)
+            {
+                if (v.Scope == ScriptScope.Global && !string.IsNullOrWhiteSpace(v.Name) && !globalStore.ContainsKey(v.Name))
+                {
+                    globalStore[v.Name] = InitialOf(v);
                 }
             }
 
@@ -132,12 +141,30 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
             foreach (var kv in interpreter.Outputs)
             {
                 // map a sanitized aspect identifier back to the original FRAM label when possible
-                var label = fn.Script.AspectVariables
+                var aspect = fn.Script.AspectVariables
                     .FirstOrDefault(a => a.Category == AspectCategory.Output
-                                         && string.Equals(a.Identifier, kv.Key, System.StringComparison.OrdinalIgnoreCase))
-                    ?.Label ?? kv.Key;
-                // write into the function's variable store so downstream coupling propagation picks it up
-                fn.newVariable($"Script_{label}", new[] { kv.Value.AsString(), "script output" });
+                                         && (string.Equals(a.Identifier, kv.Key, System.StringComparison.OrdinalIgnoreCase)
+                                             || string.Equals(a.Label, kv.Key, System.StringComparison.OrdinalIgnoreCase)));
+                var label = aspect?.Label ?? kv.Key;
+                // Write under the aspect's sanitized identifier (e.g. "Hazard_signal"). This
+                // is the name the rest of the app uses: the coupling pipeline propagates
+                // "{letter}{outputFn}_{key}" and calcVariables reads the producer's variable
+                // by key, so a script output only reaches coupled functions when it is stored
+                // under that identifier rather than a "Script_" alias.
+                var key = aspect?.Identifier ?? kv.Key;
+                var value = kv.Value.AsString();
+                fn.newVariable(key, new[] { value, $"Script output ({label})" });
+                // keep a human-readable alias so the FMI variable table still shows the output
+                fn.newVariable($"Script_{label}", new[] { value, "script output" });
+                // feed the value back into the function's metadata so coupling activation
+                // (FMIControl.bFMI_cycle_Couplings) copies the *scripted* value downstream.
+                var meta = fn.metadata?.FirstOrDefault(m =>
+                    string.Equals(m[0], key, System.StringComparison.OrdinalIgnoreCase));
+                if (meta is not null)
+                {
+                    meta[1] = value;
+                    meta[4] = value;
+                }
             }
         }
 

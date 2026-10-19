@@ -243,12 +243,34 @@ namespace FMV_OG.Shared
             updateUndo();
             projectDocumentService.SetFunctionScript(projectData_Undo[0], functionId, script);
         }
-        /// <summary>Re-derive every function's aspect variables from the current coupling list.</summary>
+        /// <summary>Re-derive every function's aspect variables from the current coupling list,
+        /// including the aspects the function declares in the model (orphan/unconnected ones).</summary>
         public void SyncScriptAspects()
         {
+            var declaredByFunction = new Dictionary<string, List<FMV_OG.Shared.MainApp.Models.AspectVariable>>();
+            void Collect(IEnumerable<Aspect> aspects, FMV_OG.Shared.MainApp.Models.AspectCategory category)
+            {
+                foreach (var a in aspects)
+                {
+                    if (!declaredByFunction.TryGetValue(a.FunctionIDNr, out var list))
+                    {
+                        list = new List<FMV_OG.Shared.MainApp.Models.AspectVariable>();
+                        declaredByFunction[a.FunctionIDNr] = list;
+                    }
+                    list.Add(new FMV_OG.Shared.MainApp.Models.AspectVariable { Category = category, Label = a.IDName });
+                }
+            }
+            Collect(aspectsList.Where(x => x.Type == "Input"), FMV_OG.Shared.MainApp.Models.AspectCategory.Input);
+            Collect(aspectsList.Where(x => x.Type == "Precondition"), FMV_OG.Shared.MainApp.Models.AspectCategory.Precondition);
+            Collect(aspectsList.Where(x => x.Type == "Resource"), FMV_OG.Shared.MainApp.Models.AspectCategory.Resource);
+            Collect(aspectsList.Where(x => x.Type == "Control"), FMV_OG.Shared.MainApp.Models.AspectCategory.Control);
+            Collect(aspectsList.Where(x => x.Type == "Time"), FMV_OG.Shared.MainApp.Models.AspectCategory.Time);
+            Collect(outputsList, FMV_OG.Shared.MainApp.Models.AspectCategory.Output);
+
             foreach (var fn in functionList)
             {
-                fn.Script.SyncAspects(couplingList, fn.IDNr);
+                declaredByFunction.TryGetValue(fn.IDNr, out var declared);
+                fn.Script.SyncAspects(couplingList, fn.IDNr, declared);
             }
         }
         /// <summary>Type-consistency warnings across all coupled functions (aspect type mismatches).</summary>

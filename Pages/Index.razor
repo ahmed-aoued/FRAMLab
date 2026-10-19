@@ -255,8 +255,12 @@
                 await Restore();
             }
         }
-        else
+        else if (stateContainer.projectData_Undo is { Length: > 0 } && stateContainer.projectData_Undo[0] is not null)
         {
+            // Only persist a session backup once a model is loaded. During the transient
+            // renders around opening a file, projectData_Undo (or its first slot) is null,
+            // which previously produced a NullReferenceException warning on every open
+            // (logged by the app as "Could not persist the session backup").
             try
             {
                 await localStorage.SetItemAsync("backupData", stateContainer.projectData_Undo[0].OuterXml);
@@ -720,7 +724,14 @@
             stateContainer.aspectsList.Add(new Aspect("Time", idCount.ToString(), "true", itemI.SelectSingleNode("IDName")?.InnerText ?? "", itemI.SelectSingleNode("FunctionIDNr")?.InnerText ?? ""));
             idCount++;
         }
-        if (aspectsA.SelectSingleNode("@WebEnhanced")?.Value != "updated")
+        // Rebuild the in-memory aspect/output/coupling lists from the persisted Inputs/
+        // Outputs on every load. This used to be skipped when WebEnhanced == "updated",
+        // which left outputsList/couplingList empty and silently disabled the whole FMI
+        // pipeline (no function could ever be classified as Entry/Exit/Passthrough, so no
+        // cycle ran - visible in the FMI log as "No functions were activated"). The
+        // geometry built below is idempotent - ResetAspect updates existing <Aspect>
+        // nodes rather than duplicating them - so re-running it is safe.
+        if (aspectsA is not null)
         {
             //while (aspectsA.FirstChild != null)
             //    aspectsA.RemoveChild(aspectsA.FirstChild);

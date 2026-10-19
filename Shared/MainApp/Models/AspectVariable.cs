@@ -83,8 +83,31 @@ namespace FMV_OG.Shared.MainApp.Models
         /// Output aspect, the target function owns the corresponding I/P/R/C/T aspect.
         /// </summary>
         public static List<AspectVariable> DeriveFor(string functionIdNr, IEnumerable<Coupling> couplings)
+            => DeriveFor(functionIdNr, couplings, null);
+
+        /// <summary>
+        /// Derive the aspect variables of a function, combining the model's declared
+        /// aspects with the coupling list. <paramref name="declared"/> holds the aspects
+        /// declared on the function itself (Inputs/Outputs/Preconditions/Resources/
+        /// Controls/Times). It is authoritative for the categories and, crucially, keeps
+        /// *unconnected* aspects (orphan outputs, inputs not yet coupled) available to the
+        /// function's script; the coupling list on its own cannot see those.
+        /// </summary>
+        public static List<AspectVariable> DeriveFor(
+            string functionIdNr,
+            IEnumerable<Coupling> couplings,
+            IEnumerable<AspectVariable>? declared)
         {
             var result = new List<AspectVariable>();
+
+            if (declared is not null)
+            {
+                foreach (var d in declared)
+                {
+                    AddUnique(result, new AspectVariable { Category = d.Category, Label = d.Label });
+                }
+            }
+
             foreach (var c in couplings)
             {
                 // this function is the OUTPUT side
@@ -115,6 +138,33 @@ namespace FMV_OG.Shared.MainApp.Models
                 .OrderBy(a => a.Category)
                 .ThenBy(a => a.Label)
                 .ToList();
+        }
+
+        /// <summary>
+        /// Read the aspects a function declares in the model's aspect lists
+        /// (Inputs/Preconditions/Resources/Controls/Times/Outputs). Used by the standalone
+        /// Script IDE tab, which has the project XML but not the editor's aspect lists.
+        /// </summary>
+        public static List<AspectVariable> DeclaredFromXml(System.Xml.XmlDocument projectData, string functionIdNr)
+        {
+            var result = new List<AspectVariable>();
+            void Read(string section, string element, AspectCategory category)
+            {
+                var nodes = projectData.SelectNodes(
+                    $"//FM/{section}/{element}[FunctionIDNr=\"{functionIdNr}\"]/IDName");
+                if (nodes is null) return;
+                foreach (System.Xml.XmlNode n in nodes)
+                {
+                    AddUnique(result, new AspectVariable { Category = category, Label = n.InnerText });
+                }
+            }
+            Read("Inputs", "Input", AspectCategory.Input);
+            Read("Preconditions", "Precondition", AspectCategory.Precondition);
+            Read("Resources", "Resource", AspectCategory.Resource);
+            Read("Controls", "Control", AspectCategory.Control);
+            Read("Times", "Time", AspectCategory.Time);
+            Read("Outputs", "Output", AspectCategory.Output);
+            return result;
         }
 
         private static void AddUnique(List<AspectVariable> list, AspectVariable candidate)

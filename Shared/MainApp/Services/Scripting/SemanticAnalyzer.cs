@@ -168,17 +168,26 @@ namespace FMV_OG.Shared.MainApp.Services.Scripting
         private void CheckHostCall(CallExpr c)
         {
             var name = c.FunctionName;
-            int expected = name switch
+            // Print/Trace are variadic: they accept one or more values and concatenate them.
+            if (name is "Print" or "Trace")
             {
-                "SetOutput" => 2,
-                "GetInput" or "GetPrecondition" or "GetResource" or "GetControl" or "GetTime" => 1,
-                "Print" or "Trace" => 1,
-                _ => 0,
-            };
-            if (name is "Cycle" or "IsActive") expected = 0;
-            if (c.Arguments.Count != expected)
+                if (c.Arguments.Count < 1)
+                {
+                    Error(c, $"'{name}' expects at least 1 argument.");
+                }
+            }
+            else
             {
-                Error(c, $"'{name}' expects {expected} argument(s), got {c.Arguments.Count}.");
+                int expected = name switch
+                {
+                    "SetOutput" => 2,
+                    "GetInput" or "GetPrecondition" or "GetResource" or "GetControl" or "GetTime" => 1,
+                    _ => 0, // Cycle, IsActive
+                };
+                if (c.Arguments.Count != expected)
+                {
+                    Error(c, $"'{name}' expects {expected} argument(s), got {c.Arguments.Count}.");
+                }
             }
             foreach (var a in c.Arguments) VisitExpression(a);
         }
