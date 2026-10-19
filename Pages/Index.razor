@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime
 @inject ILocalStorageService localStorage
@@ -8,6 +8,7 @@
 @inject FRAMLab.Shared.MainApp.Services.IProjectDocumentService projectDocumentService
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
+@inject ILogger<Index> Logger
 @inject HttpClient Http
 
 <PageTitle>@ReturnTitle()</PageTitle>
@@ -214,12 +215,39 @@
         stateContainer.showPDFreport = state;
         stateContainer.showFMIDisplaySetup = state;
     }
+    private DotNetObjectReference<Index>? scriptSyncRef;
+
+    /// <summary>Called (from JS) when the Script IDE browser tab saves the model back.</summary>
+    [JSInvokable]
+    public async Task OnScriptSavedFromTab()
+    {
+        var xml = await JSRuntime.InvokeAsync<string>("ScriptSync.result");
+        if (string.IsNullOrEmpty(xml)) return;
+        try
+        {
+            stateContainer.undoIndex = 0;
+            stateContainer.projectData_Undo = new XmlDocument[stateContainer.undoLength];
+            stateContainer.projectData_Undo[0] = new XmlDocument();
+            stateContainer.projectData_Undo[0].LoadXml(xml);
+            FileIsLoaded();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(LogEvents.ScriptIde, ex,
+                "Model saved by the Script IDE tab could not be applied ({Length} chars).", xml.Length);
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             FocusElement("openFileBtn");
             UpdateFileContent = OpenFileContent;
+            // Listen for the Script IDE tab saving the model back.
+            scriptSyncRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("ScriptSync.listen", scriptSyncRef, nameof(OnScriptSavedFromTab));
             var content = await JSRuntime.InvokeAsync<string>("fileOpenAs");
             if (content != "waiting")
             {

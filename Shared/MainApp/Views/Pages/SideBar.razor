@@ -664,6 +664,19 @@
                            title="@Loc["FN_COLOUR"]" tabindex="25" OnClick="ModalColor" @onkeyup="ModalKey"
                            aria-label="@Loc["FN_COLOUR"]" Class="ml-1" />
         </div>
+        <div class="d-flex pt-2 align-center">
+            @if (stateContainer.selectedFn != "-1")
+            {
+                @* A real anchor is not popup-blocked; prepare the model for the IDE tab on pointer-down. *@
+                <a class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27"
+                   href="@ScriptEditorUrl" target="_blank" rel="noopener"
+                   @onpointerdown="PrepareScriptIDE"></a>
+            }
+            else
+            {
+                <button class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27" disabled></button>
+            }
+        </div>
         @if (stateContainer.showKeys == "")
         {
             <hr class="mt-2 mb-0" />
@@ -698,6 +711,22 @@
     private string selectedLevelId = "";
     private string newAgentName = "";
     private string newLevelName = "";
+
+    private string ScriptEditorUrl => $"scripteditor/{stateContainer.selectedFn}";
+
+    // Runs synchronously on pointer-down (before the anchor opens the new tab),
+    // stashing the current model in localStorage for the IDE tab to load.
+    private void PrepareScriptIDE()
+    {
+        if (stateContainer.selectedFn == "-1"
+            || stateContainer.projectData_Undo is not { Length: > 0 }
+            || stateContainer.projectData_Undo[0] is null)
+        {
+            return;
+        }
+        _ = JSRuntime.InvokeVoidAsync("ScriptSync.prepare",
+            stateContainer.projectData_Undo[0].OuterXml, stateContainer.selectedFn, stateContainer.fileName);
+    }
 
     // Autocomplete state
     private string openDropdownType = "";
