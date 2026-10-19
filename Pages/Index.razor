@@ -694,7 +694,11 @@
             stateContainer.aspectsList.Add(new Aspect("Time", idCount.ToString(), "true", itemI.SelectSingleNode("IDName")?.InnerText ?? "", itemI.SelectSingleNode("FunctionIDNr")?.InnerText ?? ""));
             idCount++;
         }
-        if (aspectsA.SelectSingleNode("@WebEnhanced")?.Value != "updated")
+        // Rebuild the in-memory aspect/output/coupling lists on every load. Skipping this
+        // when WebEnhanced == "updated" leaves outputsList/couplingList empty, so no function
+        // can be classified as Entry/Exit/Passthrough and the FMI runs no cycles.
+        // ResetAspect updates existing <Aspect> nodes, so re-running it is idempotent.
+        if (aspectsA is not null)
         {
             //while (aspectsA.FirstChild != null)
             //    aspectsA.RemoveChild(aspectsA.FirstChild);
