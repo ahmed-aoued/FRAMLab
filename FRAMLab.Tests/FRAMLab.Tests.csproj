@@ -35,6 +35,9 @@
     <Compile Include="..\Shared\MainApp\Services\IMetadataService.cs" Link="Engine\Services\IMetadataService.cs" />
     <Compile Include="..\Shared\MainApp\Services\FmiDefinitionService.cs" Link="Engine\Services\FmiDefinitionService.cs" />
     <Compile Include="..\Shared\MainApp\Services\IFmiDefinitionService.cs" Link="Engine\Services\IFmiDefinitionService.cs" />
+    <Compile Include="..\Shared\MainApp\Services\MacroRegistry.cs" Link="Engine\Services\MacroRegistry.cs" />
+    <Compile Include="..\Shared\MainApp\Services\IMacroRegistry.cs" Link="Engine\Services\IMacroRegistry.cs" />
+    <Compile Include="..\Shared\MainApp\Services\MacroExpander.cs" Link="Engine\Services\MacroExpander.cs" />
   </ItemGroup>
 
   <ItemGroup>

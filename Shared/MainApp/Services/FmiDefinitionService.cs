@@ -7,22 +7,62 @@ namespace FRAMLab.Shared.MainApp.Services
         public FmiModelDefinition Load(XmlDocument projectData)
         {
             var definition = new FmiModelDefinition();
-            if (projectData.SelectSingleNode("//FM/FMI/Variables") is not XmlNode variablesRoot)
+            if (projectData.SelectSingleNode("//FM/FMI/Variables") is XmlNode variablesRoot)
             {
-                return definition; //old files without <FMI> load to an empty definition
-            }
-            foreach (XmlNode node in variablesRoot.ChildNodes)
-            {
-                if (node is XmlElement el && el.Name == "Variable")
+                foreach (XmlNode node in variablesRoot.ChildNodes)
                 {
-                    var def = FmiVariableDefinition.FromXml(el, definition.LoadDiagnostics);
-                    if (def is not null)
+                    if (node is XmlElement el && el.Name == "Variable")
                     {
-                        definition.Variables.Add(def);
+                        var def = FmiVariableDefinition.FromXml(el, definition.LoadDiagnostics);
+                        if (def is not null)
+                        {
+                            definition.Variables.Add(def);
+                        }
                     }
                 }
             }
+            LoadMacros(projectData, definition);
             return definition;
+        }
+
+        private static void LoadMacros(XmlDocument projectData, FmiModelDefinition definition)
+        {
+            var macrosNode = projectData.SelectSingleNode("//FM/FMI/Macros");
+            definition.MacrosNodeExistedAtLoad = macrosNode is not null;
+            if (macrosNode is null)
+            {
+                return;
+            }
+            var seenNames = new HashSet<string>();
+            foreach (XmlNode node in macrosNode.ChildNodes)
+            {
+                if (node is not XmlElement el || el.Name != "Macro")
+                {
+                    continue;
+                }
+                var def = FmiMacroDefinition.FromXml(el, definition.LoadDiagnostics);
+                if (def is null)
+                {
+                    continue;
+                }
+                if (!seenNames.Add(def.Name))
+                {
+                    definition.LoadDiagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error,
+                        $"FMI/Macros/Macro[{def.Name}]",
+                        $"Duplicate macro name '{def.Name}'. Macro names must be unique across all scopes; this definition is rejected."));
+                    continue;
+                }
+                foreach (var parameter in def.Parameters)
+                {
+                    if (definition.Variables.Any(v => v.Name == parameter.Name))
+                    {
+                        definition.LoadDiagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Info,
+                            $"FMI/Macros/Macro[{def.Name}]",
+                            $"Parameter '{parameter.Name}' has the same name as a declared variable; the parameter wins inside the macro body."));
+                    }
+                }
+                definition.Macros.Add(def);
+            }
         }
 
         public XmlNode EnsureFmiRoot(XmlDocument projectData)
@@ -35,7 +75,8 @@ namespace FRAMLab.Shared.MainApp.Services
             }
             EnsureChild(projectData, root, "Variables");
             EnsureChild(projectData, root, "Rules");
-            EnsureChild(projectData, root, "Macros");
+            //<Macros> is created only by UpsertMacro so a legacy file that never had macros
+            //stays byte-identical on save (see the backward-compatibility rule in the plan).
             return root;
         }
 
@@ -80,6 +121,62 @@ namespace FRAMLab.Shared.MainApp.Services
             {
                 if (node is XmlElement el && el.Name == "Variable"
                     && el.GetAttribute("name") == name && el.GetAttribute("function") == functionId)
+                {
+                    return el;
+                }
+            }
+            return null;
+        }
+
+        public bool UpsertMacro(XmlDocument projectData, FmiMacroDefinition macro)
+        {
+            var root = EnsureFmiRoot(projectData);
+            var macrosRoot = EnsureChild(projectData, root, "Macros");
+            var el = macro.ToXml(projectData);
+            if (FindMacro(macrosRoot, macro.Name, macro.FunctionId) is XmlElement existing)
+            {
+                macrosRoot.ReplaceChild(el, existing);
+                return true;
+            }
+            //No shadowing: a macro name is globally unique, so a same-name macro in any
+            //other scope rejects this upsert (the duplicate-name diagnostic surfaces at load).
+            if (FindMacroByName(macrosRoot, macro.Name) is not null)
+            {
+                return false;
+            }
+            macrosRoot.AppendChild(el);
+            return true;
+        }
+
+        public bool RemoveMacro(XmlDocument projectData, string name, string functionId)
+        {
+            if (projectData.SelectSingleNode("//FM/FMI/Macros") is XmlNode macrosRoot
+                && FindMacro(macrosRoot, name, functionId) is XmlElement existing)
+            {
+                macrosRoot.RemoveChild(existing);
+                return true;
+            }
+            return false;
+        }
+
+        private static XmlElement? FindMacro(XmlNode macrosRoot, string name, string functionId)
+        {
+            foreach (XmlNode node in macrosRoot.ChildNodes)
+            {
+                if (node is XmlElement el && el.Name == "Macro"
+                    && el.GetAttribute("name") == name && el.GetAttribute("function") == functionId)
+                {
+                    return el;
+                }
+            }
+            return null;
+        }
+
+        private static XmlElement? FindMacroByName(XmlNode macrosRoot, string name)
+        {
+            foreach (XmlNode node in macrosRoot.ChildNodes)
+            {
+                if (node is XmlElement el && el.Name == "Macro" && el.GetAttribute("name") == name)
                 {
                     return el;
                 }

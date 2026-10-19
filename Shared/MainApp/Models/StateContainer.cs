@@ -423,7 +423,7 @@ namespace FRAMLab.Shared
         }
         public string eval(string str, Dictionary<string, string[]> variables)
         {
-            return fmiInterpreter.EvaluateExpression(str, variables, buildFmiContext());
+            return fmiInterpreter.EvaluateExpression(str, variables, buildFmiContext(), selectedFunction?.IDNr ?? "");
         }
         // ── FMI runtime ─────────────────────────────────────────
         public FmiRunState fmiRunState => fmiInterpreter.RunState;
@@ -490,6 +490,26 @@ namespace FRAMLab.Shared
             updateUndo();
             fmiDefinitionService.RemoveVariable(projectData_Undo[0], name, functionId);
             initFmiRuntime();
+        }
+        public bool UpsertFmiMacro(FmiMacroDefinition macro)
+        {
+            updateUndo();
+            if (!fmiDefinitionService.UpsertMacro(projectData_Undo[0], macro))
+            {
+                return false;
+            }
+            initFmiRuntime();
+            return true;
+        }
+        public bool RemoveFmiMacro(string name, string functionId)
+        {
+            updateUndo();
+            if (!fmiDefinitionService.RemoveMacro(projectData_Undo[0], name, functionId))
+            {
+                return false;
+            }
+            initFmiRuntime();
+            return true;
         }
         // ── Agents ──────────────────────────────────────────────
         public XmlNode EnsureAgentsRoot()

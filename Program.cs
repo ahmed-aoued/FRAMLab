@@ -19,6 +19,7 @@ builder.Services.AddSingleton<IFMIDisplayConfigService, FMIDisplayConfigService>
 builder.Services.AddSingleton<IMetadataService, MetadataService>();
 builder.Services.AddSingleton<IProjectDocumentService, ProjectDocumentService>();
 builder.Services.AddSingleton<IFmiDefinitionService, FmiDefinitionService>();
+builder.Services.AddSingleton<IMacroRegistry, MacroRegistry>();
 builder.Services.AddSingleton<IFmiInterpreter, FmiInterpreter>();
 builder.Services.AddSingleton<AgentLevelService>();
 builder.Services.AddScoped<SvgUtilsInterop>();

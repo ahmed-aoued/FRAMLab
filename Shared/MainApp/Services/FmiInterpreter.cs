@@ -11,7 +11,10 @@ namespace FRAMLab.Shared.MainApp.Services
     {
         private readonly IExpressionEvaluator expressionEvaluator;
         private readonly IMetadataService metadataService;
+        private readonly IMacroRegistry macroRegistry;
+        private readonly MacroExpander macroExpander;
         private static readonly Regex IncomingVariablePattern = new(@"^([IPRCT]\d+_|[IPRCTA](n|sum|avg|min|max|prd)_)");
+        private static readonly Regex MacroCalleePattern = new(@"([a-z][A-Za-z0-9_]*)\s*\(");
 
         public bool EnablePrevVariables { get; set; } = false;
 
@@ -25,15 +28,23 @@ namespace FRAMLab.Shared.MainApp.Services
         public FmiModelDefinition Definition { get; private set; } = new();
 
         public FmiInterpreter(IExpressionEvaluator expressionEvaluator, IMetadataService metadataService)
+            : this(expressionEvaluator, metadataService, new MacroRegistry())
+        {
+        }
+
+        public FmiInterpreter(IExpressionEvaluator expressionEvaluator, IMetadataService metadataService, IMacroRegistry macroRegistry)
         {
             this.expressionEvaluator = expressionEvaluator;
             this.metadataService = metadataService;
+            this.macroRegistry = macroRegistry;
+            macroExpander = new MacroExpander(macroRegistry);
         }
 
         public void Initialize(FmiModelDefinition definition, List<Function> functions)
         {
             Definition = definition;
             RunState = new FmiRunState();
+            macroRegistry.LoadFrom(definition);
             Reset(functions);
         }
 
@@ -371,8 +382,39 @@ namespace FRAMLab.Shared.MainApp.Services
             }
         }
 
-        public string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx)
+        public string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx, string callingFunctionId = "")
         {
+            //No macros in the model: legacy path, byte-identical behavior for legacy files.
+            if (macroRegistry.All.Count == 0)
+            {
+                return expressionEvaluator.Eval(expression, variables, ctx.DataRows, ctx.DataKeys);
+            }
+
+            var hasMacroCall = false;
+            var unknownCallee = "";
+            foreach (Match match in MacroCalleePattern.Matches(expression))
+            {
+                var name = match.Groups[1].Value;
+                if (macroRegistry.TryGetMacro(name, callingFunctionId, out _))
+                {
+                    hasMacroCall = true;
+                }
+                else if (!MacroExpander.IsBuiltIn(name))
+                {
+                    unknownCallee = name;
+                }
+            }
+
+            if (hasMacroCall)
+            {
+                return macroExpander.Expand(expression, variables, callingFunctionId, ctx, PendingDiagnostics);
+            }
+            if (unknownCallee != "")
+            {
+                PendingDiagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, $"macro:{unknownCallee}",
+                    $"Unknown macro '{unknownCallee}'. It is not a built-in function and no macro with that name is visible here."));
+                return "";
+            }
             return expressionEvaluator.Eval(expression, variables, ctx.DataRows, ctx.DataKeys);
         }
     }

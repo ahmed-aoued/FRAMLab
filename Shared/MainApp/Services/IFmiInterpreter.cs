@@ -30,6 +30,10 @@ namespace FRAMLab.Shared.MainApp.Services
         FmiEvaluationResult EvaluateFunction(Function function, FmiEvaluationContext ctx);
         void EndCycle(FmiEvaluationContext ctx);
         void Reset(List<Function> functions);
-        string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx);
+        /// <summary>
+        /// Evaluates a single expression. Macro calls resolve against <paramref name="callingFunctionId"/>
+        /// (function-scoped macro first, then global); pass "" for a global-only scope.
+        /// </summary>
+        string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx, string callingFunctionId = "");
     }
 }
