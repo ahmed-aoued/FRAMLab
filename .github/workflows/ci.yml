@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, integration/fmi-modernization ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore app
+        run: dotnet restore FRAMLab.csproj
+
+      - name: Restore tests
+        run: dotnet restore FRAMLab.Tests/FRAMLab.Tests.csproj
+
+      - name: Build app
+        run: dotnet build FRAMLab.csproj --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test FRAMLab.Tests/FRAMLab.Tests.csproj --configuration Release --no-restore --logger "console;verbosity=normal"

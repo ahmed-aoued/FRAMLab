@@ -2,7 +2,7 @@ namespace FRAMLab.Shared
 {
     public sealed record MacroParameterSymbol(string Name, FmiTypeDescriptor Type, string Description);
 
-    /// <summary>Editor-facing view of a macro for the SymbolTable / future CodeMirror integration.</summary>
+    /// <summary>Editor-facing view of a macro for the SymbolTable / future Monaco integration.</summary>
     public sealed record MacroSymbol(
         string Name,
         IReadOnlyList<MacroParameterSymbol> Parameters,

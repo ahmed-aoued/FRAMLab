@@ -39,7 +39,7 @@ Cross-cutting: pre-execution validation against a `SymbolTable` (locals, metadat
 ## Constraints
 
 - DO NOT edit any file — plans and design documents only
-- DO NOT design UI components, tabs, or CodeMirror integration — that is the UI architect's scope
+- DO NOT design UI components, tabs, or Monaco integration — that is the UI architect's scope
 - DO NOT break backward compatibility: existing `.xfmv` files must load and execute identically; `<FMI>` nodes are only written when the user explicitly creates a definition or macro
 - DO NOT propose wholesale rewrites — the strangler pattern is mandatory; legacy equations keep running on the old evaluator until individually migrated
 - ALWAYS read the existing Fmi/* files before proposing a model or interface — reuse names and shapes that already exist
