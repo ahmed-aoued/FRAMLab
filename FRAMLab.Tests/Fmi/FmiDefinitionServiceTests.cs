@@ -35,7 +35,7 @@ namespace FRAMLab.Tests.Fmi
         }
 
         [Fact]
-        public void UpsertVariable_CreatesFmiRoot_WithVariablesRulesMacros()
+        public void UpsertVariable_CreatesFmiRoot_WithVariablesAndRules()
         {
             var doc = new XmlDocument();
             doc.LoadXml("<FM Version=\"0,3,0,0\"><Functions/></FM>");
@@ -53,7 +53,9 @@ namespace FRAMLab.Tests.Fmi
             Assert.Equal("1", ((XmlElement)root!).GetAttribute("version"));
             Assert.NotNull(root.SelectSingleNode("Variables"));
             Assert.NotNull(root.SelectSingleNode("Rules"));
-            Assert.NotNull(root.SelectSingleNode("Macros"));
+            // The macro branch deliberately creates <Macros> only on the first UpsertMacro,
+            // so a legacy file without macros stays byte-identical when re-saved.
+            Assert.Null(root.SelectSingleNode("Macros"));
 
             var variable = root.SelectSingleNode("Variables/Variable") as XmlElement;
             Assert.NotNull(variable);
