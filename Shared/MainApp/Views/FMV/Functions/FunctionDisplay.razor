@@ -1,6 +1,7 @@
 ﻿@inject StateContainer stateContainer
 @inject IConfiguration render
 
+@{ var usage = stateContainer.fmiUsage(); }
 @foreach (Function function in DisplayFunctions.Where(x => !stateContainer.selectedMulti.Contains(x.IDNr))) //if (function != null)
 //This is for all functions not highlighted.
 {
@@ -371,6 +372,36 @@
                         }
                     </g>
                 }
+            }
+            @if (usage.HasScript(function.IDNr) || usage.CallsMacros(function.IDNr) || usage.ReadsData(function.IDNr))
+            { //badges: where the function's behaviour comes from besides plain equations
+                var badgeX = 74.0;
+                <g class="fn-badges" font-family="'PT Sans Caption', sans-serif" font-size="5pt" font-weight="bold">
+                    <title>@usage.Describe(function.IDNr)</title>
+                    @if (usage.HasScript(function.IDNr))
+                    {
+                        <g>
+                            <rect x=@badgeX.ToString(CultureInfo.InvariantCulture) y="-2" width="14" height="9" rx="2" fill="#5B3FA0" />
+                            <text x=@((badgeX + 7).ToString(CultureInfo.InvariantCulture)) y="4.6" text-anchor="middle" fill="#FFFFFF">ST</text>
+                        </g>
+                        badgeX += 16;
+                    }
+                    @if (usage.CallsMacros(function.IDNr))
+                    {
+                        <g>
+                            <rect x=@badgeX.ToString(CultureInfo.InvariantCulture) y="-2" width="10" height="9" rx="2" fill="#B05A00" />
+                            <text x=@((badgeX + 5).ToString(CultureInfo.InvariantCulture)) y="4.8" text-anchor="middle" fill="#FFFFFF" font-style="italic">ƒ</text>
+                        </g>
+                        badgeX += 12;
+                    }
+                    @if (usage.ReadsData(function.IDNr))
+                    {
+                        <g>
+                            <rect x=@badgeX.ToString(CultureInfo.InvariantCulture) y="-2" width="16" height="9" rx="2" fill="#1E7F5C" />
+                            <text x=@((badgeX + 8).ToString(CultureInfo.InvariantCulture)) y="4.6" text-anchor="middle" fill="#FFFFFF">API</text>
+                        </g>
+                    }
+                </g>
             }
         </g>
     }

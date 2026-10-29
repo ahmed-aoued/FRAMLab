@@ -30,7 +30,81 @@ namespace FRAMLab.Shared.MainApp.Services
                 }
             }
             LoadMacros(projectData, definition);
+            LoadDataSources(projectData, definition);
             return definition;
+        }
+
+        private static void LoadDataSources(XmlDocument projectData, FmiModelDefinition definition)
+        {
+            foreach (XmlNode node in projectData.SelectNodes("//FM/FMI/DataSources/Source")!)
+            {
+                if (node is XmlElement el && FmiDataSource.FromXml(el, definition.LoadDiagnostics) is FmiDataSource source)
+                {
+                    if (definition.DataSources.Any(s => s.Name == source.Name))
+                    {
+                        definition.LoadDiagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error,
+                            $"FMI/DataSources/Source[{source.Name}]", $"Duplicate data source '{source.Name}'; the first is kept."));
+                        continue;
+                    }
+                    definition.DataSources.Add(source);
+                }
+            }
+            foreach (XmlNode node in projectData.SelectNodes("//FM/FMI/DataUses/Use")!)
+            {
+                if (node is XmlElement el && FmiDataUse.FromXml(el, definition.LoadDiagnostics) is FmiDataUse use)
+                {
+                    definition.DataUses.RemoveAll(u => u.Source == use.Source && u.FunctionId == use.FunctionId);
+                    definition.DataUses.Add(use);
+                }
+            }
+        }
+
+        public void UpsertDataSource(XmlDocument projectData, FmiDataSource source)
+        {
+            var sourcesRoot = EnsureChild(projectData, EnsureFmiRoot(projectData), "DataSources");
+            var el = source.ToXml(projectData);
+            if (sourcesRoot.ChildNodes.OfType<XmlElement>().FirstOrDefault(e => e.GetAttribute("name") == source.Name) is XmlElement existing)
+            {
+                sourcesRoot.ReplaceChild(el, existing);
+            }
+            else
+            {
+                sourcesRoot.AppendChild(el);
+            }
+        }
+
+        public bool RemoveDataSource(XmlDocument projectData, string name)
+        {
+            if (projectData.SelectSingleNode("//FM/FMI/DataSources") is not XmlNode sourcesRoot
+                || sourcesRoot.ChildNodes.OfType<XmlElement>().FirstOrDefault(e => e.GetAttribute("name") == name) is not XmlElement existing)
+            {
+                return false;
+            }
+            sourcesRoot.RemoveChild(existing);
+            if (projectData.SelectSingleNode("//FM/FMI/DataUses") is XmlNode usesRoot)
+            {
+                foreach (var use in usesRoot.ChildNodes.OfType<XmlElement>().Where(e => e.GetAttribute("source") == name).ToList())
+                {
+                    usesRoot.RemoveChild(use);
+                }
+            }
+            return true;
+        }
+
+        public void SetDataTiming(XmlDocument projectData, string source, string functionId, FmiDataTiming? timing)
+        {
+            var usesRoot = projectData.SelectSingleNode("//FM/FMI/DataUses");
+            var existing = usesRoot?.ChildNodes.OfType<XmlElement>()
+                .FirstOrDefault(e => e.GetAttribute("source") == source && e.GetAttribute("function") == functionId);
+            if (timing is null)
+            {
+                if (existing is not null) usesRoot!.RemoveChild(existing);
+                return;
+            }
+            usesRoot ??= EnsureChild(projectData, EnsureFmiRoot(projectData), "DataUses");
+            var el = new FmiDataUse { Source = source, FunctionId = functionId, Timing = timing.Value }.ToXml(projectData);
+            if (existing is not null) usesRoot.ReplaceChild(el, existing);
+            else usesRoot.AppendChild(el);
         }
 
         /// <summary>
@@ -66,6 +140,8 @@ namespace FRAMLab.Shared.MainApp.Services
                 merged.Macros.Add(macro);
             }
             merged.MacrosNodeExistedAtLoad = declared.MacrosNodeExistedAtLoad;
+            merged.DataSources.AddRange(declared.DataSources);
+            merged.DataUses.AddRange(declared.DataUses);
             return merged;
         }
 
@@ -118,7 +194,6 @@ namespace FRAMLab.Shared.MainApp.Services
                 projectData.SelectSingleNode("//FM")!.AppendChild(root);
             }
             EnsureChild(projectData, root, "Variables");
-            EnsureChild(projectData, root, "Rules");
             //<Macros> is created only by UpsertMacro so a legacy file that never had macros
             //stays byte-identical on save (see the backward-compatibility rule in the plan).
             return root;

@@ -32,7 +32,12 @@ public class GoldenFileTests
             var results = InterpreterFixture.RunCycle(interpreter, functions, cycle);
             var keys = results.SelectMany(r => r.EvaluatedKeys.Select(kv => $"{r.FunctionId}:{kv.Key}={kv.Value}")).ToList();
             Assert.Equal(expected, keys);
-            Assert.All(results, r => Assert.Empty(r.Diagnostics));
+            //Fn 2 ("Decision = Risk_Score>=4?1:0") reads fn 1's key by its bare name, which nothing
+            //feeds into fn 2 (a coupling would deliver it as I1_Risk_Score). Legacy silently read 0;
+            //it is now reported as an unknown variable and Decision keeps its value (still 0).
+            var unknown = Assert.Single(results.SelectMany(r => r.UnknownVariables));
+            Assert.Equal(("2", "Decision", "Risk_Score"), (unknown.FunctionId, unknown.Key, unknown.Variable));
+            Assert.All(results.Where(r => r.FunctionId != "2"), r => Assert.Empty(r.Diagnostics));
         }
 
         Assert.Equal(3, interpreter.RunState.History.Count);

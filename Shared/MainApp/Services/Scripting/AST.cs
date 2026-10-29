@@ -25,7 +25,8 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
     public sealed class Assignment : Statement
     {
         public string Target { get; set; } = "";
-        public Expression? Index { get; set; }   // for a[i] := ... (array phase)
+        public Expression? Index { get; set; }   // a[i] := ... or the row of m[i, j] := ...
+        public Expression? Index2 { get; set; }  // the column of m[i, j] := ... (2-D arrays)
         public Expression Value { get; set; } = null!;
     }
 
@@ -56,6 +57,22 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
     {
         public Block Body { get; set; } = new();
         public Expression Until { get; set; } = null!;
+    }
+
+    /// <summary>CASE selector OF 1: ...; 2, 3: ...; 4..9: ...; ELSE ... END_CASE;</summary>
+    public sealed class CaseStatement : Statement
+    {
+        public Expression Selector { get; set; } = null!;
+        public List<CaseBranch> Branches { get; } = new();
+        public Block? ElseBlock { get; set; }
+    }
+
+    /// <summary>One CASE branch: its labels (single values are ranges with From == To) and body.</summary>
+    public sealed class CaseBranch : AstNode
+    {
+        public List<(long From, long To)> Labels { get; } = new();
+        public Block Body { get; set; } = new();
+        public bool Matches(long value) => Labels.Exists(l => value >= l.From && value <= l.To);
     }
 
     public sealed class ReturnStatement : Statement { public Expression? Value { get; set; } }
@@ -97,5 +114,12 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
     {
         public Expression Target { get; set; } = null!;
         public Expression Index { get; set; } = null!;
+        public Expression? Index2 { get; set; } // m[i, j]: column index of a 2-D array
+    }
+
+    /// <summary>Array literal such as [1.0, 2.0, 3.0], or [[1, 2], [3, 4]] for a 2-D array.</summary>
+    public sealed class ArrayLiteralExpr : Expression
+    {
+        public List<Expression> Elements { get; } = new();
     }
 }

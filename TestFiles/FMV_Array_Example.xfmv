@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FM Version="0,3,0,0">
+  <Functions hideFMIhighlight="false" hideFMIdisplaytext="false" typeFMIdisplay="|Blend|Blend|Blend|Blend|Blend|Blend">
+    <Function fnStyle="0" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT=""
+              groupType="" groupIDNr="" groupActive="" groupX="" groupY=""
+              x="300" y="300" agentId="" levelId="" isInput="false">
+      <IDNr>0</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Rolling array average</IDName>
+      <metadata>
+        <Samples active="false" equation="">0</Samples>
+        <Average active="false" equation="">0</Average>
+        <Weighted_sum active="false" equation="">0</Weighted_sum>
+      </metadata>
+      <Description>Demonstrates ARRAY declarations, indexed writes, array literals and FOR loops in ST.</Description>
+      <script enabled="true" language="ST" version="1"><![CDATA[(* Array use case: rolling average + weighted score over a 5-sample window.
+
+   Arrays are declared in the variable table:
+     Samples      ARRAY[0..4] OF REAL  (Static, init 0.0)
+     Coefficients ARRAY[0..4] OF REAL  (Temp)
+   Both indexed access (Samples[Index]) and array literals ([...]) are supported. *)
+
+(* Seed the coefficients from an array literal every cycle. *)
+Coefficients := [0.1, 0.2, 0.3, 0.4, 0.5];
+
+(* Write the newest sample into the circular window. *)
+Samples[Index] := Cycle MOD 10;
+Index := (Index + 1) MOD 5;
+
+(* Read the window back: plain sum and weighted sum. *)
+Sum := 0.0;
+Weighted := 0.0;
+FOR i := 0 TO 4 DO
+    Sum := Sum + Samples[i];
+    Weighted := Weighted + Samples[i] * Coefficients[i];
+END_FOR;
+
+Average := Sum / 5.0;
+Weighted_sum := Weighted;]]></script>
+      <variables>
+        <var name="Samples" scope="Static" type="REAL" init="0.0" output="true" array="true" lower="0" upper="4" />
+        <var name="Coefficients" scope="Temp" type="REAL" init="0.0" array="true" lower="0" upper="4" />
+        <var name="Index" scope="Static" type="INT" init="0" />
+        <var name="Sum" scope="Temp" type="REAL" init="0.0" />
+        <var name="Weighted" scope="Temp" type="REAL" init="0.0" />
+        <var name="Average" scope="Temp" type="REAL" init="0.0" output="true" />
+        <var name="Weighted_sum" scope="Temp" type="REAL" init="0.0" output="true" />
+      </variables>
+    </Function>
+  </Functions>
+  <Inputs></Inputs>
+  <Preconditions></Preconditions>
+  <Resources></Resources>
+  <Controls></Controls>
+  <Times></Times>
+  <Outputs></Outputs>
+  <Aspects scaleFunction="1" scaleAspect="1" scaleZoom="1.11" Enhanced="false" WebEnhanced="updated"></Aspects>
+</FM>

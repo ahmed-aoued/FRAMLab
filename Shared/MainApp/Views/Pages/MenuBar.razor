@@ -91,7 +91,7 @@
             <MudMenuItem OnClick="b_showPDF">
                 <div class="d-flex align-center" style="gap:8px;">
                     <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
-                    <span>@L("PDF_REPORT", "PDF report")</span>
+                    <span>@L("PDF_REPORT", "Report (HTML)")</span>
                 </div>
             </MudMenuItem>
         </MudMenu>
@@ -188,7 +188,8 @@
                 }
             }
             stateContainer.selectedFn = "-1"; //this action also updates the metadata in the xml
-            var saveXfmv = stateContainer.projectData_Undo[0].OuterXml;
+            // with the Agents & Levels view on, save the user's layout rather than the temporary grid
+            var saveXfmv = agentLevelService.DocumentForSave().OuterXml;
             //var textBytes = Encoding.UTF8.GetBytes(saveXfmv);
             //string saveBase = Convert.ToBase64String(textBytes);
             await JSRuntime.InvokeAsync<object>(
@@ -786,6 +787,10 @@
             await refreshParent.InvokeAsync();
         }
     }
+    /// <summary>Keyboard entry points (Ctrl/Cmd+Z, Ctrl/Cmd+Y) used by the main page.</summary>
+    public void Undo() => actionUndo();
+    public void Redo() => actionRedo();
+
     private void actionUndo()
     {
         if (stateContainer.undoIndex > 0)

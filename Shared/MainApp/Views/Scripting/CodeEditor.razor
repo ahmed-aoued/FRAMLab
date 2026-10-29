@@ -26,6 +26,10 @@ else
     [Parameter]
     public EventCallback<string> OnChanged { get; set; }
 
+    /// <summary>Raised once Monaco exists, so the page can push markers and autocomplete suggestions.</summary>
+    [Parameter]
+    public EventCallback OnReady { get; set; }
+
     private DotNetObjectReference<CodeEditor>? dotNetRef;
     private bool created = false;
     private bool loadFailed = false;
@@ -45,6 +49,7 @@ else
                 dotNetRef = DotNetObjectReference.Create(this);
                 await JSRuntime.InvokeVoidAsync("ScriptEditor.create", ElementId, dotNetRef, InitialValue, false);
                 created = true;
+                if (OnReady.HasDelegate) await OnReady.InvokeAsync();
             }
             catch (JSException ex)
             {

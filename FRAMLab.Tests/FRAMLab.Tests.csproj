@@ -37,6 +37,9 @@
     <Compile Include="..\Shared\MainApp\Services\IFmiDefinitionService.cs" Link="Engine\Services\IFmiDefinitionService.cs" />
     <!-- Macro system: registry + expander (files added by the macro branch) -->
     <Compile Include="..\Shared\MainApp\Services\*Macro*.cs" LinkBase="Engine\Services" />
+    <Compile Include="..\Shared\MainApp\Services\FmiRunEngine.cs" Link="Engine\Services\FmiRunEngine.cs" />
+    <Compile Include="..\Shared\MainApp\Services\FmiModelUsage.cs" Link="Engine\Services\FmiModelUsage.cs" />
+    <Compile Include="..\Shared\MainApp\Services\FmiDataService.cs" Link="Engine\Services\FmiDataService.cs" />
     <!-- ST scripting engine + its model types -->
     <Compile Include="..\Shared\MainApp\Models\ScriptModel.cs" Link="Engine\Models\ScriptModel.cs" />
     <Compile Include="..\Shared\MainApp\Models\ScriptVariable.cs" Link="Engine\Models\ScriptVariable.cs" />

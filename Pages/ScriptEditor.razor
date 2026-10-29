@@ -108,7 +108,8 @@
                     <CodeEditor @ref="editor"
                                 ElementId="@EditorElementId"
                                 InitialValue="@script.Source"
-                                OnChanged="OnSourceChanged" />
+                                OnChanged="OnSourceChanged"
+                                OnReady="OnEditorReady" />
                     @* --- diagnostics / type-mismatch panel --- *@
                     @if (diagnostics.Count > 0 || typeMismatches.Count > 0)
                     {
@@ -127,6 +128,83 @@
                             }
                         </div>
                     }
+                    @* --- run one cycle with chosen inputs, without touching the model or an FMI run --- *@
+                    <div class="script-testrun">
+                        <div class="script-testrun-header" @onclick="ToggleTestRun">
+                            <span class="oi @(testRunOpen ? "oi-chevron-bottom" : "oi-chevron-right")"></span>
+                            <strong>Run one cycle</strong>
+                            <span class="vt-hint">try the script with your own input values</span>
+                        </div>
+                        @if (testRunOpen)
+                        {
+                            <div class="script-testrun-body">
+                                <div class="script-testrun-grid">
+                                    <div>
+                                        <div class="script-testrun-title">Inputs</div>
+                                        @if (testInputs.Count == 0)
+                                        {
+                                            <div class="vt-empty">No input aspects.</div>
+                                        }
+                                        @foreach (var row in testInputs)
+                                        {
+                                            <label class="script-testrun-row" title="@row.Hint">
+                                                <span class="av-cat-badge @AspectCatClass(row.Category)">@AspectCatLetter(row.Category)</span>
+                                                <span class="script-testrun-name">@row.Name</span>
+                                                <input class="vt-input vt-mono" @bind="row.Value" spellcheck="false" />
+                                            </label>
+                                        }
+                                    </div>
+                                    <div>
+                                        <div class="script-testrun-title">Static / Global at the start</div>
+                                        @if (testState.Count == 0)
+                                        {
+                                            <div class="vt-empty">No Static or Global variables.</div>
+                                        }
+                                        @foreach (var row in testState)
+                                        {
+                                            <label class="script-testrun-row" title="@row.Hint">
+                                                <span class="vt-badge">@row.Hint</span>
+                                                <span class="script-testrun-name">@row.Name</span>
+                                                <input class="vt-input vt-mono" @bind="row.Value" spellcheck="false" placeholder="initial value" />
+                                            </label>
+                                        }
+                                        <label class="script-testrun-row">
+                                            <span class="vt-badge">#</span>
+                                            <span class="script-testrun-name">Cycle</span>
+                                            <input class="vt-input vt-mono" type="number" min="0" @bind="testCycle" />
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center" style="gap:0.5rem;">
+                                    <button class="btn btn-sm btn-primary" @onclick="RunTest"><span class="oi oi-media-play"></span> Run</button>
+                                    <button class="btn btn-sm btn-light" title="Reset the values from the model" @onclick="PrepareTestRun">Reset values</button>
+                                </div>
+                                @if (testResult is not null)
+                                {
+                                    <div class="script-testrun-result">
+                                        @foreach (var issue in testResult.Issues.Where(i => i.Severity != "Info"))
+                                        {
+                                            <div class="diag @DiagClass(issue.Severity)" @onclick="@(() => RevealLine(issue.StartLine))">
+                                                <span class="diag-pos">@issue.StartLine:@issue.StartColumn</span> @issue.Message
+                                            </div>
+                                        }
+                                        @ResultTable("Outputs", testResult.Outputs)
+                                        @ResultTable("Static after the cycle", testResult.Statics)
+                                        @ResultTable("Global after the cycle", testResult.Globals)
+                                        @if (testResult.Trace.Count > 0)
+                                        {
+                                            <div class="script-testrun-title">Print output</div>
+                                            <pre class="script-testrun-trace">@string.Join("\n", testResult.Trace)</pre>
+                                        }
+                                        @if (!testResult.HasErrors && testResult.Outputs.Count == 0 && testResult.Trace.Count == 0)
+                                        {
+                                            <div class="vt-empty">The cycle ran without errors but produced no outputs or Print lines.</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
             <div class="script-ide-footer">
@@ -178,6 +256,9 @@
 
                 // reconstruct minimal couplings from the Aspects XML so aspect variables can be derived
                 stateContainer.couplingList = AspectVariable.CouplingsFromXml(stateContainer.projectData_Undo[0]);
+                // model-wide globals live in the .xfmv, not just in this tab's memory
+                stateContainer.globalScriptVariables = ScriptModel.ReadGlobals(stateContainer.projectData_Undo[0]);
+                SyncGlobalDeclarations();
 
                 var fnId = string.IsNullOrEmpty(data.fnId) ? FunctionId : data.fnId;
                 var fnNode = stateContainer.projectData_Undo[0]
@@ -219,6 +300,36 @@
         var compiled = stateContainer.Scripting.Compile(TargetFunction);
         diagnostics = compiled.Diagnostics.ToList();
         _ = PushMarkers(compiled.Diagnostics);
+        _ = PushCompletions();
+    }
+
+    private string lastCompletionsKey = "";
+
+    /// <summary>Monaco finished loading: push the current markers and suggestions (earlier pushes had no editor yet).</summary>
+    private Task OnEditorReady()
+    {
+        lastCompletionsKey = "";
+        Recompile();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Send the autocomplete list to Monaco when the declared names or types changed.</summary>
+    private async Task PushCompletions()
+    {
+        if (TargetFunction is null || stateContainer.Scripting is null) return;
+        var items = FRAMLab.Shared.MainApp.Services.Scripting.ScriptCompletions.Build(stateContainer.Scripting.BuildSymbols(TargetFunction));
+        var key = string.Join("|", items.Select(i => i.Label + ":" + i.Detail));
+        if (key == lastCompletionsKey) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("ScriptEditor.setCompletions", EditorElementId,
+                items.Select(i => new { label = i.Label, kind = i.Kind, detail = i.Detail, documentation = i.Documentation, insertText = i.InsertText, isSnippet = i.IsSnippet }).ToArray());
+            lastCompletionsKey = key;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(LogEvents.ScriptIde, ex, "Could not push autocomplete suggestions into the Monaco editor (editor not ready yet).");
+        }
     }
 
     private async Task PushMarkers(IEnumerable<FRAMLab.Shared.MainApp.Services.Scripting.ScriptDiagnostic> diags)
@@ -271,6 +382,86 @@
         }
         typeMismatches = AspectVariable.FindTypeMismatches(functions, stateContainer.couplingList);
     }
+
+    // ---- run one cycle ----
+    private sealed class TestValue
+    {
+        public string Name { get; init; } = "";
+        public AspectCategory Category { get; init; }
+        public string Hint { get; init; } = "";
+        public string Value { get; set; } = "";
+    }
+
+    private bool testRunOpen;
+    private int testCycle = 1;
+    private List<TestValue> testInputs = new();
+    private List<TestValue> testState = new();
+    private FRAMLab.Shared.MainApp.Services.Scripting.ScriptTestRunResult? testResult;
+
+    private void ToggleTestRun()
+    {
+        testRunOpen = !testRunOpen;
+        if (testRunOpen && testInputs.Count == 0 && testState.Count == 0) PrepareTestRun();
+    }
+
+    /// <summary>Prefill inputs from the upstream function's current value (when a coupling provides
+    /// one) and Static/Global variables from their initial values.</summary>
+    private void PrepareTestRun()
+    {
+        testResult = null;
+        if (TargetFunction is null) return;
+        var doc = stateContainer.projectData_Undo[0];
+        testInputs = script.AspectVariables
+            .Where(a => a.Category != AspectCategory.Output)
+            .OrderBy(a => a.Category).ThenBy(a => a.Label)
+            .Select(a =>
+            {
+                var upstream = stateContainer.couplingList.FirstOrDefault(c => c.toFn == TargetFunction.IDNr && c.label == a.Label);
+                var value = upstream is null ? null
+                    : doc.SelectSingleNode($"//FM/Functions/Function[IDNr={upstream.outputFn}]/metadata/{a.Identifier}")?.InnerText;
+                return new TestValue
+                {
+                    Name = a.Identifier,
+                    Category = a.Category,
+                    Hint = upstream is null ? $"{a.Label} (no coupling)" : $"{a.Label} from function {upstream.outputFn}",
+                    Value = value ?? a.Type switch
+                    {
+                        ScriptVarType.BOOL => "FALSE",
+                        ScriptVarType.STRING => "",
+                        ScriptVarType.TIME => "T#0s",
+                        _ => "0",
+                    },
+                };
+            }).ToList();
+        testState = script.Variables.Where(v => v.Scope is ScriptScope.Static or ScriptScope.Global)
+            .Concat(stateContainer.globalScriptVariables)
+            .Where(v => !string.IsNullOrWhiteSpace(v.Name))
+            .Select(v => new TestValue { Name = v.Name, Hint = v.Scope.ToString(), Value = v.InitialValue })
+            .ToList();
+    }
+
+    private void RunTest()
+    {
+        if (TargetFunction is null || stateContainer.Scripting is null) return;
+        var fnNode = stateContainer.projectData_Undo[0].SelectSingleNode($"//FM/Functions/Function[IDNr={TargetFunction.IDNr}]");
+        if (fnNode is null) return;
+        var copy = new Function(fnNode) { Script = script }; // throwaway: test inputs go into its variables
+        testResult = stateContainer.Scripting.TestRun(copy, testCycle,
+            testInputs.ToDictionary(r => r.Name, r => r.Value),
+            testState.ToDictionary(r => r.Name, r => r.Value));
+    }
+
+    private RenderFragment ResultTable(string title, Dictionary<string, string> values) => __builder =>
+    {
+        if (values.Count == 0) return;
+        <div class="script-testrun-title">@title</div>
+        <table class="script-testrun-table">
+            @foreach (var kv in values.OrderBy(kv => kv.Key))
+            {
+                <tr><td class="vt-mono">@kv.Key</td><td class="vt-mono">@kv.Value</td></tr>
+            }
+        </table>
+    };
 
     private string DiagClass(string severity) => severity switch
     {
@@ -371,6 +562,7 @@
         {
             script.WriteXml(stateContainer.projectData_Undo[0], fnNode);
         }
+        ScriptModel.WriteGlobals(stateContainer.projectData_Undo[0], stateContainer.globalScriptVariables);
         await JSRuntime.InvokeVoidAsync("ScriptSync.save", stateContainer.projectData_Undo[0].OuterXml);
         dirty = false;
     }
@@ -384,7 +576,9 @@
     private async Task CloseAsync()
     {
         await WriteBackAsync();
-        await JSRuntime.InvokeVoidAsync("close");
+        // Closes a tab we opened; when the IDE was opened in place
+        // (popup blocked) it returns to the main editor instead.
+        await JSRuntime.InvokeVoidAsync("ScriptSync.closeOrGoHome", Nav.BaseUri);
     }
 
     private class ScriptIdeData

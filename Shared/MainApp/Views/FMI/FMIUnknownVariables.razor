@@ -1,0 +1,137 @@
+@using MudBlazor
+@inject StateContainer stateContainer
+
+@* Shown when a cycle's equations reference variables nothing in the model defines. The run
+   stops; the user decides per variable instead of the value silently becoming 0. *@
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Unknown variables — the run is paused</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            These equations use variables that no function, coupling or declared variable provides, or live data (api) that could not be read.
+            The affected keys kept their previous value. Choose what each variable should be, then press
+            Step or Play to continue.
+        </MudText>
+        <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+            <thead>
+                <tr><th>Function</th><th>Key</th><th>Variable</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var unknown in stateContainer.fmiUnknownVariables.ToList())
+                {
+                    <tr @key="unknown">
+                        <td>@unknown.FunctionName</td>
+                        <td><code>@unknown.Key</code></td>
+                        <td>
+                            <code>@unknown.Variable</code>
+                            @if (unknown.Reason != "")
+                            {
+                                <div class="fmi-unknown-reason">@unknown.Reason</div>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center flex-wrap" style="gap:0.25rem;">
+                                <input class="fmi-unknown-value" type="text" placeholder="value" title="Initial value for the new key"
+                                       value="@ValueFor(unknown)" @onchange="@((e) => values[unknown.AcceptKey] = e.Value?.ToString() ?? "")" />
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                           Disabled="@(!CanAddKey(unknown))" OnClick="@(() => AddKey(unknown))"
+                                           title="Add the variable as a metadata key of this function">Add key</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => AcceptZero(unknown))"
+                                           title="Read it as 0 until the model is reloaded">Read as 0</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenFunction(unknown))"
+                                           title="Select the function and show its equations">Edit equation</MudButton>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2">@message</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+    [Parameter] public EventCallback refreshParent { get; set; }
+
+    private readonly Dictionary<string, string> values = new();
+    private string message = "";
+
+    private bool _visible
+    {
+        get => true;
+        set { if (!value) { _ = OnClosed(); } }
+    }
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = false
+    };
+
+    private string ValueFor(FmiUnknownVariable unknown) => values.TryGetValue(unknown.AcceptKey, out var v) ? v : "0";
+
+    private static bool CanAddKey(FmiUnknownVariable unknown) =>
+        System.Text.RegularExpressions.Regex.IsMatch(unknown.Variable, "^[A-Z][A-Za-z0-9_]*$");
+
+    private void AddKey(FmiUnknownVariable unknown)
+    {
+        var fn = stateContainer.functionList.Find(f => f.IDNr == unknown.FunctionId);
+        if (fn is null || !stateContainer.addMetadataKey(fn, unknown.Variable, ValueFor(unknown)))
+        {
+            message = $"'{unknown.Variable}' could not be added to {unknown.FunctionName}.";
+            return;
+        }
+        Resolve(unknown);
+    }
+
+    private void AcceptZero(FmiUnknownVariable unknown)
+    {
+        stateContainer.acceptFmiUnknownVariable(unknown);
+        Resolve(unknown);
+    }
+
+    private async Task OpenFunction(FmiUnknownVariable unknown)
+    {
+        stateContainer.selectedFn = unknown.FunctionId;
+        stateContainer.showKeys = nameof(stateContainer.activeMode); // show the metadata/equation panel
+        await Close();
+    }
+
+    /// <summary>Clear every entry for the same function + variable (it may appear under several keys).</summary>
+    private void Resolve(FmiUnknownVariable unknown)
+    {
+        message = "";
+        stateContainer.fmiUnknownVariables.RemoveAll(u => u.AcceptKey == unknown.AcceptKey);
+        if (stateContainer.fmiUnknownVariables.Count == 0)
+        {
+            _ = Close();
+        }
+    }
+
+    // Close through MudBlazor (CloseAsync) so the dialog really leaves the screen; MudBlazor then
+    // sets Visible=false and the _visible setter runs OnClosed.
+    private MudDialog? dialog;
+    private async Task Close()
+    {
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClosed();
+    }
+
+    private async Task OnClosed()
+    {
+        stateContainer.showFMIUnknownVariables = false;
+        await OnClose.InvokeAsync(false);
+        await refreshParent.InvokeAsync();
+    }
+}

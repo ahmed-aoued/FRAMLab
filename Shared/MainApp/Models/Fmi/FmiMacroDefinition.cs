@@ -3,8 +3,6 @@ using System.Xml;
 
 namespace FRAMLab.Shared
 {
-    public enum FmiMacroKind { Formula, Rule }
-
     public sealed class FmiMacroParameter
     {
         public string Name { get; set; } = ""; //[A-Za-z_][A-Za-z0-9_]* (lower-case camel ok, unlike variables)
@@ -13,9 +11,9 @@ namespace FRAMLab.Shared
     }
 
     /// <summary>
-    /// A user-defined function (macro) declared in the &lt;FMI&gt;&lt;Macros&gt; section of an .xfmv file.
-    /// Formula macros return a value; rule macros expand to statements and are stored/validated
-    /// this phase with their execution landing with the DSL block interpreter (Feature 5).
+    /// A user-defined formula (macro) declared in the &lt;FMI&gt;&lt;Macros&gt; section of an .xfmv file:
+    /// a named, parameterised expression that returns a value. Statement logic belongs in ST scripts;
+    /// the former "rule" macro kind has been removed.
     /// </summary>
     public sealed class FmiMacroDefinition
     {
@@ -24,10 +22,9 @@ namespace FRAMLab.Shared
         public static readonly Regex ParameterNamePattern = new("^[A-Za-z_][A-Za-z0-9_]*$");
 
         public string Name { get; set; } = "";
-        public FmiMacroKind Kind { get; set; } = FmiMacroKind.Formula;
         public List<FmiMacroParameter> Parameters { get; } = new();
-        public string Body { get; set; } = ""; //formula: single expression; rule: statement block text
-        public FmiTypeDescriptor? ReturnType { get; set; } //hint only; null = infer (Formula). Always null for Rule.
+        public string Body { get; set; } = ""; //a single expression
+        public FmiTypeDescriptor? ReturnType { get; set; } //hint only; null = infer
         public string FunctionId { get; set; } = ""; //"" = global: visible to every function (same convention as FmiVariableDefinition)
         public string Description { get; set; } = "";
         public bool IsImplicit { get; set; } //reserved; macros are never implicit this phase
@@ -42,15 +39,18 @@ namespace FRAMLab.Shared
                 return null;
             }
 
+            //Older files write kind="formula"; rule macros no longer exist.
             var kindRaw = el.GetAttribute("kind");
-            var kind = FmiMacroKind.Formula;
-            if (kindRaw != "")
+            if (kindRaw.Equals("rule", StringComparison.OrdinalIgnoreCase))
             {
-                if (!Enum.TryParse<FmiMacroKind>(kindRaw, true, out kind))
-                {
-                    diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, source, $"Unknown kind '{kindRaw}'. Expected formula or rule."));
-                    return null;
-                }
+                diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, source,
+                    "Rule macros are no longer supported; move the statements into the function's ST script. This macro was skipped."));
+                return null;
+            }
+            if (kindRaw != "" && !kindRaw.Equals("formula", StringComparison.OrdinalIgnoreCase))
+            {
+                diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, source, $"Unknown kind '{kindRaw}'. Macros are formulas; omit the kind attribute."));
+                return null;
             }
 
             FmiTypeDescriptor? returnType = null;
@@ -62,14 +62,7 @@ namespace FRAMLab.Shared
                     diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, source, returnError!));
                     return null;
                 }
-                if (kind == FmiMacroKind.Rule)
-                {
-                    diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Warning, source, "return attribute is ignored for rule macros."));
-                }
-                else
-                {
-                    returnType = parsed;
-                }
+                returnType = parsed;
             }
 
             var parameters = new List<FmiMacroParameter>();
@@ -103,7 +96,7 @@ namespace FRAMLab.Shared
             {
                 body = bodyEl.InnerText;
             }
-            if (kind == FmiMacroKind.Formula && string.IsNullOrWhiteSpace(body))
+            if (string.IsNullOrWhiteSpace(body))
             {
                 diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, source, "Formula macro body must not be empty."));
                 return null;
@@ -112,7 +105,6 @@ namespace FRAMLab.Shared
             var macro = new FmiMacroDefinition
             {
                 Name = name,
-                Kind = kind,
                 Body = body,
                 ReturnType = returnType,
                 FunctionId = el.GetAttribute("function"),
@@ -126,7 +118,6 @@ namespace FRAMLab.Shared
         {
             var el = doc.CreateElement("Macro");
             el.SetAttribute("name", Name);
-            el.SetAttribute("kind", Kind.ToString().ToLowerInvariant());
             if (ReturnType is not null) el.SetAttribute("return", ReturnType.ToString());
             if (FunctionId != "") el.SetAttribute("function", FunctionId);
             if (Description != "") el.SetAttribute("description", Description);

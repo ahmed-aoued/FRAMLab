@@ -65,6 +65,7 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 {
                     case TokenKind.If: case TokenKind.For: case TokenKind.While:
                     case TokenKind.Repeat: case TokenKind.Return: case TokenKind.Exit:
+                    case TokenKind.Case: case TokenKind.EndCase:
                     case TokenKind.EndIf: case TokenKind.EndFor: case TokenKind.EndWhile:
                     case TokenKind.EndRepeat: case TokenKind.Else: case TokenKind.ElsIf:
                         return;
@@ -81,11 +82,18 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 if (Match(TokenKind.For)) return ParseFor(Previous);
                 if (Match(TokenKind.While)) return ParseWhile(Previous);
                 if (Match(TokenKind.Repeat)) return ParseRepeat(Previous);
+                if (Match(TokenKind.Case)) return ParseCase(Previous);
                 if (Match(TokenKind.Return)) return ParseReturn(Previous);
                 if (Match(TokenKind.Exit)) { Consume(TokenKind.Semicolon, "Expected ';' after EXIT."); return new ExitStatement { Line = Previous.Line, Column = Previous.Column }; }
                 if (Check(TokenKind.Identifier)) return ParseAssignmentOrExpr();
                 // stray semicolons are tolerated
                 if (Match(TokenKind.Semicolon)) return null;
+                // reserved word that looks valid to ST users but is not part of this dialect
+                if (Check(TokenKind.Var))
+                {
+                    Error(Current, "VAR sections are not supported; declare variables in the variable table next to the editor.");
+                    return null;
+                }
                 Error(Current, $"Unexpected token '{Current.Text}'.");
                 return null;
             }
@@ -104,21 +112,24 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
 
         private Statement ParseAssignmentOrExpr()
         {
+            var startPos = pos;
             var ident = Advance();
             Expression? index = null;
+            Expression? index2 = null;
             if (Match(TokenKind.LBracket))
             {
                 index = ParseExpression();
+                if (Match(TokenKind.Comma)) index2 = ParseExpression();
                 Consume(TokenKind.RBracket, "Expected ']' after index.");
             }
             if (Match(TokenKind.Assign))
             {
                 var value = ParseExpression();
                 Consume(TokenKind.Semicolon, "Expected ';' after assignment.");
-                return new Assignment { Target = ident.Text, Index = index, Value = value, Line = ident.Line, Column = ident.Column };
+                return new Assignment { Target = ident.Text, Index = index, Index2 = index2, Value = value, Line = ident.Line, Column = ident.Column };
             }
             // not an assignment -> expression statement (e.g. a function call used for side effects)
-            pos--; // back up to re-parse as expression
+            pos = startPos; // re-parse the whole statement as an expression
             var expr = ParseExpression();
             Consume(TokenKind.Semicolon, "Expected ';' after expression.");
             return new ExprStatement { Expr = expr, Line = ident.Line, Column = ident.Column };
@@ -183,6 +194,53 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             Consume(TokenKind.EndRepeat, "Expected END_REPEAT.");
             Consume(TokenKind.Semicolon, "Expected ';' after END_REPEAT.");
             return node;
+        }
+
+        private Statement ParseCase(Token caseTok)
+        {
+            var node = new CaseStatement { Line = caseTok.Line, Column = caseTok.Column };
+            node.Selector = ParseExpression();
+            Consume(TokenKind.Of, "Expected OF after the CASE selector.");
+            while (!IsAtEnd && !Check(TokenKind.Else) && !Check(TokenKind.EndCase))
+            {
+                var branch = new CaseBranch { Line = Current.Line, Column = Current.Column };
+                do
+                {
+                    var from = ParseCaseLabel();
+                    var to = from;
+                    if (Match(TokenKind.DotDot))
+                    {
+                        to = ParseCaseLabel();
+                        if (to < from) Error(Previous, $"CASE range {from}..{to} is empty; write the smaller value first.");
+                    }
+                    branch.Labels.Add((from, to));
+                } while (Match(TokenKind.Comma));
+                Consume(TokenKind.Colon, "Expected ':' after the CASE label.");
+                // a branch ends where the next label (a number, possibly negative), ELSE or END_CASE starts
+                branch.Body = ParseBlock(TokenKind.IntLiteral, TokenKind.Minus, TokenKind.Else, TokenKind.EndCase);
+                node.Branches.Add(branch);
+            }
+            if (Match(TokenKind.Else))
+            {
+                node.ElseBlock = ParseBlock(TokenKind.EndCase);
+            }
+            Consume(TokenKind.EndCase, "Expected END_CASE.");
+            Consume(TokenKind.Semicolon, "Expected ';' after END_CASE.");
+            return node;
+        }
+
+        /// <summary>A CASE label: a whole-number constant, optionally negative.</summary>
+        private long ParseCaseLabel()
+        {
+            var negative = Match(TokenKind.Minus);
+            if (Match(TokenKind.IntLiteral))
+            {
+                var value = long.Parse(Previous.Text, CultureInfo.InvariantCulture);
+                return negative ? -value : value;
+            }
+            Error(Current, $"CASE labels must be whole-number constants such as 1, 2, 3 or 4..9, not '{Current.Text}'.");
+            if (!IsAtEnd) Advance();
+            return 0;
         }
 
         private Statement ParseReturn(Token retTok)
@@ -307,6 +365,17 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 return new Literal { Value = tok.Text, LiteralType = "STRING", Line = tok.Line, Column = tok.Column };
             if (Match(TokenKind.TimeLiteral))
                 return new Literal { Value = ParseTimeLiteral(tok.Text), LiteralType = "TIME", Line = tok.Line, Column = tok.Column };
+            if (Match(TokenKind.LBracket))
+            {
+                // array literal: [ expr, expr, ... ]
+                var array = new ArrayLiteralExpr { Line = tok.Line, Column = tok.Column };
+                if (!Check(TokenKind.RBracket))
+                {
+                    do { array.Elements.Add(ParseExpression()); } while (Match(TokenKind.Comma));
+                }
+                Consume(TokenKind.RBracket, "Expected ']' after array literal.");
+                return array;
+            }
             if (Match(TokenKind.Identifier))
             {
                 Expression expr = new IdentifierExpr { Name = tok.Text, Line = tok.Line, Column = tok.Column };
@@ -323,8 +392,9 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 else if (Match(TokenKind.LBracket))
                 {
                     var idx = ParseExpression();
+                    Expression? idx2 = Match(TokenKind.Comma) ? ParseExpression() : null;
                     Consume(TokenKind.RBracket, "Expected ']' after index.");
-                    expr = new IndexExpr { Target = expr, Index = idx, Line = tok.Line, Column = tok.Column };
+                    expr = new IndexExpr { Target = expr, Index = idx, Index2 = idx2, Line = tok.Line, Column = tok.Column };
                 }
                 return expr;
             }

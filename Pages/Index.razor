@@ -33,7 +33,15 @@
 {
     <FMIDisplaySetup OnClose="ModalClose"></FMIDisplaySetup>
 }
-<MenuBar refreshParent="refreshParent" onInputFileChange="OnInputFileChange" fileIsLoaded="FileIsLoaded" />
+@if (stateContainer.showFMIUnknownVariables)
+{
+    <FMIUnknownVariables OnClose="ModalClose" refreshParent="refreshParent"></FMIUnknownVariables>
+}
+@if (stateContainer.showFMISetup)
+{
+    <FMISetup OnClose="ModalClose"></FMISetup>
+}
+<MenuBar @ref="menuBar" refreshParent="refreshParent" onInputFileChange="OnInputFileChange" fileIsLoaded="FileIsLoaded" />
 <SideBar refreshParent="refreshParent" newFunction="NewFunction" nextFn="NextFn" />
 @if (stateContainer.rightPanel != "")
 {
@@ -164,6 +172,7 @@
     public double newFnY = 0;
     public bool isNewModel = true;
     protected Spreadsheet? spreadsheet;
+    protected MenuBar? menuBar;
     private static Func<string, string, Task>? UpdateFileContent;
 
     private static string FormatLayoutValue(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
@@ -214,6 +223,8 @@
         stateContainer.showFMIPopup = state;
         stateContainer.showPDFreport = state;
         stateContainer.showFMIDisplaySetup = state;
+        stateContainer.showFMIUnknownVariables = state;
+        stateContainer.showFMISetup = state;
     }
     private DotNetObjectReference<Index>? scriptSyncRef;
 
@@ -259,7 +270,7 @@
         {
             try
             {
-                await localStorage.SetItemAsync("backupData", stateContainer.projectData_Undo[0].OuterXml);
+                await localStorage.SetItemAsync("backupData", agentLevelService.DocumentForSave().OuterXml);
                 await localStorage.SetItemAsync("backupFileName", stateContainer.fileName);
             }
             catch
@@ -566,6 +577,8 @@
             stateContainer.projectData_Undo[0].SelectSingleNode("//FM")!.AppendChild(stateContainer.projectData_Undo[0].CreateElement("Groups"));
         }
         stateContainer.fnGroups = stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Groups");
+        // Model-wide script globals (written by the Script IDE's Global variables panel)
+        stateContainer.globalScriptVariables = ScriptModel.ReadGlobals(stateContainer.projectData_Undo[0]);
         // Load Agents
         stateContainer.agentList = new List<Agent>();
         if (stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Agents") is not null)
@@ -714,7 +727,8 @@
                 dictArray[0] = itemO.SelectSingleNode("FunctionIDNr")?.InnerText ?? "";
                 dictArray[1] = itemO.SelectSingleNode("IDName")?.InnerText ?? "";
                 int iTo = stateContainer.aspectsList.Count;
-                foreach (var aspect in stateContainer.aspectsList.FindAll(x => x.IDName == dictArray[1]))
+                // skip the function's own aspects: the editor never couples a function to itself
+                foreach (var aspect in stateContainer.aspectsList.FindAll(x => x.IDName == dictArray[1] && x.FunctionIDNr != dictArray[0]))
                 {
                     dictArray[2] = aspect.FunctionIDNr;
                     dictArray[3] = aspect.Type.Substring(0, 1);
@@ -841,6 +855,10 @@
         newFnX = 20;
         newFnY = 20;
         isNewModel = false;
+        // Load the <FMI> section (typed variables, macros) into the interpreter. Without this the
+        // definitions stored in the file were ignored until one was edited in the UI.
+        stateContainer.initFmiRuntime();
+        stateContainer.fmiRun?.Reset();
         stateContainer.fileLoaded = true;
         stateContainer.debugOutput = "";
         //spreadsheet?.InitialState();
@@ -953,6 +971,18 @@
         if ((e.CtrlKey || e.MetaKey) && e.Code == "KeyD")
         {
             DuplicateSelectedFunctions();
+            return;
+        }
+
+        // Undo: Ctrl/Cmd+Z; Redo: Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z (same actions as the menu buttons)
+        if ((e.CtrlKey || e.MetaKey) && (e.Code == "KeyY" || (e.Code == "KeyZ" && e.ShiftKey)))
+        {
+            menuBar?.Redo();
+            return;
+        }
+        if ((e.CtrlKey || e.MetaKey) && e.Code == "KeyZ")
+        {
+            menuBar?.Undo();
             return;
         }
 

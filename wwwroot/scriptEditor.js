@@ -8,6 +8,28 @@
     let stRegistered = false;
     const editors = new Map();
 
+    // Small local debounce so the editor does not depend on lodash from a CDN.
+    function debounce(fn, ms) {
+        let timer = null;
+        return function () {
+            const args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(null, args), ms);
+        };
+    }
+
+    function completionKind(m, kind) {
+        const k = m.languages.CompletionItemKind;
+        switch (kind) {
+            case "variable": return k.Variable;
+            case "aspect": return k.Field;
+            case "function": return k.Function;
+            case "keyword": return k.Keyword;
+            case "snippet": return k.Snippet;
+            default: return k.Text;
+        }
+    }
+
     function registerSTLanguage() {
         if (stRegistered || !window.monaco) return;
         const m = window.monaco;
@@ -29,28 +51,30 @@
         m.languages.setMonarchTokensProvider("framst", {
             ignoreCase: true,
             defaultToken: "",
+            // Only what STParser/STInterpreter actually support (variables are declared in the
+            // IDE tables, so there are no VAR sections).
             keywords: [
                 "IF", "THEN", "ELSIF", "ELSE", "END_IF",
                 "FOR", "TO", "BY", "DO", "END_FOR",
                 "WHILE", "END_WHILE",
                 "REPEAT", "UNTIL", "END_REPEAT",
                 "CASE", "OF", "END_CASE",
-                "VAR", "VAR_INPUT", "VAR_OUTPUT", "VAR_GLOBAL", "END_VAR",
-                "FUNCTION", "END_FUNCTION", "RETURN", "EXIT",
+                "RETURN", "EXIT",
                 "AND", "OR", "XOR", "NOT", "MOD",
                 "TRUE", "FALSE"
             ],
-            typeKeywords: ["BOOL", "INT", "DINT", "REAL", "LREAL", "STRING", "TIME", "DATE", "ARRAY"],
+            typeKeywords: ["BOOL", "INT", "REAL", "STRING", "TIME"],
             hostFunctions: [
                 "GetInput", "GetPrecondition", "GetResource", "GetControl", "GetTime",
-                "SetOutput", "Cycle", "IsActive", "Print", "Trace",
-                "ABS", "SQRT", "SIN", "COS", "TAN", "LN", "EXP", "MIN", "MAX", "LIMIT"
+                "SetOutput", "Cycle", "IsActive", "Print", "Trace", "API",
+                "ABS", "SQRT", "SIN", "COS", "TAN", "LN", "EXP", "MIN", "MAX", "LIMIT",
+                "ROUND", "TRUNC"
             ],
             tokenizer: {
                 root: [
                     [/\(\*/, { token: "comment", next: "@comment" }],
                     [/\/\/.*$/, "comment"],
-                    [/T#[\d.]+(ms|s|m|h|d)?/i, "number.time"],
+                    [/T(IME)?#-?[\d.]+(ms|s|m|h|d)?/i, "number.time"],
                     [/\d+\.\d+([eE][+-]?\d+)?/, "number.float"],
                     [/\d+/, "number"],
                     [/'([^'\\]|\\.)*'/, "string"],
@@ -72,6 +96,31 @@
                     [/\*\)/, "comment", "@pop"],
                     [/./, "comment"]
                 ]
+            }
+        });
+
+        // Autocomplete: suggestions come from .NET (ScriptCompletions) per editor via setCompletions.
+        m.languages.registerCompletionItemProvider("framst", {
+            provideCompletionItems: function (model, position) {
+                let items = [];
+                editors.forEach(entry => { if (entry.editor.getModel() === model) items = entry.completions || []; });
+                const word = model.getWordUntilPosition(position);
+                const range = {
+                    startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+                    startColumn: word.startColumn, endColumn: word.endColumn
+                };
+                return {
+                    suggestions: items.map(i => ({
+                        label: i.label,
+                        kind: completionKind(m, i.kind),
+                        detail: i.detail,
+                        documentation: i.documentation,
+                        insertText: i.insertText,
+                        insertTextRules: i.isSnippet ? m.languages.CompletionItemInsertTextRule.InsertAsSnippet : 0,
+                        sortText: (i.kind === "variable" || i.kind === "aspect" ? "0" : i.kind === "function" ? "1" : i.kind === "snippet" ? "2" : "3") + i.label,
+                        range: range
+                    }))
+                };
             }
         });
 
@@ -135,11 +184,17 @@
                 fixedOverflowWidgets: true
             });
 
-            const sub = editor.onDidChangeModelContent(_.debounce(() => {
+            const sub = editor.onDidChangeModelContent(debounce(() => {
                 dotNetRef.invokeMethodAsync("OnEditorChanged", editor.getValue());
             }, 300));
 
-            editors.set(elementId, { editor: editor, subscription: sub });
+            editors.set(elementId, { editor: editor, subscription: sub, completions: [] });
+        },
+
+        /// Replace the autocomplete suggestions for one editor (built in .NET by ScriptCompletions).
+        setCompletions: function (elementId, items) {
+            const entry = editors.get(elementId);
+            if (entry) entry.completions = items || [];
         },
 
         setValue: function (elementId, value) {
@@ -197,6 +252,45 @@
     }
 
     window.ScriptSync = {
+        // Called by the MAIN tab when the Script (ST) button is pressed. Tries to open
+        // the IDE in a new tab and reports whether that worked, so the caller can fall
+        // back to navigating in place when the environment blocks popups.
+        open: function (url) {
+            try {
+                // Editor-embedded browsers (VS Code Simple Browser, Electron webviews)
+                // hand back a window proxy for window.open but never display the tab,
+                // so report failure and let the caller navigate in place.
+                const ua = navigator.userAgent || "";
+                if (/\bElectron\//.test(ua) || /\bCode\//.test(ua)) {
+                    return false;
+                }
+                const win = window.open(url, "_blank");
+                if (!win) {
+                    return false;
+                }
+                try { win.opener = null; } catch (e) { /* cross-origin safety */ }
+                return true;
+            } catch (e) {
+                console.error("[FRAMLab] Could not open the Script IDE tab.", e);
+                return false;
+            }
+        },
+        // Called by the IDE page when it was not opened as its own tab (in-place
+        // fallback), where window.close() is ignored: return to the main editor.
+        closeOrGoHome: function (homeUrl) {
+            try { window.close(); } catch (e) { /* ignored */ }
+            window.setTimeout(function () {
+                if (!window.closed) {
+                    // Back first so the browser can restore the editor tab from
+                    // its back/forward cache; fall back to the app root.
+                    if (window.history.length > 1) {
+                        window.history.back();
+                    } else {
+                        window.location.href = homeUrl || "/";
+                    }
+                }
+            }, 150);
+        },
         // Called by the MAIN tab before opening the IDE tab: stash the model the IDE should load.
         prepare: function (xml, fnId, fileName) {
             try {

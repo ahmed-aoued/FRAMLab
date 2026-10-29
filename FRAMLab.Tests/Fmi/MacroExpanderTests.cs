@@ -6,15 +6,15 @@ namespace FRAMLab.Tests.Fmi;
 
 /// <summary>
 /// Formula-macro evaluation: arithmetic, variables, built-ins, nested macros, strict
-/// arity/type checks, rule-in-value-context rejection, depth/cycle guards, and the
+/// arity/type checks, depth/cycle guards, and the
 /// scope-aware callee lookup.
 /// </summary>
 public class MacroExpanderTests
 {
     private static FmiMacroDefinition Macro(string name, string body, string functionId = "",
-        FmiMacroKind kind = FmiMacroKind.Formula, params (string Name, FmiTypeDescriptor Type)[] parameters)
+        params (string Name, FmiTypeDescriptor Type)[] parameters)
     {
-        var macro = new FmiMacroDefinition { Name = name, Kind = kind, Body = body, FunctionId = functionId };
+        var macro = new FmiMacroDefinition { Name = name, Body = body, FunctionId = functionId };
         foreach (var (pn, pt) in parameters)
         {
             macro.Parameters.Add(new FmiMacroParameter { Name = pn, Type = pt });
@@ -44,7 +44,7 @@ public class MacroExpanderTests
     public void Formula_EvaluatesArithmetic()
     {
         var (result, diagnostics) = Expand(
-            new[] { Macro("doubleIt", "x * 2", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)) },
+            new[] { Macro("doubleIt", "x * 2", "", ("x", FmiTypeDescriptor.Number)) },
             "doubleIt(4)");
 
         Assert.Equal("8", result);
@@ -67,7 +67,7 @@ public class MacroExpanderTests
     public void Formula_TernaryAndBuiltIns()
     {
         var (result, diagnostics) = Expand(
-            new[] { Macro("hyp", "sqrt(a^2 + b^2)", "", FmiMacroKind.Formula,
+            new[] { Macro("hyp", "sqrt(a^2 + b^2)", "",
                 ("a", FmiTypeDescriptor.Number), ("b", FmiTypeDescriptor.Number)) },
             "hyp(3, 4)");
 
@@ -81,8 +81,8 @@ public class MacroExpanderTests
         var (result, diagnostics) = Expand(
             new[]
             {
-                Macro("inc", "x + 1", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)),
-                Macro("inc2", "inc(inc(x))", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number))
+                Macro("inc", "x + 1", "", ("x", FmiTypeDescriptor.Number)),
+                Macro("inc2", "inc(inc(x))", "", ("x", FmiTypeDescriptor.Number))
             },
             "inc2(1)");
 
@@ -90,25 +90,12 @@ public class MacroExpanderTests
         Assert.Empty(diagnostics);
     }
 
-    [Fact]
-    public void Rule_InValueContext_EmitsError()
-    {
-        var (result, diagnostics) = Expand(
-            new[] { Macro("setFlag", "SET Flag = true", "3", FmiMacroKind.Rule) },
-            "setFlag()",
-            callingFunctionId: "3");
-
-        Assert.Equal("", result);
-        var error = Assert.Single(diagnostics);
-        Assert.Equal(FmiDiagnosticSeverity.Error, error.Severity);
-        Assert.Contains("value expression", error.Message);
-    }
 
     [Fact]
     public void ArityMismatch_EmitsError()
     {
         var (result, diagnostics) = Expand(
-            new[] { Macro("f", "x", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)) },
+            new[] { Macro("f", "x", "", ("x", FmiTypeDescriptor.Number)) },
             "f(1, 2)");
 
         Assert.Equal("", result);
@@ -119,7 +106,7 @@ public class MacroExpanderTests
     public void TypeMismatch_IsHardError()
     {
         var (result, diagnostics) = Expand(
-            new[] { Macro("f", "x", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)) },
+            new[] { Macro("f", "x", "", ("x", FmiTypeDescriptor.Number)) },
             "f(true)");
 
         Assert.Equal("", result);
@@ -147,7 +134,7 @@ public class MacroExpanderTests
     [Fact]
     public void FunctionScopedMacro_ResolvesByCaller()
     {
-        var macros = new[] { Macro("g", "x + 100", "3", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)) };
+        var macros = new[] { Macro("g", "x + 100", "3", ("x", FmiTypeDescriptor.Number)) };
 
         var (inScope, inScopeDiags) = Expand(macros, "g(2)", callingFunctionId: "3");
         Assert.Equal("102", inScope);
@@ -161,7 +148,7 @@ public class MacroExpanderTests
     [Fact]
     public void GlobalMacro_FallbackForAnyCaller()
     {
-        var macros = new[] { Macro("g", "x + 1", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)) };
+        var macros = new[] { Macro("g", "x + 1", "", ("x", FmiTypeDescriptor.Number)) };
 
         var (result, diagnostics) = Expand(macros, "g(2)", callingFunctionId: "3");
 
@@ -177,7 +164,7 @@ public class MacroExpanderTests
         for (var i = 0; i < 11; i++)
         {
             var body = i < 10 ? $"m{i + 1}(x)" : "x";
-            macros.Add(Macro($"m{i}", body, "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number)));
+            macros.Add(Macro($"m{i}", body, "", ("x", FmiTypeDescriptor.Number)));
         }
 
         var (result, diagnostics) = Expand(macros, "m0(1)");

@@ -15,9 +15,9 @@ public class FmiMacroRoundTripTests
     private static string LegacyFile => Path.Combine(AppContext.BaseDirectory, "TestFiles", "FMV_FeatureTest.xfmv");
 
     private static FmiMacroDefinition Macro(string name, string body, string functionId = "",
-        FmiMacroKind kind = FmiMacroKind.Formula, params (string Name, FmiTypeDescriptor Type)[] parameters)
+        params (string Name, FmiTypeDescriptor Type)[] parameters)
     {
-        var macro = new FmiMacroDefinition { Name = name, Kind = kind, Body = body, FunctionId = functionId };
+        var macro = new FmiMacroDefinition { Name = name, Body = body, FunctionId = functionId };
         foreach (var (pn, pt) in parameters)
         {
             macro.Parameters.Add(new FmiMacroParameter { Name = pn, Type = pt });
@@ -49,7 +49,7 @@ public class FmiMacroRoundTripTests
             "<Macro name=\"clamp01\" kind=\"formula\" return=\"number\" description=\"Clamp\">" +
             "<Param name=\"x\" type=\"number\" description=\"value\" />" +
             "<Body>min(max(x, 0), 1)</Body></Macro>" +
-            "<Macro name=\"setFlag\" kind=\"rule\" function=\"3\"><Body>SET Flag = true</Body></Macro>" +
+            "<Macro name=\"setFlag\" function=\"3\"><Body>Flag + 1</Body></Macro>" +
             "</Macros></FMI></FM>";
 
         var doc = new XmlDocument();
@@ -60,9 +60,7 @@ public class FmiMacroRoundTripTests
         Assert.True(definition.MacrosNodeExistedAtLoad);
         Assert.Equal(2, definition.Macros.Count);
         Assert.Equal("clamp01", definition.Macros[0].Name);
-        Assert.Equal(FmiMacroKind.Formula, definition.Macros[0].Kind);
         Assert.Equal("setFlag", definition.Macros[1].Name);
-        Assert.Equal(FmiMacroKind.Rule, definition.Macros[1].Kind);
         Assert.Equal("3", definition.Macros[1].FunctionId);
         Assert.Empty(definition.LoadDiagnostics);
         Assert.Equal(xml, doc.OuterXml);
@@ -80,9 +78,9 @@ public class FmiMacroRoundTripTests
         var macroNode = doc.SelectSingleNode("//FM/FMI/Macros/Macro");
         Assert.NotNull(macroNode);
         Assert.Equal("g", ((XmlElement)macroNode!).GetAttribute("name"));
-        //EnsureFmiRoot also guarantees the sibling nodes so edits are well-formed.
+        //EnsureFmiRoot also guarantees <Variables>; the old <Rules> placeholder is no longer created.
         Assert.NotNull(doc.SelectSingleNode("//FM/FMI/Variables"));
-        Assert.NotNull(doc.SelectSingleNode("//FM/FMI/Rules"));
+        Assert.Null(doc.SelectSingleNode("//FM/FMI/Rules"));
     }
 
     [Fact]

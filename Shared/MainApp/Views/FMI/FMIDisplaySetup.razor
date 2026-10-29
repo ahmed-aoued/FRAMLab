@@ -3,7 +3,7 @@
 @inject IJSRuntime JSRuntime
 @inject IConfiguration render
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions" ContentClass="fmi-display-content" Class="fmi-display-dialog">
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions" ContentClass="fmi-display-content" Class="fmi-display-dialog">
     <TitleContent>
         <div class="d-flex align-center" style="gap:8px;">
             <MudText Typo="Typo.h6">Display</MudText>
@@ -118,6 +118,16 @@
 </MudDialog>
 
 @code {
+    // Inline MudDialogs must be closed by MudBlazor itself (CloseAsync): if the page removes the
+    // component first, the dialog stays on screen. MudBlazor then sets Visible=false, and the
+    // _visible setter tells the page (the same path Escape and the X button take).
+    private MudDialog? dialog;
+    private async Task CloseDialogAsync()
+    {
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClose.InvokeAsync(false);
+    }
+
     [Parameter] public EventCallback<bool> OnClose { get; set; }
     private string selectedDisplay = "1";
 
@@ -226,7 +236,7 @@
     }
     private async void clickOut(MouseEventArgs e)
     {
-        await OnClose.InvokeAsync(false);
+        await CloseDialogAsync();
     }
     private void clickNothing(MouseEventArgs e)
     {
@@ -235,11 +245,11 @@
     {
         if (e.Key == "Escape")
         {
-            await OnClose.InvokeAsync(false);
+            await CloseDialogAsync();
         }
         // else if (e.Key == "Enter")
         // {
-        //     await OnClose.InvokeAsync(false);
+        //     await CloseDialogAsync();
         // }
     }
     public async void FocusElement(string elementName)

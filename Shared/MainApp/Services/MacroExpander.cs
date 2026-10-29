@@ -37,6 +37,22 @@ namespace FRAMLab.Shared.MainApp.Services
 
         public static bool IsBuiltIn(string name) => BuiltIns.Contains(name);
 
+        /// <summary>Check a formula body for syntax errors without evaluating it (used by the FMI Setup editor).</summary>
+        public static bool TryParseBody(string body, out string? error)
+        {
+            try
+            {
+                new Parser(body ?? "").Parse();
+                error = null;
+                return true;
+            }
+            catch (FormatException fe)
+            {
+                error = fe.Message;
+                return false;
+            }
+        }
+
         /// <summary>
         /// Lightweight scan for call-callee identifiers, used by the registry's static body scan.
         /// String literals are blanked first so text inside quotes is ignored.
@@ -76,15 +92,27 @@ namespace FRAMLab.Shared.MainApp.Services
 
         /// <summary>
         /// Evaluates <paramref name="expression"/> in typed mode and returns the legacy string
-        /// representation. All macro-level failures (arity, type, cycle, depth, rule-in-value,
+        /// representation. All macro-level failures (arity, type, cycle, depth,
         /// unknown callee) emit a diagnostic and fail-soft to "".
         /// </summary>
         public string Expand(string expression, Dictionary<string, string[]> variables, string callingFunctionId, FmiEvaluationContext ctx, List<FmiDiagnostic> diagnostics)
+            => Expand(expression, variables, callingFunctionId, ctx, diagnostics, null);
+
+        /// <summary>As <see cref="Expand(string, Dictionary{string, string[]}, string, FmiEvaluationContext, List{FmiDiagnostic})"/>,
+        /// additionally recording uppercase variable names that were not found (still read as 0).</summary>
+        public string Expand(string expression, Dictionary<string, string[]> variables, string callingFunctionId, FmiEvaluationContext ctx, List<FmiDiagnostic> diagnostics, ICollection<string>? unresolved)
+            => Expand(expression, variables, callingFunctionId, ctx, diagnostics, unresolved, null);
+
+        public string Expand(string expression, Dictionary<string, string[]> variables, string callingFunctionId, FmiEvaluationContext ctx, List<FmiDiagnostic> diagnostics, ICollection<string>? unresolved, FmiApiReader? api)
         {
             try
             {
                 var root = new Parser(expression ?? "").Parse();
-                var state = new EvalState(variables, callingFunctionId, ctx, diagnostics, 0, new List<string>(), new Dictionary<string, FmiValue>());
+                var state = new EvalState(variables, callingFunctionId, ctx, diagnostics, 0, new List<string>(), new Dictionary<string, FmiValue>())
+                {
+                    Unresolved = unresolved,
+                    Api = api
+                };
                 return Evaluate(root, state).ToLegacyString();
             }
             catch (FormatException fe)
@@ -129,7 +157,11 @@ namespace FRAMLab.Shared.MainApp.Services
             }
             if (name.Length > 0 && char.IsUpper(name[0]))
             {
-                return FmiValue.Number(0); //legacy: unknown uppercase variable reads as 0
+                if (state.Unresolved is not null && !state.Unresolved.Contains(name))
+                {
+                    state.Unresolved.Add(name);
+                }
+                return FmiValue.Number(0); //legacy: unknown uppercase variable reads as 0 (caller decides via Unresolved)
             }
             return FmiValue.Str(name); //legacy: unknown lowercase identifier reads as itself
         }
@@ -204,12 +236,6 @@ namespace FRAMLab.Shared.MainApp.Services
 
         private FmiValue ExpandMacro(FmiMacroDefinition macro, List<MacroAstNode> args, EvalState state)
         {
-            if (macro.Kind == FmiMacroKind.Rule)
-            {
-                state.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, $"macro:{macro.Name}",
-                    $"Rule macro '{macro.Name}' cannot be used in a value expression."));
-                return FmiValue.Empty;
-            }
             if (_registry.IsPoisoned(macro))
             {
                 state.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, $"macro:{macro.Name}",
@@ -262,7 +288,11 @@ namespace FRAMLab.Shared.MainApp.Services
             }
 
             var child = new EvalState(state.Variables, state.CallingFunctionId, state.Ctx, state.Diagnostics,
-                state.Depth + 1, new List<string>(state.Stack) { macro.Name }, bound);
+                state.Depth + 1, new List<string>(state.Stack) { macro.Name }, bound)
+            {
+                Unresolved = state.Unresolved,
+                Api = state.Api
+            };
             return Evaluate(body, child);
         }
 
@@ -270,28 +300,48 @@ namespace FRAMLab.Shared.MainApp.Services
         {
             var values = args.Select(a => Evaluate(a, state)).ToList();
             var first = values.Count > 0 ? values[0].AsNumber() : 0;
+            var second = values.Count > 1 ? values[1].AsNumber() : 0;
+            // Built-ins mirror ExpressionEvaluator so an equation gives the same result whether
+            // or not it calls a macro: trig in degrees, round(x, digits), rnd/rndi(from, to).
             switch (name)
             {
                 case "min": return FmiValue.Number(values.Count == 0 ? 0 : values.Min(v => v.AsNumber()));
                 case "max": return FmiValue.Number(values.Count == 0 ? 0 : values.Max(v => v.AsNumber()));
-                case "round": return FmiValue.Number(Math.Round(first));
+                case "round":
+                    if (values.Count > 1)
+                    {
+                        var f = Math.Pow(10, second);
+                        return FmiValue.Number(Math.Round(first * f) / f);
+                    }
+                    return FmiValue.Number(Math.Round(first));
                 case "sqrt": return FmiValue.Number(Math.Sqrt(first));
-                case "sin": return FmiValue.Number(Math.Sin(first));
-                case "cos": return FmiValue.Number(Math.Cos(first));
-                case "tan": return FmiValue.Number(Math.Tan(first));
+                case "sin": return FmiValue.Number(Math.Sin(first * Math.PI / 180));
+                case "cos": return FmiValue.Number(Math.Cos(first * Math.PI / 180));
+                case "tan": return FmiValue.Number(Math.Tan(first * Math.PI / 180));
                 case "abs": return FmiValue.Number(Math.Abs(first));
                 case "exp": return FmiValue.Number(Math.Exp(first));
                 case "log": return FmiValue.Number(Math.Log(first));
                 case "ceiling": return FmiValue.Number(Math.Ceiling(first));
                 case "floor": return FmiValue.Number(Math.Floor(first));
                 case "int": return FmiValue.Number(Math.Truncate(first));
-                case "rnd": return FmiValue.Number(values.Count == 0 ? _random.NextDouble() : _random.NextDouble() * first);
-                case "rndi": return FmiValue.Number(values.Count == 0 ? 0 : Math.Floor(_random.NextDouble() * first));
+                case "rnd":
+                    if (values.Count == 0) return FmiValue.Number(_random.NextDouble());
+                    if (values.Count == 1) return FmiValue.Number(_random.NextDouble() * first);
+                    return FmiValue.Number(_random.NextDouble() * (second - first) + first);
+                case "rndi":
+                    if (values.Count == 0) return FmiValue.Number(_random.Next(0, 2));
+                    if (values.Count == 1) return FmiValue.Number(_random.Next(0, Math.Max(0, (int)first)));
+                    return FmiValue.Number(_random.Next((int)first, Math.Max((int)first, (int)second)));
                 case "rnorm": return FmiValue.Number(RandomNormal(values.Count > 0 ? values[0].AsNumber() : 0, values.Count > 1 ? values[1].AsNumber() : 1));
                 case "rnormi": return FmiValue.Number(Math.Round(RandomNormal(values.Count > 0 ? values[0].AsNumber() : 0, values.Count > 1 ? values[1].AsNumber() : 1)));
                 case "lookup": return EvaluateLookup(values, state);
                 case "xref": return EvaluateXref(values, state);
-                case "api": return FmiValue.Str("NaN");
+                case "api":
+                    if (state.Api is null || values.Count < 2) return FmiValue.Str("NaN");
+                    if (!state.Api(values[0].ToLegacyString(), values[1].ToLegacyString(), out var apiValue, out _)) return FmiValue.Number(0);
+                    return double.TryParse(apiValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var apiNumber)
+                        ? FmiValue.Number(apiNumber)
+                        : FmiValue.Str(apiValue);
                 case "execute":
                 case "array":
                     return FmiValue.Str(name);
@@ -356,6 +406,8 @@ namespace FRAMLab.Shared.MainApp.Services
             public int Depth { get; }
             public List<string> Stack { get; }
             public Dictionary<string, FmiValue> Parameters { get; }
+            public ICollection<string>? Unresolved { get; init; }
+            public FmiApiReader? Api { get; init; }
 
             public EvalState(Dictionary<string, string[]> variables, string callingFunctionId, FmiEvaluationContext ctx,
                 List<FmiDiagnostic> diagnostics, int depth, List<string> stack, Dictionary<string, FmiValue> parameters)

@@ -1,6 +1,6 @@
 ﻿@using MudBlazor
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions">
     <TitleContent>
         <div class="d-flex align-center">
             <MudIcon Icon="@Icons.Material.Filled.Hexagon" Color="Color.Primary" Class="mr-2" />
@@ -17,11 +17,11 @@
                 <tr><td><MudIcon Icon="@Icons.Material.Filled.UploadFile" Size="Size.Small" /></td><td>Upload an existing FMV data file</td>
                     <td><MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" /></td><td>Download the model as an FMV data file</td></tr>
                 <tr><td><MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" /></td><td>Download the model as an SVG image</td>
-                    <td><kbd>Ctrl+R</kbd></td><td>Refresh new model</td></tr>
+                    <td><kbd>Ctrl+R</kbd></td><td>Reload the page (start a new model)</td></tr>
                 <tr><td><MudIcon Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Small" /></td><td>Zoom out</td>
                     <td><MudIcon Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Small" /></td><td>Zoom in</td></tr>
-                <tr><td><MudIcon Icon="@Icons.Material.Filled.Undo" Size="Size.Small" /></td><td>Undo</td>
-                    <td><MudIcon Icon="@Icons.Material.Filled.Redo" Size="Size.Small" /></td><td>Redo</td></tr>
+                <tr><td><MudIcon Icon="@Icons.Material.Filled.Undo" Size="Size.Small" /></td><td>Undo (<kbd>Ctrl+Z</kbd>)</td>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Redo" Size="Size.Small" /></td><td>Redo (<kbd>Ctrl+Y</kbd>)</td></tr>
                 <tr><td><MudIcon Icon="@Icons.Material.Filled.Label" Size="Size.Small" /></td><td>Hide/Show aspect labels</td>
                     <td><MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" /></td><td>Change function style rendering</td></tr>
                 <tr><td><MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" /></td><td>Restore latest model</td>
@@ -40,7 +40,7 @@
             When an <strong>Output</strong> aspect has the same name as an <strong>I P R C T</strong> aspect on another function, a potential coupling line connects the functions.
         </MudText>
         <MudText Typo="Typo.body2" Class="mb-3">
-            Drag a function to arrange the model. On iPad use long-press to lock scrolling. Use F11 for full-screen, or install the app for offline use.
+            Drag a function to arrange the model. On iPad use long-press to lock scrolling. Use F11 for full-screen.
         </MudText>
         <MudDivider Class="mb-2" />
         <MudText Typo="Typo.caption"><strong>Copyright © 2021 ZERPRIZE LIMITED</strong></MudText>
@@ -57,6 +57,16 @@
 </MudDialog>
 
 @code {
+    // Inline MudDialogs must be closed by MudBlazor itself (CloseAsync): if the page removes the
+    // component first, the dialog stays on screen. MudBlazor then sets Visible=false, and the
+    // _visible setter tells the page (the same path Escape and the X button take).
+    private MudDialog? dialog;
+    private async Task CloseDialogAsync()
+    {
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClick.InvokeAsync(false);
+    }
+
     [Parameter] public EventCallback<bool> OnClick { get; set; }
 
     private bool _visible
@@ -76,6 +86,6 @@
 
     private async Task Close()
     {
-        await OnClick.InvokeAsync(false);
+        await CloseDialogAsync();
     }
 }

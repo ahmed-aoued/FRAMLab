@@ -67,5 +67,16 @@ namespace FRAMLab.Shared
         public string FunctionId { get; init; } = "";
         public List<(string Key, string Value)> EvaluatedKeys { get; } = new(); //every key the loop touched, in loop order
         public List<FmiDiagnostic> Diagnostics { get; } = new();
+        /// <summary>Variables an equation referenced that do not exist anywhere in the model.
+        /// The affected key keeps its previous value; the run asks the user what to do.</summary>
+        public List<FmiUnknownVariable> UnknownVariables { get; } = new();
+    }
+
+    /// <summary>An equation (function + metadata key) that references a variable nothing defines.</summary>
+    /// <param name="Reason">Why the value is missing (live data); "" for a plain unknown variable.</param>
+    public sealed record FmiUnknownVariable(string FunctionId, string FunctionName, string Key, string Variable, string Reason = "")
+    {
+        /// <summary>Identity used to remember a user's "treat as 0" decision.</summary>
+        public string AcceptKey => $"{FunctionId}|{Variable}";
     }
 }

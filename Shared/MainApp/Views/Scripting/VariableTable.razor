@@ -11,8 +11,9 @@
                 {
                     <th class="vt-col-scope">Scope</th>
                 }
+                <th class="vt-col-array" title="One-dimensional array: indexes start at 0 and it grows when you write a[i]">Array</th>
                 <th class="vt-col-type">Type</th>
-                <th class="vt-col-init">Initial value</th>
+                <th class="vt-col-init" title="Optional: leave empty to require the script to assign a value first">Initial value</th>
                 <th class="vt-col-out" title="Write this variable back to the function each cycle">Out</th>
                 <th class="vt-col-del"></th>
             </tr>
@@ -42,6 +43,18 @@
                             </select>
                         </td>
                     }
+                    <td class="vt-cell vt-cell-array">
+                        <input type="checkbox" class="vt-check" checked="@v.IsArray" title="Declare as array"
+                               @onchange="@((e) => SetArray(v, (bool)(e.Value ?? false)))" />
+                        @if (v.IsArray)
+                        {
+                            <select class="vt-select vt-dims-select" value="@v.Dimensions" title="1-D: a[i]   ·   2-D table: m[row, col]"
+                                    @onchange="@((e) => SetDimensions(v, e.Value?.ToString() ?? "1"))">
+                                <option value="1">1-D</option>
+                                <option value="2">2-D</option>
+                            </select>
+                        }
+                    </td>
                     <td class="vt-cell vt-cell-type">
                         <select class="vt-select"
                                 value="@v.Type.ToString()"
@@ -54,7 +67,8 @@
                     </td>
                     <td class="vt-cell vt-cell-init @(InitInvalid(v) ? "vt-invalid" : "")">
                         <input class="vt-input vt-mono"
-                               value="@v.InitialValue" spellcheck="false" placeholder="@ScriptVariable.DefaultInit(v.Type)"
+                               value="@v.InitialValue" spellcheck="false"
+                               placeholder="@(v.IsTable ? "1,2;3,4" : v.IsArray ? "1,2,3" : "optional")"
                                @onchange="@((e) => SetInit(v, e.Value?.ToString() ?? ""))" />
                     </td>
                     <td class="vt-cell vt-cell-out">
@@ -126,8 +140,7 @@
            || !Regex.IsMatch(v.Name, "^[A-Za-z_][A-Za-z0-9_]*$")
            || Variables.Count(x => x.Name == v.Name) > 1;
 
-    private bool InitInvalid(ScriptVariable v)
-        => !ScriptVariable.IsValidInit(v.Type, v.InitialValue);
+    private bool InitInvalid(ScriptVariable v) => !ScriptVariable.IsValidInitFor(v);
 
     private async Task Add()
     {
@@ -144,7 +157,10 @@
             Name = name,
             Scope = IsGlobal ? ScriptScope.Global : ScriptScope.Temp,
             Type = ScriptVarType.REAL,
-            InitialValue = ScriptVariable.DefaultInit(ScriptVarType.REAL)
+            InitialValue = "",
+            IsArray = false,
+            LowerBound = 0,
+            UpperBound = 0
         });
         await NotifyChanged();
     }
@@ -182,10 +198,31 @@
         if (Enum.TryParse<ScriptVarType>(type, out var t))
         {
             v.Type = t;
-            if (!ScriptVariable.IsValidInit(t, v.InitialValue))
+            if (!ScriptVariable.IsValidInitFor(v))
             {
-                v.InitialValue = ScriptVariable.DefaultInit(t);
+                v.InitialValue = "";
             }
+        }
+        await NotifyChanged();
+    }
+
+    private async Task SetArray(ScriptVariable v, bool isArray)
+    {
+        v.IsArray = isArray;
+        if (!isArray) v.Dimensions = 1;
+        if (!ScriptVariable.IsValidInitFor(v))
+        {
+            v.InitialValue = "";
+        }
+        await NotifyChanged();
+    }
+
+    private async Task SetDimensions(ScriptVariable v, string dims)
+    {
+        v.Dimensions = dims == "2" ? 2 : 1;
+        if (!ScriptVariable.IsValidInitFor(v))
+        {
+            v.InitialValue = "";
         }
         await NotifyChanged();
     }

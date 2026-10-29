@@ -488,6 +488,7 @@ namespace FRAMLab.Shared
         public void initFmiRuntime()
         {
             fmiInterpreter.Initialize(fmiDefinitionService.MergeWithImplicit(fmiDefinitionService.Load(projectData_Undo[0]), functionList), functionList);
+            fmiData?.Configure(fmiInterpreter.Definition.DataSources, fmiInterpreter.Definition.DataUses);
             foreach (var diagnostic in fmiInterpreter.Definition.LoadDiagnostics)
             {
                 Console.WriteLine($"FMI {diagnostic.Severity}: {diagnostic.Source}: {diagnostic.Message}");
@@ -497,21 +498,135 @@ namespace FRAMLab.Shared
         {
             fmiInterpreter.OnFunctionAdded(fn);
         }
-        public void fmiBeginCycle()
+        /// <summary>Structured FMI run log (the log panel); <see cref="fmiMessage"/> keeps the plain text for saving.</summary>
+        public List<FmiLogEntry> fmiLog { get; } = new();
+        /// <summary>Unknown variables from the last cycle that are waiting for the user's decision.</summary>
+        public List<FmiUnknownVariable> fmiUnknownVariables { get; set; } = new();
+        public bool showFMIUnknownVariables { get; set; } = false;
+        /// <summary>FMI Setup dialog (typed variables and macros).</summary>
+        public bool showFMISetup { get; set; } = false;
+
+        /// <summary>Append one entry to the run log (plain text and structured).</summary>
+        public void appendFmiLog(string text, FmiLogLevel level = FmiLogLevel.Info, string origin = "Run", Function? fn = null)
         {
-            fmiInterpreter.BeginCycle(buildFmiContext());
+            fmiMessage += text;
+            var message = text.Trim('\n');
+            if (message.Length > 0)
+            {
+                fmiLog.Add(new FmiLogEntry(cycleFMI, level, origin, fn?.IDNr ?? "", fn?.IDName ?? "", message));
+            }
+        }
+        public void clearFmiLog()
+        {
+            fmiMessage = "";
+            fmiLog.Clear();
+            fmiLogQueue.Clear();
+        }
+
+        /// <summary>Diagnostics waiting to be written to the FMI log by the run.</summary>
+        private readonly List<FmiDiagnostic> fmiLogQueue = new();
+        private void queueFmiDiagnostics(IEnumerable<FmiDiagnostic> diagnostics)
+        {
+            foreach (var diagnostic in diagnostics)
+            {
+                Console.WriteLine($"FMI {diagnostic.Severity}: {diagnostic.Source}: {diagnostic.Message}");
+                fmiLogQueue.Add(diagnostic);
+            }
+        }
+        private void drainPendingDiagnostics()
+        {
             if (fmiInterpreter is FmiInterpreter interpreter && interpreter.PendingDiagnostics.Count > 0)
             {
-                foreach (var diagnostic in interpreter.PendingDiagnostics)
-                {
-                    Console.WriteLine($"FMI {diagnostic.Severity}: {diagnostic.Source}: {diagnostic.Message}");
-                }
+                queueFmiDiagnostics(interpreter.PendingDiagnostics);
                 interpreter.PendingDiagnostics.Clear();
             }
         }
+        private static readonly System.Text.RegularExpressions.Regex diagnosticFunctionPattern = new(@"^Fn (\S+) / key ");
+        private void logFmiDiagnostic(FmiDiagnostic d)
+        {
+            var level = d.Severity switch
+            {
+                FmiDiagnosticSeverity.Error => FmiLogLevel.Error,
+                FmiDiagnosticSeverity.Warning => FmiLogLevel.Warning,
+                _ => FmiLogLevel.Info,
+            };
+            var origin = d.Source.StartsWith("macro") ? "Macro" : d.Source.StartsWith("Fn ") ? "Equation" : "Model";
+            var match = diagnosticFunctionPattern.Match(d.Source);
+            var fn = match.Success ? functionList.Find(f => f.IDNr == match.Groups[1].Value) : null;
+            appendFmiLog($"{d.Severity.ToString().ToUpperInvariant()}: {d.Source}: {d.Message}\n", level, origin, fn);
+        }
+        /// <summary>Append queued diagnostics to the FMI log. With includeLoad (run start) the
+        /// definition-load diagnostics are written first, so every run's log shows them.</summary>
+        public void flushFmiDiagnostics(bool includeLoad = false)
+        {
+            if (includeLoad)
+            {
+                foreach (var diagnostic in fmiInterpreter.Definition.LoadDiagnostics)
+                {
+                    logFmiDiagnostic(diagnostic);
+                }
+            }
+            foreach (var diagnostic in fmiLogQueue)
+            {
+                logFmiDiagnostic(diagnostic);
+            }
+            fmiLogQueue.Clear();
+        }
+        /// <summary>Equations may read last cycle's values as Prev_Key (FMI panel toggle).</summary>
+        public bool fmiPrevVariables
+        {
+            get => fmiInterpreter is FmiInterpreter interpreter && interpreter.EnablePrevVariables;
+            set { if (fmiInterpreter is FmiInterpreter interpreter) interpreter.EnablePrevVariables = value; }
+        }
+        /// <summary>The user chose to read this unknown variable as 0 (until the model is reloaded).</summary>
+        public void acceptFmiUnknownVariable(FmiUnknownVariable unknown)
+        {
+            if (fmiInterpreter is FmiInterpreter interpreter)
+            {
+                interpreter.AcceptedUnknownVariables.Add(unknown.AcceptKey);
+            }
+        }
+        /// <summary>Add a metadata key (with an initial value) to a function and persist it to the XML.
+        /// Returns false when the name is not a valid key or the function already has it.</summary>
+        public bool addMetadataKey(Function fn, string key, string value)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(key, "^[A-Z][A-Za-z0-9_]*$") || fn.metadata.Any(m => m[0] == key))
+            {
+                return false;
+            }
+            updateUndo();
+            fn.metadata.Add(new string[] { key, value, "", "", value });
+            if (!metaDataKeys.ContainsKey(key))
+            {
+                metaDataKeys.Add(key, "");
+            }
+            var cols = metadataDS.Tables["Metadata"]?.Columns;
+            if (cols is not null && !cols.Contains(key))
+            {
+                cols.Add(new DataColumn(key, typeof(string)));
+                cols.Add(new DataColumn($"{key}-active", typeof(string)));
+                cols.Add(new DataColumn($"{key}-equation", typeof(string)));
+            }
+            updateMetadata(fn);
+            return true;
+        }
+        /// <summary>Which functions use scripts / macros, and how many declared variables and globals exist.</summary>
+        public FmiModelUsage fmiUsage() => FmiModelUsage.Analyze(functionList, fmiDefinition, globalScriptVariables.Count);
+        /// <summary>Live data sources for api("source", "path"); set from Program.cs.</summary>
+        public FmiDataService? fmiData { get; set; }
+        /// <summary>The FMI run loop, created on first use (survives the FMI panel being re-rendered).</summary>
+        public FmiRunEngine? fmiRun { get; set; }
+        public void fmiBeginCycle()
+        {
+            fmiInterpreter.BeginCycle(buildFmiContext());
+            drainPendingDiagnostics();
+        }
         public FmiEvaluationResult fmiEvaluate(Function fn)
         {
-            return fmiInterpreter.EvaluateFunction(fn, buildFmiContext());
+            var result = fmiInterpreter.EvaluateFunction(fn, buildFmiContext());
+            queueFmiDiagnostics(result.Diagnostics);
+            drainPendingDiagnostics(); // macro expansion reports through PendingDiagnostics
+            return result;
         }
         public void fmiEndCycle()
         {
@@ -520,6 +635,7 @@ namespace FRAMLab.Shared
         public void fmiReset()
         {
             fmiInterpreter.Reset(functionList);
+            fmiData?.Reset();
         }
         public XmlNode EnsureFmiRoot()
         {
@@ -556,6 +672,30 @@ namespace FRAMLab.Shared
             }
             initFmiRuntime();
             return true;
+        }
+        public void UpsertFmiDataSource(FmiDataSource source, string? previousName = null)
+        {
+            updateUndo();
+            if (previousName is not null && previousName != source.Name)
+            {
+                fmiDefinitionService.RemoveDataSource(projectData_Undo[0], previousName);
+            }
+            fmiDefinitionService.UpsertDataSource(projectData_Undo[0], source);
+            initFmiRuntime();
+        }
+        public void RemoveFmiDataSource(string name)
+        {
+            updateUndo();
+            fmiDefinitionService.RemoveDataSource(projectData_Undo[0], name);
+            initFmiRuntime();
+        }
+        public void SetFmiDataTiming(string source, string functionId, FmiDataTiming timing)
+        {
+            updateUndo();
+            // reading on activation is the default, so it needs no entry in the file
+            fmiDefinitionService.SetDataTiming(projectData_Undo[0], source, functionId,
+                timing == FmiDataTiming.OnActivation ? null : timing);
+            initFmiRuntime();
         }
         // ── Agents ──────────────────────────────────────────────
         public XmlNode EnsureAgentsRoot()

@@ -1,5 +1,6 @@
 @using MudBlazor
 @inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
 @inject StateContainer stateContainer
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
@@ -667,14 +668,18 @@
         <div class="d-flex pt-2 align-center">
             @if (stateContainer.selectedFn != "-1")
             {
-                @* A real anchor is not popup-blocked; prepare the model for the IDE tab on pointer-down. *@
+                @* Stash the model on pointer-down, then open the IDE. The click handler is explicit
+                   so that browsers/embedded views that suppress window.open (target="_blank") still
+                   navigate to the IDE in the current tab instead of silently doing nothing. *@
                 <a class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27"
-                   href="@ScriptEditorUrl" target="_blank" rel="noopener"
-                   @onpointerdown="PrepareScriptIDE"></a>
+                   href="@ScriptEditorUrl"
+                   @onpointerdown="PrepareScriptIDE"
+                   @onclick="OpenScriptIDE"
+                   @onclick:preventDefault></a>
             }
             else
             {
-                <button class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27" disabled></button>
+                <button class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST) - select a function first" tabindex="27" disabled></button>
             }
         </div>
         @if (stateContainer.showKeys == "")
@@ -714,9 +719,9 @@
 
     private string ScriptEditorUrl => $"scripteditor/{stateContainer.selectedFn}";
 
-    // Runs synchronously on pointer-down (before the anchor opens the new tab),
-    // stashing the current model in localStorage for the IDE tab to load.
-    private void PrepareScriptIDE()
+    // Runs on pointer-down (before the IDE opens), stashing the current model in
+    // localStorage for the IDE page to load.
+    private async Task PrepareScriptIDE()
     {
         if (stateContainer.selectedFn == "-1"
             || stateContainer.projectData_Undo is not { Length: > 0 }
@@ -724,8 +729,35 @@
         {
             return;
         }
-        _ = JSRuntime.InvokeVoidAsync("ScriptSync.prepare",
+        await JSRuntime.InvokeVoidAsync("ScriptSync.prepare",
             stateContainer.projectData_Undo[0].OuterXml, stateContainer.selectedFn, stateContainer.fileName);
+    }
+
+    // Opens the Script IDE. Prefers a new tab, but if the environment blocks popups
+    // (VS Code's embedded browser, PWAs, strict popup blockers) it navigates in place
+    // so the button always has a visible effect.
+    private async Task OpenScriptIDE()
+    {
+        if (stateContainer.selectedFn == "-1")
+        {
+            return;
+        }
+        await PrepareScriptIDE();
+
+        var opened = false;
+        try
+        {
+            opened = await JSRuntime.InvokeAsync<bool>("ScriptSync.open", ScriptEditorUrl);
+        }
+        catch (Exception)
+        {
+            // JS interop unavailable - fall through to in-place navigation.
+        }
+
+        if (!opened)
+        {
+            Nav.NavigateTo(ScriptEditorUrl);
+        }
     }
 
     // Autocomplete state
@@ -879,6 +911,7 @@
 
     private void CommitAspect(ChangeEventArgs e, string type, string id)
     {
+        stateContainer.updateUndo();
         var value = e.Value?.ToString() ?? "";
         if (!string.IsNullOrWhiteSpace(value))
         {
@@ -1199,6 +1232,7 @@
     {
         if (stateContainer.projectData_Undo[0] is not null && stateContainer.selectedFn != "-1")
         {
+            stateContainer.updateUndo();
             pendingAspectCreation[type] = true;
             _ = Task.Run(async () =>
             {

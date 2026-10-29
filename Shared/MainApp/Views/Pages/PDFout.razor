@@ -3,7 +3,7 @@
 @inject IJSRuntime JSRuntime
 @inject IStringLocalizer<Localization.SharedResource> Loc
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions" ContentStyle="overflow-y:auto;">
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions" ContentStyle="overflow-y:auto;">
     <TitleContent>
         <MudText Typo="Typo.h6">@stateContainer.fileName.Replace(".xfmv", "-text")</MudText>
     </TitleContent>
@@ -193,6 +193,16 @@
 </MudDialog>
 
 @code {
+    // Inline MudDialogs must be closed by MudBlazor itself (CloseAsync): if the page removes the
+    // component first, the dialog stays on screen. MudBlazor then sets Visible=false, and the
+    // _visible setter tells the page (the same path Escape and the X button take).
+    private MudDialog? dialog;
+    private async Task CloseDialogAsync()
+    {
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClose.InvokeAsync(false);
+    }
+
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
     private bool _visible
@@ -212,7 +222,7 @@
 
     private async Task Close()
     {
-        await OnClose.InvokeAsync(false);
+        await CloseDialogAsync();
     }
 
     private async void printFMILog()

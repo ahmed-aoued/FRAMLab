@@ -1,0 +1,681 @@
+@using MudBlazor
+@using FRAMLab.Shared.MainApp.Services
+@inject StateContainer stateContainer
+@inject IMacroRegistry macroRegistry
+@inject FmiDataService dataService
+@inject IJSRuntime JSRuntime
+
+@* FMI Setup: what the model uses (overview), typed FMI variables, and formula macros.
+   Everything is stored in the .xfmv under <FMI><Variables>/<Macros>. *@
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">FMI Setup</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs Elevation="0" Rounded="true" @bind-ActivePanelIndex="tab">
+            @* ---------------- Overview ---------------- *@
+            <MudTabPanel Text="Overview" Class="pt-3">
+                @{ var usage = stateContainer.fmiUsage(); }
+                <div class="fmi-setup-summary">
+                    <span class="fmi-chip fmi-chip-st">ST scripts: @usage.ScriptFunctions.Count</span>
+                    <span class="fmi-chip fmi-chip-macro">Macros: @usage.MacroCount (used by @usage.MacroCalls.Count functions)</span>
+                    <span class="fmi-chip">Typed variables: @usage.DeclaredVariableCount</span>
+                    <span class="fmi-chip">Script globals: @usage.ScriptGlobalCount</span>
+                    <span class="fmi-chip fmi-chip-api">Data sources: @usage.DataSourceCount (read by @usage.ApiCalls.Count functions)</span>
+                </div>
+                <MudText Typo="Typo.body2" Class="mt-3 mb-1"><strong>Evaluation order for each activated function, every cycle</strong></MudText>
+                <ol class="fmi-setup-order">
+                    <li><strong>Inputs</strong> — values from active couplings (<code>I3_Key</code>), their aggregates (<code>Isum_Key</code>, <code>Iavg_Key</code>, …), <code>Global_*</code> keys, typed variables and, if enabled, <code>Prev_Key</code>.</li>
+                    <li><strong>Live data</strong> — sources the function reads on activation (<span class="fmi-chip fmi-chip-api">API</span>) are fetched now.</li>
+                    <li><strong>Equations</strong> — every active metadata key's <i>f(x)</i>; calls to macros (<span class="fmi-chip fmi-chip-macro">ƒ</span>) are expanded here.</li>
+                    <li><strong>Script</strong> — the function's ST script (<span class="fmi-chip fmi-chip-st">ST</span>) runs last and may overwrite keys it outputs.</li>
+                    <li><strong>Outputs</strong> — the function's metadata values flow to downstream functions along its couplings.</li>
+                </ol>
+                @if (usage.UsesScripts || usage.MacroCalls.Count > 0)
+                {
+                    <MudSimpleTable Dense="true" Elevation="0" Class="mt-2">
+                        <thead><tr><th>Function</th><th>Script</th><th>Macro calls (key ← macro)</th></tr></thead>
+                        <tbody>
+                            @foreach (var fn in stateContainer.functionList.Where(f => usage.HasScript(f.IDNr) || usage.CallsMacros(f.IDNr)))
+                            {
+                                <tr>
+                                    <td><a href="javascript:void(0)" @onclick="@(() => SelectFunction(fn.IDNr))">@fn.IDName</a></td>
+                                    <td>@(usage.HasScript(fn.IDNr) ? "ST" : "")</td>
+                                    <td>
+                                        @if (usage.MacroCalls.TryGetValue(fn.IDNr, out var calls))
+                                        {
+                                            @string.Join(", ", calls.Select(kv => $"{kv.Key} ← {string.Join("/", kv.Value)}"))
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted">This model uses only metadata equations.</MudText>
+                }
+            </MudTabPanel>
+
+            @* ---------------- Variables ---------------- *@
+            <MudTabPanel Text="@($"Variables ({DeclaredVariables.Count})")">
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Typed variables give a key a type, a scope and a start value. With <i>persist</i>, function- and model-scope values carry over between cycles.
+                </MudText>
+                <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                    <thead><tr><th>Name</th><th>Type</th><th>Scope</th><th>Function</th><th>Initial</th><th>Persist</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var def in DeclaredVariables)
+                        {
+                            <tr>
+                                <td><code>@def.Name</code></td>
+                                <td>@def.Type</td>
+                                <td>@def.Scope</td>
+                                <td>@FunctionName(def.FunctionId)</td>
+                                <td>@def.InitialRaw</td>
+                                <td>@(def.Persist ? "yes" : "")</td>
+                                <td class="text-nowrap">
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" title="Edit" OnClick="@(() => EditVariable(def))" />
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Delete" title="Delete" OnClick="@(() => DeleteVariable(def))" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                <div class="fmi-setup-form">
+                    <MudText Typo="Typo.subtitle2">@(varEditing is null ? "New variable" : $"Edit {varEditing.Name}")</MudText>
+                    <div class="fmi-setup-row">
+                        <label>Name <input class="vt-input" @bind="varName" placeholder="Budget" spellcheck="false" /></label>
+                        <label>Type
+                            <select class="vt-select" @bind="varType">
+                                @foreach (var t in TypeChoices) { <option value="@t">@t</option> }
+                            </select>
+                        </label>
+                        <label>Scope
+                            <select class="vt-select" @bind="varScope">
+                                @foreach (var s in Enum.GetValues<FmiVariableScope>()) { <option value="@s">@s</option> }
+                            </select>
+                        </label>
+                        <label>Function
+                            <select class="vt-select" @bind="varFunction" disabled="@(varScope == FmiVariableScope.Model)">
+                                <option value="">All functions</option>
+                                @foreach (var fn in stateContainer.functionList) { <option value="@fn.IDNr">@fn.IDName</option> }
+                            </select>
+                        </label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <label>Initial <input class="vt-input" @bind="varInitial" spellcheck="false" /></label>
+                        <label class="fmi-setup-check"><input type="checkbox" @bind="varPersist" disabled="@(varScope is not (FmiVariableScope.Function or FmiVariableScope.Model))" /> Persist between cycles</label>
+                        <label class="fmi-setup-grow">Description <input class="vt-input w-100" @bind="varDescription" /></label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveVariable">@(varEditing is null ? "Add variable" : "Save variable")</MudButton>
+                        @if (varEditing is not null)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ClearVariableForm">Cancel</MudButton>
+                        }
+                    </div>
+                    @foreach (var d in varMessages)
+                    {
+                        <MudText Typo="Typo.caption" Color="@(d.Severity == FmiDiagnosticSeverity.Error ? Color.Error : Color.Warning)">@d.Message</MudText>
+                    }
+                </div>
+            </MudTabPanel>
+
+            @* ---------------- Macros ---------------- *@
+            <MudTabPanel Text="@($"Macros ({Macros.Count})")">
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    A macro is a named formula, e.g. <code>clamp01(x) = x &lt; 0 ? 0 : (x &gt; 1 ? 1 : x)</code>, callable from any equation as <code>clamp01(Risk)</code>.
+                </MudText>
+                <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                    <thead><tr><th>Signature</th><th>Scope</th><th>Body</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var macro in Macros)
+                        {
+                            <tr>
+                                <td><code>@Signature(macro)</code></td>
+                                <td>@(macro.FunctionId == "" ? "Global" : FunctionName(macro.FunctionId))</td>
+                                <td><code class="fmi-setup-body">@macro.Body</code></td>
+                                <td>@(macroRegistry.IsPoisoned(macro) ? "⚠ circular" : "ok")</td>
+                                <td class="text-nowrap">
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" title="Edit" OnClick="@(() => EditMacro(macro))" />
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Delete" title="Delete" OnClick="@(() => DeleteMacro(macro))" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                <div class="fmi-setup-form">
+                    <MudText Typo="Typo.subtitle2">@(macroEditing is null ? "New macro" : $"Edit {macroEditing.Name}")</MudText>
+                    <div class="fmi-setup-row">
+                        <label>Name <input class="vt-input" @bind="macroName" placeholder="clamp01" spellcheck="false" /></label>
+                        <label>Scope
+                            <select class="vt-select" @bind="macroFunction">
+                                <option value="">Global</option>
+                                @foreach (var fn in stateContainer.functionList) { <option value="@fn.IDNr">@fn.IDName</option> }
+                            </select>
+                        </label>
+                        <label>Returns
+                            <select class="vt-select" @bind="macroReturn">
+                                <option value="">(infer)</option>
+                                @foreach (var t in ScalarTypes) { <option value="@t">@t</option> }
+                            </select>
+                        </label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <span class="fmi-setup-label">Parameters</span>
+                        @for (var i = 0; i < macroParams.Count; i++)
+                        {
+                            var index = i;
+                            <span class="fmi-setup-param">
+                                <input class="vt-input" style="width:6rem" @bind="macroParams[index].Name" placeholder="x" spellcheck="false" />
+                                <select class="vt-select" @bind="macroParams[index].Type">
+                                    @foreach (var t in ScalarTypes) { <option value="@t">@t</option> }
+                                </select>
+                                <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close" title="Remove parameter" OnClick="@(() => macroParams.RemoveAt(index))" />
+                            </span>
+                        }
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => macroParams.Add(new ParamRow()))">+ parameter</MudButton>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <label class="fmi-setup-grow">Body (one expression)
+                            <textarea class="fmi-equation w-100" rows="2" @bind="macroBody" spellcheck="false" placeholder="x < 0 ? 0 : (x > 1 ? 1 : x)"></textarea>
+                        </label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <label class="fmi-setup-grow">Description <input class="vt-input w-100" @bind="macroDescription" /></label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveMacro">@(macroEditing is null ? "Add macro" : "Save macro")</MudButton>
+                        @if (macroEditing is not null)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ClearMacroForm">Cancel</MudButton>
+                        }
+                    </div>
+                    @foreach (var d in macroMessages)
+                    {
+                        <MudText Typo="Typo.caption" Color="@(d.Severity == FmiDiagnosticSeverity.Error ? Color.Error : Color.Warning)">@d.Message</MudText>
+                    }
+                </div>
+            </MudTabPanel>
+            @* ---------------- Data sources ---------------- *@
+            <MudTabPanel Text="@($"Data sources ({DataSources.Count})")">
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Live data read in equations with <code>api("source", "path")</code> and in scripts with <code>API('source', 'path')</code>,
+                    e.g. <code>api("weather", "current.temperature_2m")</code>. Data is only read, never sent. Sources must allow browser access (CORS);
+                    a database is reached through a REST layer such as PostgREST or Supabase.
+                </MudText>
+                <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                    <thead><tr><th>Name</th><th>Kind</th><th>Address</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var source in DataSources)
+                        {
+                            var status = dataService.StatusOf(source.Name);
+                            <tr>
+                                <td><code>@source.Name</code></td>
+                                <td>@(source.Kind == FmiDataSourceKind.WebSocket ? "WebSocket" : $"HTTP · {source.Format.ToString().ToUpperInvariant()}")</td>
+                                <td><span class="fmi-data-address" title="@source.Address">@source.Address</span></td>
+                                <td>
+                                    @if (status.Error != "")
+                                    {
+                                        <span class="fmi-data-status-error" title="@status.Error">⚠ @Shorten(status.Error)</span>
+                                    }
+                                    else if (status.FetchedAt is DateTime at)
+                                    {
+                                        <span class="fmi-data-status-ok">✓ @at.ToString("HH:mm:ss")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">not fetched yet</span>
+                                    }
+                                </td>
+                                <td class="text-nowrap">
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => TestSource(source.Name))">Test</MudButton>
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Edit" title="Edit" OnClick="@(() => EditSource(source))" />
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Delete" title="Delete" OnClick="@(() => DeleteSource(source))" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+
+                @if (testedSource is not null)
+                {
+                    <div class="fmi-setup-form">
+                        <MudText Typo="Typo.subtitle2">Values in <code>@testedSource</code> (click to copy the api() call)</MudText>
+                        @if (testedPaths.Count == 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error">@(dataService.StatusOf(testedSource).Error is { Length: > 0 } err ? err : "No values found.")</MudText>
+                        }
+                        else
+                        {
+                            <table class="fmi-data-paths">
+                                @foreach (var (path, value) in testedPaths)
+                                {
+                                    <tr>
+                                        <td><a href="javascript:void(0)" title="Copy" @onclick="@(() => CopyCall(testedSource, path))"><code>api("@testedSource", "@path")</code></a></td>
+                                        <td class="vt-mono">@value</td>
+                                    </tr>
+                                }
+                            </table>
+                        }
+                        @if (copied != "")
+                        {
+                            <MudText Typo="Typo.caption">Copied <code>@copied</code></MudText>
+                        }
+                    </div>
+                }
+
+                @if (DataReaders.Count > 0)
+                {
+                    <div class="fmi-setup-form">
+                        <MudText Typo="Typo.subtitle2">When each function reads its data</MudText>
+                        <MudText Typo="Typo.caption">
+                            <b>On activation</b>: fetched just before the function's equations run.
+                            <b>Live</b>: the source's latest value at the moment of the read (WebSocket messages, or HTTP refreshed in the background).
+                            <b>On exit</b>: fetched after the function activated; its next evaluation reads that data.
+                        </MudText>
+                        <MudSimpleTable Dense="true" Elevation="0">
+                            <thead><tr><th>Function</th><th>Source</th><th>Reads</th></tr></thead>
+                            <tbody>
+                                @foreach (var (fn, sourceName) in DataReaders)
+                                {
+                                    <tr>
+                                        <td>@fn.IDName</td>
+                                        <td><code>@sourceName</code>@(DataSources.Any(d => d.Name == sourceName) ? "" : " ⚠ not defined")</td>
+                                        <td>
+                                            <select class="vt-select" value="@stateContainer.fmiDefinition.TimingFor(sourceName, fn.IDNr)"
+                                                    @onchange="@((e) => SetTiming(sourceName, fn.IDNr, e.Value?.ToString()))">
+                                                <option value="OnActivation">On activation</option>
+                                                <option value="Live">Live</option>
+                                                <option value="OnExit">On exit</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </div>
+                }
+
+                <div class="fmi-setup-form">
+                    <MudText Typo="Typo.subtitle2">@(sourceEditing is null ? "New data source" : $"Edit {sourceEditing.Name}")</MudText>
+                    <div class="fmi-setup-row">
+                        <label>Name <input class="vt-input" @bind="srcName" placeholder="weather" spellcheck="false" /></label>
+                        <label>Kind
+                            <select class="vt-select" @bind="srcKind">
+                                <option value="@FmiDataSourceKind.Http">HTTP (URL, REST API, database REST layer)</option>
+                                <option value="@FmiDataSourceKind.WebSocket">WebSocket (streaming feed)</option>
+                            </select>
+                        </label>
+                        <label>Format
+                            <select class="vt-select" @bind="srcFormat">
+                                <option value="@FmiDataFormat.Json">JSON</option>
+                                <option value="@FmiDataFormat.Csv">CSV</option>
+                            </select>
+                        </label>
+                        <label>Live refresh (s) <input class="vt-input" type="number" min="1" style="width:5rem" @bind="srcRefresh" disabled="@(srcKind == FmiDataSourceKind.WebSocket)" /></label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <label class="fmi-setup-grow">Address
+                            <input class="vt-input w-100" @bind="srcAddress" spellcheck="false"
+                                   placeholder="https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m" />
+                        </label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <label>Key header (optional) <input class="vt-input" @bind="srcAuthHeader" placeholder="Authorization" spellcheck="false" /></label>
+                        <label class="fmi-setup-grow">Key — stored in this browser only, never in the file
+                            <input class="vt-input w-100" type="password" @bind="srcSecret" placeholder="@(srcHasSecret ? "•••••• (stored; type to replace)" : "e.g. Bearer abc123")" disabled="@(srcAuthHeader.Trim() == "")" />
+                        </label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <label class="fmi-setup-grow">Description <input class="vt-input w-100" @bind="srcDescription" /></label>
+                    </div>
+                    <div class="fmi-setup-row">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSource">@(sourceEditing is null ? "Add source" : "Save source")</MudButton>
+                        @if (sourceEditing is not null)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ClearSourceForm">Cancel</MudButton>
+                        }
+                    </div>
+                    @foreach (var d in srcMessages)
+                    {
+                        <MudText Typo="Typo.caption" Color="@(d.Severity == FmiDiagnosticSeverity.Error ? Color.Error : Color.Warning)">@d.Message</MudText>
+                    }
+                </div>
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    private static readonly string[] ScalarTypes = { "number", "string", "bool" };
+    private static readonly string[] TypeChoices = { "number", "string", "bool", "array<number>", "array<string>", "array<bool>", "list", "dictionary" };
+
+    private int tab;
+
+    private bool _visible
+    {
+        get => true;
+        set { if (!value) { _ = OnClosed(); } }
+    }
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Large,
+        FullWidth = true,
+        CloseButton = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true
+    };
+
+    private List<FmiVariableDefinition> DeclaredVariables =>
+        stateContainer.fmiDefinition.Variables.Where(v => !v.IsImplicit).OrderBy(v => v.Name).ToList();
+    private List<FmiMacroDefinition> Macros =>
+        stateContainer.fmiDefinition.Macros.OrderBy(m => m.Name).ToList();
+
+    private string FunctionName(string functionId) =>
+        functionId == "" ? "All" : stateContainer.functionList.Find(f => f.IDNr == functionId)?.IDName ?? $"#{functionId}";
+
+    private static string Signature(FmiMacroDefinition m) =>
+        $"{m.Name}({string.Join(", ", m.Parameters.Select(p => $"{p.Name}: {p.Type}"))}){(m.ReturnType is null ? "" : $": {m.ReturnType}")}";
+
+    private async Task SelectFunction(string functionId)
+    {
+        stateContainer.selectedFn = functionId;
+        await Close();
+    }
+
+    // ---------------- data sources ----------------
+    private List<FmiDataSource> DataSources => stateContainer.fmiDefinition.DataSources.OrderBy(d => d.Name).ToList();
+
+    /// <summary>Every (function, source) pair where the function calls api("source", ...).</summary>
+    private List<(Function Fn, string Source)> DataReaders => stateContainer.functionList
+        .SelectMany(fn => FmiDataService.SourcesUsedBy(fn).OrderBy(n => n).Select(n => (fn, n)))
+        .ToList();
+
+    private FmiDataSource? sourceEditing;
+    private string srcName = "";
+    private FmiDataSourceKind srcKind = FmiDataSourceKind.Http;
+    private FmiDataFormat srcFormat = FmiDataFormat.Json;
+    private int srcRefresh = 10;
+    private string srcAddress = "";
+    private string srcAuthHeader = "";
+    private string srcSecret = "";
+    private bool srcHasSecret;
+    private string srcDescription = "";
+    private List<FmiDiagnostic> srcMessages = new();
+    private string? testedSource;
+    private List<(string Path, string Value)> testedPaths = new();
+    private string copied = "";
+
+    private static string Shorten(string text) => text.Length > 60 ? text[..60] + "…" : text;
+
+    private async Task EditSource(FmiDataSource source)
+    {
+        sourceEditing = source;
+        srcName = source.Name;
+        srcKind = source.Kind;
+        srcFormat = source.Format;
+        srcRefresh = source.RefreshSeconds;
+        srcAddress = source.Address;
+        srcAuthHeader = source.AuthHeader;
+        srcDescription = source.Description;
+        srcSecret = "";
+        srcHasSecret = !string.IsNullOrEmpty(await JSRuntime.InvokeAsync<string?>("localStorage.getItem", FmiDataService.SecretStorageKey(source.Name)));
+        srcMessages.Clear();
+    }
+
+    private void ClearSourceForm()
+    {
+        sourceEditing = null;
+        srcName = srcAddress = srcAuthHeader = srcSecret = srcDescription = "";
+        srcKind = FmiDataSourceKind.Http;
+        srcFormat = FmiDataFormat.Json;
+        srcRefresh = 10;
+        srcHasSecret = false;
+        srcMessages.Clear();
+    }
+
+    private async Task SaveSource()
+    {
+        // validate like loading a file does: build the element and parse it back
+        var doc = new System.Xml.XmlDocument();
+        var el = new FmiDataSource
+        {
+            Name = srcName.Trim(), Kind = srcKind, Address = srcAddress.Trim(), Format = srcFormat,
+            RefreshSeconds = Math.Max(1, srcRefresh), AuthHeader = srcAuthHeader.Trim(), Description = srcDescription.Trim(),
+        }.ToXml(doc);
+        srcMessages = new List<FmiDiagnostic>();
+        var source = FmiDataSource.FromXml(el, srcMessages);
+        if (source is null) return;
+        if (DataSources.Any(d => d.Name == source.Name && !ReferenceEquals(d, sourceEditing)))
+        {
+            srcMessages.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, "", $"A data source named '{source.Name}' already exists."));
+            return;
+        }
+        if (srcSecret != "")
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", FmiDataService.SecretStorageKey(source.Name), srcSecret);
+        }
+        stateContainer.UpsertFmiDataSource(source, sourceEditing?.Name);
+        ClearSourceForm();
+        await TestSource(source.Name);
+    }
+
+    private void DeleteSource(FmiDataSource source)
+    {
+        stateContainer.RemoveFmiDataSource(source.Name);
+        if (ReferenceEquals(source, sourceEditing)) ClearSourceForm();
+        if (testedSource == source.Name) testedSource = null;
+    }
+
+    private async Task TestSource(string name)
+    {
+        testedSource = name;
+        copied = "";
+        await dataService.FetchAsync(name);
+        if (dataService.Sources.FirstOrDefault(s => s.Name == name)?.Kind == FmiDataSourceKind.WebSocket)
+        {
+            await Task.Delay(1500); // give the feed a moment to send its first message
+        }
+        testedPaths = dataService.ListPaths(name);
+    }
+
+    private async Task CopyCall(string source, string path)
+    {
+        copied = $"api(\"{source}\", \"{path}\")";
+        try { await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", copied); }
+        catch (JSException) { /* clipboard not available: the text is still shown */ }
+    }
+
+    private void SetTiming(string source, string functionId, string? value)
+    {
+        if (Enum.TryParse<FmiDataTiming>(value, out var timing))
+        {
+            stateContainer.SetFmiDataTiming(source, functionId, timing);
+        }
+    }
+
+    // ---------------- variables ----------------
+    private FmiVariableDefinition? varEditing;
+    private string varName = "";
+    private string varType = "number";
+    private FmiVariableScope varScope = FmiVariableScope.Function;
+    private string varFunction = "";
+    private string varInitial = "";
+    private bool varPersist;
+    private string varDescription = "";
+    private List<FmiDiagnostic> varMessages = new();
+
+    private void EditVariable(FmiVariableDefinition def)
+    {
+        varEditing = def;
+        varName = def.Name;
+        varType = def.Type.ToString();
+        varScope = def.Scope;
+        varFunction = def.FunctionId;
+        varInitial = def.InitialRaw;
+        varPersist = def.Persist;
+        varDescription = def.Description;
+        varMessages.Clear();
+    }
+
+    private void ClearVariableForm()
+    {
+        varEditing = null;
+        varName = varInitial = varDescription = varFunction = "";
+        varType = "number";
+        varScope = FmiVariableScope.Function;
+        varPersist = false;
+        varMessages.Clear();
+    }
+
+    private void SaveVariable()
+    {
+        // Validate exactly like loading a file does: build the XML element and parse it back.
+        var doc = new System.Xml.XmlDocument();
+        var el = doc.CreateElement("Variable");
+        el.SetAttribute("name", varName.Trim());
+        el.SetAttribute("type", varType);
+        el.SetAttribute("scope", varScope.ToString().ToLowerInvariant());
+        if (varScope != FmiVariableScope.Model && varFunction != "") el.SetAttribute("function", varFunction);
+        if (varInitial != "") el.SetAttribute("initial", varInitial);
+        if (varPersist) el.SetAttribute("persist", "true");
+        if (varDescription != "") el.SetAttribute("description", varDescription);
+
+        varMessages = new List<FmiDiagnostic>();
+        var def = FmiVariableDefinition.FromXml(el, varMessages);
+        if (def is null) return;
+        var duplicate = DeclaredVariables.FirstOrDefault(v => v.Name == def.Name && v.FunctionId == def.FunctionId && !ReferenceEquals(v, varEditing));
+        if (duplicate is not null)
+        {
+            varMessages.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, "", $"'{def.Name}' is already declared for {FunctionName(def.FunctionId)}."));
+            return;
+        }
+        if (varEditing is not null && (varEditing.Name != def.Name || varEditing.FunctionId != def.FunctionId))
+        {
+            stateContainer.RemoveFmiVariable(varEditing.Name, varEditing.FunctionId);
+        }
+        stateContainer.UpsertFmiVariable(def);
+        var warnings = varMessages;
+        ClearVariableForm();
+        varMessages = warnings; // keep warnings (e.g. initial value coerced) visible after saving
+    }
+
+    private void DeleteVariable(FmiVariableDefinition def)
+    {
+        stateContainer.RemoveFmiVariable(def.Name, def.FunctionId);
+        if (ReferenceEquals(def, varEditing)) ClearVariableForm();
+    }
+
+    // ---------------- macros ----------------
+    private sealed class ParamRow
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "number";
+    }
+
+    private FmiMacroDefinition? macroEditing;
+    private string macroName = "";
+    private string macroFunction = "";
+    private string macroReturn = "";
+    private string macroBody = "";
+    private string macroDescription = "";
+    private List<ParamRow> macroParams = new();
+    private List<FmiDiagnostic> macroMessages = new();
+
+    private void EditMacro(FmiMacroDefinition macro)
+    {
+        macroEditing = macro;
+        macroName = macro.Name;
+        macroFunction = macro.FunctionId;
+        macroReturn = macro.ReturnType?.ToString() ?? "";
+        macroBody = macro.Body;
+        macroDescription = macro.Description;
+        macroParams = macro.Parameters.Select(p => new ParamRow { Name = p.Name, Type = p.Type.ToString() }).ToList();
+        macroMessages.Clear();
+    }
+
+    private void ClearMacroForm()
+    {
+        macroEditing = null;
+        macroName = macroFunction = macroReturn = macroBody = macroDescription = "";
+        macroParams = new List<ParamRow>();
+        macroMessages.Clear();
+    }
+
+    private void SaveMacro()
+    {
+        var doc = new System.Xml.XmlDocument();
+        var el = doc.CreateElement("Macro");
+        el.SetAttribute("name", macroName.Trim());
+        if (macroReturn != "") el.SetAttribute("return", macroReturn);
+        if (macroFunction != "") el.SetAttribute("function", macroFunction);
+        if (macroDescription != "") el.SetAttribute("description", macroDescription);
+        foreach (var p in macroParams)
+        {
+            var pe = doc.CreateElement("Param");
+            pe.SetAttribute("name", p.Name.Trim());
+            pe.SetAttribute("type", p.Type);
+            el.AppendChild(pe);
+        }
+        var body = doc.CreateElement("Body");
+        body.InnerText = macroBody.Trim();
+        el.AppendChild(body);
+
+        macroMessages = new List<FmiDiagnostic>();
+        var macro = FmiMacroDefinition.FromXml(el, macroMessages);
+        if (macro is null) return;
+        if (!MacroExpander.TryParseBody(macro.Body, out var syntaxError))
+        {
+            macroMessages.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, "", $"Body: {syntaxError}"));
+            return;
+        }
+        if (macroEditing is not null && (macroEditing.Name != macro.Name || macroEditing.FunctionId != macro.FunctionId))
+        {
+            stateContainer.RemoveFmiMacro(macroEditing.Name, macroEditing.FunctionId);
+        }
+        if (!stateContainer.UpsertFmiMacro(macro))
+        {
+            macroMessages.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, "",
+                $"A macro named '{macro.Name}' already exists in another scope. Macro names must be unique."));
+            return;
+        }
+        var warnings = macroMessages;
+        ClearMacroForm();
+        macroMessages = warnings;
+        if (macroRegistry.IsPoisoned(macro))
+        {
+            macroMessages.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Warning, "",
+                $"'{macro.Name}' is part of a circular call chain and will not be evaluated."));
+        }
+    }
+
+    private void DeleteMacro(FmiMacroDefinition macro)
+    {
+        stateContainer.RemoveFmiMacro(macro.Name, macro.FunctionId);
+        if (ReferenceEquals(macro, macroEditing)) ClearMacroForm();
+    }
+
+    // Close through MudBlazor (CloseAsync) so the dialog really leaves the screen; MudBlazor then
+    // sets Visible=false and the _visible setter runs OnClosed.
+    private MudDialog? dialog;
+    private async Task Close()
+    {
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClosed();
+    }
+
+    private async Task OnClosed()
+    {
+        stateContainer.showFMISetup = false;
+        await OnClose.InvokeAsync(false);
+    }
+}

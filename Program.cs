@@ -23,6 +23,9 @@ builder.Services.AddSingleton<IMacroRegistry, MacroRegistry>();
 builder.Services.AddSingleton<IFmiInterpreter, FmiInterpreter>();
 builder.Services.AddSingleton<AgentLevelService>();
 builder.Services.AddSingleton<FRAMLab.Shared.MainApp.Services.Scripting.ScriptingService>();
+// Live data for api(): its own HttpClient (absolute URLs); API keys come from this browser's localStorage only.
+builder.Services.AddSingleton(sp => new FmiDataService(new HttpClient(),
+    name => sp.GetRequiredService<Microsoft.JSInterop.IJSRuntime>().InvokeAsync<string?>("localStorage.getItem", new object?[] { FmiDataService.SecretStorageKey(name) }).AsTask()));
 builder.Services.AddScoped<SvgUtilsInterop>();
 
 builder.Services.AddBlazoredLocalStorage();
@@ -44,5 +47,13 @@ var host = builder.Build();
 // Link the scripting engine to the central state after construction (avoids a DI cycle).
 var stateContainer = host.Services.GetRequiredService<StateContainer>();
 stateContainer.Scripting = host.Services.GetRequiredService<FRAMLab.Shared.MainApp.Services.Scripting.ScriptingService>();
+// Connect live data to the state, the equation interpreter and the script engine.
+var fmiData = host.Services.GetRequiredService<FmiDataService>();
+stateContainer.fmiData = fmiData;
+stateContainer.Scripting.Data = fmiData;
+if (host.Services.GetRequiredService<IFmiInterpreter>() is FmiInterpreter fmiInterpreter)
+{
+    fmiInterpreter.Data = fmiData;
+}
 
 await host.RunAsync();

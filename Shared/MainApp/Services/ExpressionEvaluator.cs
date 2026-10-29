@@ -7,6 +7,12 @@ namespace FRAMLab.Shared.MainApp.Services
         private readonly Random random = new();
 
         public string Eval(string expression, Dictionary<string, string[]> variables, List<string[]> dataRows, Dictionary<string, string> dataKeys)
+            => Eval(expression, variables, dataRows, dataKeys, null);
+
+        public string Eval(string expression, Dictionary<string, string[]> variables, List<string[]> dataRows, Dictionary<string, string> dataKeys, ICollection<string>? unresolved)
+            => Eval(expression, variables, dataRows, dataKeys, unresolved, null);
+
+        public string Eval(string expression, Dictionary<string, string[]> variables, List<string[]> dataRows, Dictionary<string, string> dataKeys, ICollection<string>? unresolved, FmiApiReader? api)
         {
             var str = expression;
             int pos = -1;
@@ -31,6 +37,60 @@ namespace FRAMLab.Shared.MainApp.Services
                 }
 
                 return false;
+            }
+
+            // Skip one ternary branch. untilColon: skip the true branch and consume its matching
+            // ':' (returns false if there is none). Otherwise skip the false branch and stop
+            // before whatever ends it: end of input, an unmatched ')' or ',', or the ':' of an
+            // enclosing ternary. String literals, parentheses and nested '?' are respected.
+            bool SkipBranch(bool untilColon)
+            {
+                var depth = 0;
+                var nested = 0;
+                while (pos < str.Length)
+                {
+                    if (ch == '"')
+                    {
+                        NextChar();
+                        while (ch != '"' && pos < str.Length)
+                        {
+                            NextChar();
+                        }
+                    }
+                    else if (ch == '(')
+                    {
+                        depth++;
+                    }
+                    else if (ch == ')' || (ch == ',' && depth == 0))
+                    {
+                        if (depth == 0)
+                        {
+                            return !untilColon;
+                        }
+                        if (ch == ')') depth--;
+                    }
+                    else if (ch == '?')
+                    {
+                        nested++;
+                    }
+                    else if (ch == ':')
+                    {
+                        if (nested > 0)
+                        {
+                            nested--;
+                        }
+                        else if (depth == 0)
+                        {
+                            if (untilColon)
+                            {
+                                NextChar();
+                            }
+                            return true;
+                        }
+                    }
+                    NextChar();
+                }
+                return !untilColon;
             }
 
             string Parse()
@@ -60,31 +120,23 @@ namespace FRAMLab.Shared.MainApp.Services
                     }
                     else if (Eat('?'))
                     {
+                        // cond ? a : b — lowest precedence, right-associative. The true branch
+                        // runs to its matching ':', the false branch to the end of the enclosing
+                        // expression; the branch not taken is skipped without being evaluated.
                         if (double.Parse(x, CultureInfo.InvariantCulture) > 0)
                         {
-                            str = str.Substring(pos, str.IndexOf(':') - pos);
-                        }
-                        else
-                        {
-                            str = str.Substring(str.IndexOf(':') + 1);
-                        }
-
-                        pos = -1;
-                        NextChar();
-
-                        if (Eat('"'))
-                        {
-                            var startPos = pos;
-                            while (ch != '"' && pos < str.Length)
+                            var result = ParseExpression();
+                            if (!Eat(':'))
                             {
-                                NextChar();
+                                return "NaN";
                             }
-
-                            var subText = str.Substring(startPos, pos - startPos);
-                            pos = str.Length;
-                            return subText;
+                            SkipBranch(untilColon: false);
+                            return result;
                         }
-
+                        if (!SkipBranch(untilColon: true))
+                        {
+                            return "NaN";
+                        }
                         return ParseExpression();
                     }
                     else if (Eat('&'))
@@ -371,7 +423,26 @@ namespace FRAMLab.Shared.MainApp.Services
                     }
                     else if (func == "api")
                     {
-                        return "NaN";
+                        // api("source", "path"): a live data value (see FmiDataService)
+                        if (!Eat('('))
+                        {
+                            return "NaN";
+                        }
+                        var source = ParseExpression();
+                        if (!Eat(','))
+                        {
+                            return "NaN";
+                        }
+                        var path = ParseExpression();
+                        if (!Eat(')'))
+                        {
+                            return "NaN";
+                        }
+                        if (api is null)
+                        {
+                            return "NaN";
+                        }
+                        x = api(source, path, out var apiValue, out _) ? apiValue : "0";
                     }
                     else if (func == "round")
                     {
@@ -453,6 +524,10 @@ namespace FRAMLab.Shared.MainApp.Services
                     }
 
                     var variable = str.Substring(startPos, pos - startPos);
+                    if (!variables.ContainsKey(variable) && unresolved is not null && !unresolved.Contains(variable))
+                    {
+                        unresolved.Add(variable);
+                    }
                     x = variables.ContainsKey(variable) ? variables[variable][0] : "0";
                     if (string.IsNullOrEmpty(x))
                     {

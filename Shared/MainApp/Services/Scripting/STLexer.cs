@@ -20,6 +20,7 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
         public IReadOnlyList<ScriptDiagnostic> Errors => errors;
 
         private char Peek(int ahead = 0) => (pos + ahead < src.Length) ? src[pos + ahead] : '\0';
+        private string PeekText(int length) => src.Substring(pos, Math.Min(length, src.Length - pos));
 
         private char Advance()
         {
@@ -96,6 +97,17 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             var ch = Peek();
             if (ch == '\0') return new Token(TokenKind.EndOfFile, "", line0, col0, 0);
 
+            // time literals T#... / TIME#... (checked before identifiers, which would
+            // otherwise consume the leading T and leave a stray '#')
+            if ((ch == 'T' || ch == 't') && Peek(1) == '#')
+            {
+                return LexTime(line0, col0, 1);
+            }
+            if ((ch == 'T' || ch == 't') && string.Equals(PeekText(5), "TIME#", StringComparison.OrdinalIgnoreCase))
+            {
+                return LexTime(line0, col0, 4);
+            }
+
             // identifiers / keywords
             if (char.IsLetter(ch) || ch == '_')
             {
@@ -107,14 +119,10 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 return new Token(kind, text, line0, col0, text.Length);
             }
 
-            // numbers (int / real) and time literals T#...
+            // numbers (int / real)
             if (char.IsDigit(ch))
             {
                 return LexNumber(line0, col0);
-            }
-            if ((ch == 'T' || ch == 't') && Peek(1) == '#')
-            {
-                return LexTime(line0, col0);
             }
 
             // string literal '...' (IEC) or "..." (accepted for convenience)
@@ -184,10 +192,10 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             return new Token(isReal ? TokenKind.RealLiteral : TokenKind.IntLiteral, text, line0, col0, text.Length);
         }
 
-        private Token LexTime(int line0, int col0)
+        private Token LexTime(int line0, int col0, int prefixLength)
         {
             var sb = new StringBuilder();
-            sb.Append(Advance()); // T
+            for (var i = 0; i < prefixLength; i++) sb.Append(Advance()); // T or TIME
             sb.Append(Advance()); // #
             if (Peek() == '-') sb.Append(Advance());
             while (char.IsDigit(Peek()) || Peek() == '.') sb.Append(Advance());

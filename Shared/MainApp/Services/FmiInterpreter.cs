@@ -15,6 +15,15 @@ namespace FRAMLab.Shared.MainApp.Services
         private readonly MacroExpander macroExpander;
         private static readonly Regex IncomingVariablePattern = new(@"^([IPRCT]\d+_|[IPRCTA](n|sum|avg|min|max|prd)_)");
         private static readonly Regex MacroCalleePattern = new(@"([a-z][A-Za-z0-9_]*)\s*\(");
+        private static readonly Regex CouplingVariablePattern = new(@"^[IPRCT](\d+)_(.+)$");
+        private static readonly Regex AggregateVariablePattern = new(@"^[IPRCTA](n|sum|avg|min|max|prd)_(.+)$");
+
+        /// <summary>Unknown variables the user chose to read as 0 (key: FmiUnknownVariable.AcceptKey).
+        /// Kept until a model is (re)initialized, so the user is not asked again on every run.</summary>
+        public HashSet<string> AcceptedUnknownVariables { get; } = new();
+
+        /// <summary>Live data for api("source", "path"); null = api() returns NaN (as before).</summary>
+        public FmiDataService? Data { get; set; }
 
         public bool EnablePrevVariables { get; set; } = false;
 
@@ -44,6 +53,7 @@ namespace FRAMLab.Shared.MainApp.Services
         {
             Definition = definition;
             RunState = new FmiRunState();
+            AcceptedUnknownVariables.Clear();
             macroRegistry.LoadFrom(definition);
             Reset(functions);
         }
@@ -204,16 +214,22 @@ namespace FRAMLab.Shared.MainApp.Services
                                 va.Value = md3Key[1];
                                 metadataService.MetaDataKeys[md3Key[0]] = md3Key[1];
                             }
-                            if (md3Key[3].StartsWith("execute("))
+                            if (md3Key[3].StartsWith("execute(", StringComparison.OrdinalIgnoreCase))
                             {
-                                var contentText = md3Key[3].Replace("execute(", "").Replace(")", "");
+                                // the BBN/LOPA presets write "Execute(...)", so accept either case
+                                var contentText = md3Key[3].Substring("execute(".Length).Replace(")", "");
                                 var contentArray = contentText.Split(",");
-                                var codeName = contentArray[0];
+                                var codeName = contentArray[0].Trim();
                                 var method = iBG.GetType().GetMethod(codeName);
                                 if (method is not null)
                                 {
                                     contentArray[0] = md3Key[0];
                                     md3Key[1] = method.Invoke(iBG, new object[] { contentArray })?.ToString() ?? "STOP";
+                                }
+                                else
+                                {
+                                    result.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Warning, $"Fn {iBG.IDNr} / key {md3Key[0]}",
+                                        $"execute(): no method named '{codeName}' exists; the value was left unchanged."));
                                 }
                             }
                             else if (md3Key[3].StartsWith("array("))
@@ -226,7 +242,41 @@ namespace FRAMLab.Shared.MainApp.Services
                                 try
                                 {
                                     var vars = iBG.variableList.ToDictionary(v => v.Name, v => new string[] { v.Value?.ToString() ?? "", "" });
-                                    md3Key[1] = expressionEvaluator.Eval(md3Key[3], vars, ctx.DataRows, ctx.DataKeys);
+                                    var unresolved = new List<string>();
+                                    var apiFailures = new List<FmiUnknownVariable>();
+                                    var fnId = iBG.IDNr;
+                                    var fnName = iBG.IDName;
+                                    var key = md3Key[0];
+                                    FmiApiReader? api = Data is null ? null : (string source, string path, out string apiValue, out string apiError) =>
+                                    {
+                                        if (Data.TryRead(fnId, source, path, out apiValue, out apiError)) return true;
+                                        apiFailures.Add(new FmiUnknownVariable(fnId, fnName, key, $"api(\"{source}\", \"{path}\")", apiError));
+                                        return false;
+                                    };
+                                    // macro-aware: falls back to the legacy evaluator when the model has no macros
+                                    var value = EvaluateExpression(md3Key[3], vars, ctx, iBG.IDNr, unresolved, api);
+                                    var unknown = unresolved
+                                        .Where(name => !IsExpectedButAbsent(name, iBG, ctx))
+                                        .Select(name => new FmiUnknownVariable(iBG.IDNr, iBG.IDName, md3Key[0], name))
+                                        .Concat(apiFailures)
+                                        .Where(u => !AcceptedUnknownVariables.Contains(u.AcceptKey))
+                                        .ToList();
+                                    if (unknown.Count == 0)
+                                    {
+                                        md3Key[1] = value;
+                                    }
+                                    else
+                                    {
+                                        // Never compute with a made-up 0: keep the previous value and ask the user.
+                                        foreach (var u in unknown)
+                                        {
+                                            result.UnknownVariables.Add(u);
+                                            result.Diagnostics.Add(new FmiDiagnostic(FmiDiagnosticSeverity.Error, $"Fn {iBG.IDNr} / key {md3Key[0]}",
+                                                u.Reason == ""
+                                                    ? $"Unknown variable '{u.Variable}' in the equation of '{md3Key[0]}'. Nothing in the model defines it."
+                                                    : $"{u.Variable} in the equation of '{md3Key[0]}' has no value: {u.Reason}"));
+                                        }
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -383,11 +433,61 @@ namespace FRAMLab.Shared.MainApp.Services
         }
 
         public string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx, string callingFunctionId = "")
+            => EvaluateExpression(expression, variables, ctx, callingFunctionId, null);
+
+        /// <summary>
+        /// A referenced variable that is missing from the function's variables but that the model
+        /// will define once data flows: values from couplings (I3_Key) and their aggregates
+        /// (Isum_Key, ...), Global_* keys, Prev_* values, the function's own keys, declared FMI
+        /// variables and script outputs. These still read as 0 until they arrive; anything else
+        /// is genuinely unknown.
+        /// </summary>
+        private bool IsExpectedButAbsent(string name, Function fn, FmiEvaluationContext ctx)
+        {
+            if (name == "Cycle") return true;
+            if (fn.metadata?.Any(m => m[0] == name) == true) return true;
+            if (Definition.Variables.Any(def => def.Name == name && (def.Scope == FmiVariableScope.Model || AppliesTo(def, fn.IDNr)))) return true;
+            if (name.StartsWith("Global_")) return metadataService.MetaDataKeys.ContainsKey(name);
+            if (name.StartsWith("Prev_")) return EnablePrevVariables && IsKnownKey(name.Substring("Prev_".Length), ctx.FunctionList, fn);
+            if (IsScriptName(fn, name)) return true;
+
+            var coupled = CouplingVariablePattern.Match(name);
+            if (coupled.Success)
+            {
+                var source = ctx.FunctionList.Find(f => f.IDNr == coupled.Groups[1].Value);
+                return source is not null && IsKnownKey(coupled.Groups[2].Value, new List<Function> { source }, null);
+            }
+            var aggregate = AggregateVariablePattern.Match(name);
+            if (aggregate.Success)
+            {
+                return IsKnownKey(aggregate.Groups[2].Value, ctx.FunctionList, null);
+            }
+            return false;
+        }
+
+        private static bool IsKnownKey(string key, List<Function> functions, Function? self)
+        {
+            if (self is not null && self.metadata?.Any(m => m[0] == key) == true) return true;
+            return functions.Any(f => f.metadata?.Any(m => m[0] == key) == true || IsScriptName(f, key));
+        }
+
+        private static bool IsScriptName(Function fn, string name)
+        {
+            var script = fn.Script;
+            if (script is null) return false;
+            return script.Variables.Any(v => v.Name == name)
+                || script.AspectVariables.Any(a => a.Identifier == name || $"Script_{a.Label}" == name);
+        }
+
+        public string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx, string callingFunctionId, ICollection<string>? unresolved)
+            => EvaluateExpression(expression, variables, ctx, callingFunctionId, unresolved, null);
+
+        public string EvaluateExpression(string expression, Dictionary<string, string[]> variables, FmiEvaluationContext ctx, string callingFunctionId, ICollection<string>? unresolved, FmiApiReader? api)
         {
             //No macros in the model: legacy path, byte-identical behavior for legacy files.
             if (macroRegistry.All.Count == 0)
             {
-                return expressionEvaluator.Eval(expression, variables, ctx.DataRows, ctx.DataKeys);
+                return expressionEvaluator.Eval(expression, variables, ctx.DataRows, ctx.DataKeys, unresolved, api);
             }
 
             var hasMacroCall = false;
@@ -407,7 +507,7 @@ namespace FRAMLab.Shared.MainApp.Services
 
             if (hasMacroCall)
             {
-                return macroExpander.Expand(expression, variables, callingFunctionId, ctx, PendingDiagnostics);
+                return macroExpander.Expand(expression, variables, callingFunctionId, ctx, PendingDiagnostics, unresolved, api);
             }
             if (unknownCallee != "")
             {
@@ -415,7 +515,7 @@ namespace FRAMLab.Shared.MainApp.Services
                     $"Unknown macro '{unknownCallee}'. It is not a built-in function and no macro with that name is visible here."));
                 return "";
             }
-            return expressionEvaluator.Eval(expression, variables, ctx.DataRows, ctx.DataKeys);
+            return expressionEvaluator.Eval(expression, variables, ctx.DataRows, ctx.DataKeys, unresolved, api);
         }
     }
 }

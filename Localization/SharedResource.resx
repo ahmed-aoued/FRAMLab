@@ -336,7 +336,7 @@
     <value>Export selection (.sxfmv)</value>
   </data>
   <data name="PDF_REPORT" xml:space="preserve">
-    <value>PDF report</value>
+    <value>Report (HTML)</value>
   </data>
   <data name="AGENTS_LEVELS_VIEW" xml:space="preserve">
     <value>Agents &amp; Levels view</value>

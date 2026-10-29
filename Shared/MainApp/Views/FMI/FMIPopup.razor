@@ -3,12 +3,52 @@
 @inject IJSRuntime JSRuntime
 @inject IStringLocalizer<Localization.SharedResource> Loc
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions">
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions">
     <TitleContent>
         <MudText Typo="Typo.h6">FMI LOG</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@stateContainer.fmiMessage</MudText>
+        <div class="fmi-log-filters">
+            @foreach (var level in Enum.GetValues<FmiLogLevel>())
+            {
+                <MudChip T="string" Size="Size.Small" Variant="@(levels.Contains(level) ? Variant.Filled : Variant.Outlined)"
+                         Color="@ColorFor(level)" OnClick="@(() => Toggle(levels, level))">@level (@Count(level))</MudChip>
+            }
+            <span class="fmi-log-sep"></span>
+            @foreach (var origin in Origins)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="@(origins.Contains(origin) ? Variant.Filled : Variant.Outlined)"
+                         OnClick="@(() => Toggle(origins, origin))">@origin</MudChip>
+            }
+            <span class="fmi-log-sep"></span>
+            <MudChip T="string" Size="Size.Small" Variant="@(plainText ? Variant.Filled : Variant.Outlined)"
+                     OnClick="@(() => plainText = !plainText)">Plain text</MudChip>
+        </div>
+        @if (plainText)
+        {
+            <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@stateContainer.fmiMessage</MudText>
+        }
+        else
+        {
+            <div class="fmi-log-list">
+                @foreach (var entry in Visible())
+                {
+                    <div class="fmi-log-entry fmi-log-@entry.Level.ToString().ToLowerInvariant()">
+                        <span class="fmi-log-cycle" title="Cycle">@(entry.Cycle < 0 ? "–" : entry.Cycle.ToString())</span>
+                        <span class="fmi-log-origin">@entry.Origin</span>
+                        @if (entry.FunctionId != "")
+                        {
+                            <a class="fmi-log-fn" href="javascript:void(0)" title="Select this function" @onclick="@(() => SelectFunction(entry.FunctionId))">@entry.FunctionName</a>
+                        }
+                        <span class="fmi-log-message">@entry.Message</span>
+                    </div>
+                }
+                @if (!Visible().Any())
+                {
+                    <MudText Typo="Typo.body2" Class="text-muted">No log entries match the filter.</MudText>
+                }
+            </div>
+        }
     </DialogContent>
     <DialogActions>
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
@@ -20,6 +60,15 @@
 @code {
     [Parameter] public EventCallback<bool> OnClose { get; set; }
 
+    private static readonly string[] Origins = { "Run", "Model", "Equation", "Macro", "Script" };
+    private readonly HashSet<FmiLogLevel> levels = new(Enum.GetValues<FmiLogLevel>());
+    private readonly HashSet<string> origins = new(Origins);
+    private bool plainText = false;
+
+    // Inline MudDialogs must be closed by MudBlazor itself (CloseAsync): removing the component
+    // from the page first leaves the dialog on screen. MudBlazor then sets Visible=false, which
+    // tells the page to drop the component (the same path Escape and the X button take).
+    private MudDialog? dialog;
     private bool _visible
     {
         get => true;
@@ -28,16 +77,40 @@
 
     private readonly DialogOptions _dialogOptions = new()
     {
-        MaxWidth = MaxWidth.Small,
+        MaxWidth = MaxWidth.Medium,
         FullWidth = true,
         CloseButton = true,
         CloseOnEscapeKey = true,
         BackdropClick = true
     };
 
+    private IEnumerable<FmiLogEntry> Visible() =>
+        stateContainer.fmiLog.Where(e => levels.Contains(e.Level) && origins.Contains(e.Origin));
+
+    private int Count(FmiLogLevel level) => stateContainer.fmiLog.Count(e => e.Level == level);
+
+    private static Color ColorFor(FmiLogLevel level) => level switch
+    {
+        FmiLogLevel.Error => Color.Error,
+        FmiLogLevel.Warning => Color.Warning,
+        _ => Color.Default,
+    };
+
+    private static void Toggle<T>(HashSet<T> set, T value)
+    {
+        if (!set.Remove(value)) set.Add(value);
+    }
+
+    private async Task SelectFunction(string functionId)
+    {
+        stateContainer.selectedFn = functionId;
+        await Close();
+    }
+
     private async Task Close()
     {
-        await OnClose.InvokeAsync(false);
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClose.InvokeAsync(false);
     }
 
     private async void printFMILog()

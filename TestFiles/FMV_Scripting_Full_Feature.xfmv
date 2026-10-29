@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FM Version="0,3,0,0">
+  <Functions hideFMIhighlight="false" hideFMIdisplaytext="false" typeFMIdisplay="|Blend|Blend|Blend|Blend|Blend|Blend">
+    <!-- =====================================================================
+         FULL SCRIPTING FEATURE MODEL
+         Chain: Entry (arrays + global audit) -> Passthrough (filter) -> Exit (statistics).
+
+         Every function uses Print(...) so the FMI log shows the values that
+         the scripts compute (including array contents) on each cycle.
+         ===================================================================== -->
+
+    <!-- ENTRY: rolling window kept in a Static array -->
+    <Function fnStyle="0" orphans="0" profileFn="1" profileI="" profileP="" profileR="" profileC="" profileT=""
+              groupType="" groupIDNr="" groupActive="" groupX="" groupY=""
+              x="200" y="550" agentId="" levelId="" isInput="false">
+      <IDNr>0</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Sensor array</IDName>
+      <metadata>
+        <Raw_signal active="false" equation="">0</Raw_signal>
+      </metadata>
+      <Description>Entry function: writes the cycle value into a Static array and logs a rolling average.</Description>
+      <script enabled="true" language="ST" version="1"><![CDATA[(* ENTRY - Arrays
+   Static array with an initializer list; no bounds need to be entered.
+   A Global array logs every cycle as well. Print(...) writes to the FMI log. *)
+readings[slot] := Cycle MOD 10;
+slot := (slot + 1) MOD 5;
+
+sum := 0.0;
+FOR i := 0 TO 4 DO
+    sum := sum + readings[i];
+END_FOR;
+
+audit[audit_slot] := Cycle;
+audit_slot := (audit_slot + 1) MOD 4;
+
+Raw_signal := sum / 5.0;
+Print('Sensor window=', readings, ' average=', Raw_signal);
+Print('Audit array=', audit);]]></script>
+      <variables>
+        <var name="readings" scope="Static" type="REAL" init="[0.0,0.0,0.0,0.0,0.0]" array="true" />
+        <var name="slot" scope="Static" type="INT" init="0" />
+        <var name="audit" scope="Global" type="REAL" init="[0.0,0.0,0.0,0.0]" array="true" />
+        <var name="audit_slot" scope="Global" type="INT" init="0" />
+        <var name="sum" scope="Temp" type="REAL" />
+      </variables>
+      <aspectTypes>
+        <aspect category="Output" label="Raw signal" type="REAL" />
+      </aspectTypes>
+    </Function>
+
+    <!-- PASSTHROUGH: input -> smoothing history -> output -->
+    <Function fnStyle="0" orphans="0" profileFn="" profileI="All" profileP="" profileR="" profileC="" profileT=""
+              groupType="" groupIDNr="" groupActive="" groupX="" groupY=""
+              x="520" y="550" agentId="" levelId="" isInput="true">
+      <IDNr>1</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Filter</IDName>
+      <metadata>
+        <Filtered_signal active="false" equation="">0</Filtered_signal>
+      </metadata>
+      <Description>Passthrough function: smooths the coupled input over a Static history array and applies branch logic.</Description>
+      <script enabled="true" language="ST" version="1"><![CDATA[(* PASSTHROUGH - Filter
+   Reads the coupled Input aspect, smooths over a Static array,
+   uses IF/ELSIF/ELSE and numeric built-ins. *)
+history[tail] := GetInput('Raw signal');
+tail := (tail + 1) MOD 3;
+
+sum := 0.0;
+FOR i := 0 TO 2 DO
+    sum := sum + history[i];
+END_FOR;
+smooth := sum / 3.0;
+
+IF smooth > 1.0 THEN
+    gain := MIN(gain + 0.1, 2.0);
+ELSIF smooth < 0.2 THEN
+    gain := MAX(gain - 0.1, 0.5);
+END_IF;
+
+Filtered_signal := MIN(MAX(smooth * gain, 0.0), 10.0);
+Print('Filter history=', history, ' gain=', gain, ' filtered=', Filtered_signal);]]></script>
+      <variables>
+        <var name="history" scope="Static" type="REAL" init="[0.0,0.0,0.0]" array="true" />
+        <var name="tail" scope="Static" type="INT" init="0" />
+        <var name="gain" scope="Static" type="REAL" init="1.0" />
+        <var name="sum" scope="Temp" type="REAL" />
+        <var name="smooth" scope="Temp" type="REAL" />
+      </variables>
+      <aspectTypes>
+        <aspect category="Input" label="Raw signal" type="REAL" />
+        <aspect category="Output" label="Filtered signal" type="REAL" />
+      </aspectTypes>
+    </Function>
+
+    <!-- EXIT: global array statistics + static report counter -->
+    <Function fnStyle="0" orphans="0" profileFn="" profileI="Any" profileP="" profileR="" profileC="" profileT=""
+              groupType="" groupIDNr="" groupActive="" groupX="" groupY=""
+              x="840" y="550" agentId="" levelId="" isInput="true">
+      <IDNr>2</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Statistics</IDName>
+      <metadata></metadata>
+      <Description>Exit function: keeps the last outputs in a Global array, counts reports and logs mean/peak values.</Description>
+      <script enabled="true" language="ST" version="1"><![CDATA[(* EXIT - Statistics
+   Global array keeps the last five filtered values; Static counter counts reports. *)
+Filtered_history[Filtered_slot] := GetInput('Filtered signal');
+Filtered_slot := (Filtered_slot + 1) MOD 5;
+
+total := 0.0;
+peak := 0.0;
+FOR i := 0 TO 4 DO
+    total := total + Filtered_history[i];
+    IF Filtered_history[i] > peak THEN
+        peak := Filtered_history[i];
+    END_IF;
+END_FOR;
+
+Reports := Reports + 1;
+mean := total / 5.0;
+Print('Exit reports=', Reports, ' history=', Filtered_history, ' mean=', mean, ' peak=', peak);]]></script>
+      <variables>
+        <var name="Filtered_history" scope="Global" type="REAL" init="[0.0,0.0,0.0,0.0,0.0]" array="true" />
+        <var name="Filtered_slot" scope="Global" type="INT" init="0" />
+        <var name="Reports" scope="Static" type="INT" init="0" />
+        <var name="total" scope="Temp" type="REAL" />
+        <var name="peak" scope="Temp" type="REAL" />
+        <var name="mean" scope="Temp" type="REAL" />
+      </variables>
+      <aspectTypes>
+        <aspect category="Input" label="Filtered signal" type="REAL" />
+      </aspectTypes>
+    </Function>
+
+  </Functions>
+
+  <Inputs>
+    <Input orphan="false"><IDNr>0</IDNr><IDName>Raw signal</IDName><FunctionIDNr>1</FunctionIDNr></Input>
+    <Input orphan="false"><IDNr>1</IDNr><IDName>Filtered signal</IDName><FunctionIDNr>2</FunctionIDNr></Input>
+  </Inputs>
+  <Preconditions></Preconditions>
+  <Resources></Resources>
+  <Controls></Controls>
+  <Times></Times>
+  <Outputs>
+    <Output orphan="false"><IDNr>0</IDNr><IDName>Raw signal</IDName><FunctionIDNr>0</FunctionIDNr></Output>
+    <Output orphan="false"><IDNr>1</IDNr><IDName>Filtered signal</IDName><FunctionIDNr>1</FunctionIDNr></Output>
+  </Outputs>
+
+  <Aspects scaleFunction="1" scaleAspect="1" scaleZoom="1.11" Enhanced="false" WebEnhanced="updated">
+    <Aspect x="0" y="0" directionX="from" directionY="to" outputFn="0" toFn="1" notGroup="">
+      <Name>0|Raw signal|1|I</Name>
+      <Curve>293.5|600|486|380|437.88|380|341.63|600|389.75|490</Curve>
+      <Curve2>M 486 380 Q 437.88 380 389.75 490 Q 341.63 600 293.5 600</Curve2>
+    </Aspect>
+    <Aspect x="0" y="0" directionX="from" directionY="to" outputFn="1" toFn="2" notGroup="">
+      <Name>1|Filtered signal|2|I</Name>
+      <Curve>573.5|380|766|380|717.88|380|621.63|380|669.75|380</Curve>
+      <Curve2>M 766 380 Q 717.88 380 669.75 380 Q 621.63 380 573.5 380</Curve2>
+    </Aspect>
+  </Aspects>
+</FM>

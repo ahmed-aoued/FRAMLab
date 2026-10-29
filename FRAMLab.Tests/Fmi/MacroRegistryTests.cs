@@ -12,9 +12,9 @@ namespace FRAMLab.Tests.Fmi;
 public class MacroRegistryTests
 {
     private static FmiMacroDefinition Macro(string name, string body, string functionId = "",
-        FmiMacroKind kind = FmiMacroKind.Formula, params (string Name, FmiTypeDescriptor Type)[] parameters)
+        params (string Name, FmiTypeDescriptor Type)[] parameters)
     {
-        var macro = new FmiMacroDefinition { Name = name, Kind = kind, Body = body, FunctionId = functionId };
+        var macro = new FmiMacroDefinition { Name = name, Body = body, FunctionId = functionId };
         foreach (var (pn, pt) in parameters)
         {
             macro.Parameters.Add(new FmiMacroParameter { Name = pn, Type = pt });
@@ -33,7 +33,7 @@ public class MacroRegistryTests
     public void LoadFrom_GlobalMacro_VisibleFromAnyFunction()
     {
         var registry = new MacroRegistry();
-        registry.LoadFrom(Definition(Macro("g", "x + 1", "", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number))));
+        registry.LoadFrom(Definition(Macro("g", "x + 1", "", ("x", FmiTypeDescriptor.Number))));
 
         Assert.True(registry.TryGetMacro("g", "", out _));
         Assert.True(registry.TryGetMacro("g", "3", out _));
@@ -45,7 +45,7 @@ public class MacroRegistryTests
     public void LoadFrom_FunctionScoped_OnlyVisibleInItsFunction()
     {
         var registry = new MacroRegistry();
-        registry.LoadFrom(Definition(Macro("g", "x + 100", "3", FmiMacroKind.Formula, ("x", FmiTypeDescriptor.Number))));
+        registry.LoadFrom(Definition(Macro("g", "x + 100", "3", ("x", FmiTypeDescriptor.Number))));
 
         Assert.True(registry.TryGetMacro("g", "3", out _));
         Assert.False(registry.TryGetMacro("g", "4", out _));
@@ -56,8 +56,8 @@ public class MacroRegistryTests
     public void LoadFrom_DuplicateNameAcrossScopes_RejectedFirstWins()
     {
         var definition = Definition(
-            Macro("g", "1", "", FmiMacroKind.Formula),
-            Macro("g", "2", "3", FmiMacroKind.Formula));
+            Macro("g", "1", ""),
+            Macro("g", "2", "3"));
         var registry = new MacroRegistry();
 
         registry.LoadFrom(definition);

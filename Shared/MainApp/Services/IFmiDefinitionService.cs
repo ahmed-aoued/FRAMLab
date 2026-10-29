@@ -18,5 +18,11 @@ namespace FRAMLab.Shared.MainApp.Services
         bool UpsertMacro(XmlDocument projectData, FmiMacroDefinition macro);
         bool RemoveMacro(XmlDocument projectData, string name, string functionId);
         FmiModelDefinition BuildImplicitDefinitions(List<Function> functions);
+        /// <summary>Adds or replaces a data source by name (creates &lt;DataSources&gt; on first use).</summary>
+        void UpsertDataSource(XmlDocument projectData, FmiDataSource source);
+        /// <summary>Removes a data source and every function's timing for it.</summary>
+        bool RemoveDataSource(XmlDocument projectData, string name);
+        /// <summary>Sets (or, with null, clears) when a function reads a data source.</summary>
+        void SetDataTiming(XmlDocument projectData, string source, string functionId, FmiDataTiming? timing);
     }
 }

@@ -8,14 +8,26 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
     public sealed class Symbol
     {
         public string Name { get; }
-        public string DataType { get; }      // BOOL/INT/REAL/STRING/TIME
+        /// <summary>Element type for arrays, value type for scalars.</summary>
+        public string DataType { get; }
         public bool IsWritable { get; }
         public string Category { get; }      // Temp/Static/Global/Input/Output/Precondition/Resource/Control/Time/Host
         public bool IsFunction { get; }
+        public bool IsArray { get; }
+        public int LowerBound { get; }
+        public int UpperBound { get; }
+        /// <summary>1 for a list, 2 for a table (m[i, j]); 0 for scalars.</summary>
+        public int Rank { get; }
+        /// <summary>True when the declaration supplies an initial value (or the symbol
+        /// is inherently initialised, like aspects and Cycle).</summary>
+        public bool HasInitialValue { get; }
 
-        public Symbol(string name, string dataType, bool isWritable, string category, bool isFunction = false)
+        public Symbol(string name, string dataType, bool isWritable, string category, bool isFunction = false,
+            bool isArray = false, int lowerBound = 0, int upperBound = 0, bool hasInitialValue = true, int rank = 1)
         {
             Name = name; DataType = dataType; IsWritable = isWritable; Category = category; IsFunction = isFunction;
+            IsArray = isArray; LowerBound = lowerBound; UpperBound = upperBound; HasInitialValue = hasInitialValue;
+            Rank = isArray ? (rank == 2 ? 2 : 1) : 0;
         }
     }
 

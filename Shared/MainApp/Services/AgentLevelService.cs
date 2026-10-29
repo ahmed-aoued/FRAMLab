@@ -23,6 +23,10 @@ namespace FRAMLab.Shared.MainApp.Services
         private readonly Dictionary<(string levelId, string agentId), List<Function>> _tableCellFunctions = new();
         private StateContainer? _stateContainer;
         private LayoutSnapshot? _agentsLevelsBackup;
+        /// <summary>The user's own layout as stored in the XML before the grid view rewrote it
+        /// (function @x/@y and coupling Curve/Curve2), used to save that layout instead of the grid.</summary>
+        private Dictionary<string, (string? x, string? y)>? _xmlFunctionPositions;
+        private Dictionary<string, (string? curve, string? curve2)>? _xmlCouplingCurves;
         private string _measurementLevelId = string.Empty;
         private string _measurementAgentId = string.Empty;
         private List<string>? _agentsLevelsOriginalOrder;
@@ -120,6 +124,7 @@ namespace FRAMLab.Shared.MainApp.Services
                 return;
             }
             _agentsLevelsBackup = BuildLayoutSnapshot();
+            CaptureXmlLayout(state.projectData_Undo[0]);
             _agentsLevelsOriginalOrder = state.functionList.Select(fn => fn.IDNr).ToList();
             state.AgentsLevelsViewActive = true;
             Console.WriteLine($"[AgentsLevels] View enabled. functions={state.functionList.Count}");
@@ -160,10 +165,61 @@ namespace FRAMLab.Shared.MainApp.Services
             Console.WriteLine("[AgentsLevels] View disabled.");
         }
 
+        /// <summary>
+        /// The document to persist (file save, local backup). While the Agents &amp; Levels view
+        /// is active the live XML holds the temporary grid positions, so this returns a copy
+        /// with the user's own layout restored; otherwise the live document itself.
+        /// </summary>
+        public XmlDocument DocumentForSave()
+        {
+            var state = EnsureState();
+            var doc = state.projectData_Undo[0];
+            if (!state.AgentsLevelsViewActive || _xmlFunctionPositions is null || _xmlCouplingCurves is null)
+            {
+                return doc;
+            }
+
+            var copy = (XmlDocument)doc.Clone();
+            foreach (XmlNode fnNode in copy.SelectNodes("//FM/Functions/Function")!)
+            {
+                var id = fnNode.SelectSingleNode("IDNr")?.InnerText ?? "";
+                if (!_xmlFunctionPositions.TryGetValue(id, out var pos)) continue; // added while the view was on
+                if (pos.x is not null && fnNode.Attributes?["x"] is XmlAttribute x) x.Value = pos.x;
+                if (pos.y is not null && fnNode.Attributes?["y"] is XmlAttribute y) y.Value = pos.y;
+            }
+            foreach (XmlNode aspectNode in copy.SelectNodes("//FM/Aspects/Aspect")!)
+            {
+                var name = aspectNode.SelectSingleNode("Name")?.InnerText ?? "";
+                if (!_xmlCouplingCurves.TryGetValue(name, out var curves)) continue;
+                if (curves.curve is not null && aspectNode.SelectSingleNode("Curve") is XmlNode c) c.InnerText = curves.curve;
+                if (curves.curve2 is not null && aspectNode.SelectSingleNode("Curve2") is XmlNode c2) c2.InnerText = curves.curve2;
+            }
+            return copy;
+        }
+
+        private void CaptureXmlLayout(XmlDocument doc)
+        {
+            _xmlFunctionPositions = new Dictionary<string, (string? x, string? y)>();
+            foreach (XmlNode fnNode in doc.SelectNodes("//FM/Functions/Function")!)
+            {
+                var id = fnNode.SelectSingleNode("IDNr")?.InnerText ?? "";
+                _xmlFunctionPositions[id] = (fnNode.Attributes?["x"]?.Value, fnNode.Attributes?["y"]?.Value);
+            }
+            _xmlCouplingCurves = new Dictionary<string, (string? curve, string? curve2)>();
+            foreach (XmlNode aspectNode in doc.SelectNodes("//FM/Aspects/Aspect")!)
+            {
+                var name = aspectNode.SelectSingleNode("Name")?.InnerText ?? "";
+                _xmlCouplingCurves[name] = (aspectNode.SelectSingleNode("Curve")?.InnerText,
+                    aspectNode.SelectSingleNode("Curve2")?.InnerText);
+            }
+        }
+
         public void ResetAgentsLevelsViewState()
         {
             var state = EnsureState();
             _agentsLevelsBackup = null;
+            _xmlFunctionPositions = null;
+            _xmlCouplingCurves = null;
             _agentsLevelsOriginalOrder = null;
             state.AgentsLevelsViewActive = false;
             _tableRows.Clear();

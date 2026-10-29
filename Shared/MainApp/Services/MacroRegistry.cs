@@ -109,8 +109,8 @@ namespace FRAMLab.Shared.MainApp.Services
                     var parameters = m.Parameters
                         .Select(p => new MacroParameterSymbol(p.Name, p.Type, p.Description))
                         .ToList();
-                    var returnType = m.Kind == FmiMacroKind.Formula ? m.ReturnType : null;
-                    return new MacroSymbol(m.Name, parameters, returnType, m.Kind, m.FunctionId, m.Description,
+                    var returnType = m.ReturnType;
+                    return new MacroSymbol(m.Name, parameters, returnType, m.FunctionId, m.Description,
                         MacroSymbol.BuildSignature(m.Name, parameters, returnType));
                 })
                 .ToList();
@@ -121,14 +121,9 @@ namespace FRAMLab.Shared.MainApp.Services
             _poisoned.Clear();
             _diagnostics.Clear();
 
-            //Unknown-callee / visibility scan applies to formula bodies only; rule macros are
-            //stored and validated, their statement text is interpreted by the Feature 5 DSL engine.
+            //Unknown-callee / visibility scan over every macro body.
             foreach (var macro in _macros.Values)
             {
-                if (macro.Kind != FmiMacroKind.Formula)
-                {
-                    continue;
-                }
                 foreach (var callee in MacroExpander.FindCallCallees(macro.Body))
                 {
                     if (MacroExpander.IsBuiltIn(callee) || TryGetMacro(callee, macro.FunctionId, out _))
@@ -164,7 +159,7 @@ namespace FRAMLab.Shared.MainApp.Services
         {
             state[key] = 1;
             stack.Add(key);
-            if (_macros.TryGetValue(key, out var macro) && macro.Kind == FmiMacroKind.Formula)
+            if (_macros.TryGetValue(key, out var macro))
             {
                 foreach (var callee in MacroExpander.FindCallCallees(macro.Body))
                 {

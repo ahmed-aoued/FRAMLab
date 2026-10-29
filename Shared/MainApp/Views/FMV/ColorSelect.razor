@@ -2,7 +2,7 @@
 @inject StateContainer stateContainer
 @inject IJSRuntime JSRuntime
 
-<MudDialog @bind-Visible="_visible" Options="_dialogOptions" ContentClass="color-select-content" Class="color-select-dialog">
+<MudDialog @ref="dialog" @bind-Visible="_visible" Options="_dialogOptions" ContentClass="color-select-content" Class="color-select-dialog">
     <DialogContent>
         <div class="color-select-inner" tabindex="100" @onkeydown="checkforEsc">
             <div class="d-flex align-center p-1" style="gap:6px;">
@@ -146,6 +146,16 @@
 </MudDialog>
 
 @code {
+    // Inline MudDialogs must be closed by MudBlazor itself (CloseAsync): if the page removes the
+    // component first, the dialog stays on screen. MudBlazor then sets Visible=false, and the
+    // _visible setter tells the page (the same path Escape and the X button take).
+    private MudDialog? dialog;
+    private async Task CloseDialogAsync()
+    {
+        if (dialog is not null) await dialog.CloseAsync();
+        else await OnClose.InvokeAsync(false);
+    }
+
     [Parameter] public EventCallback<bool> OnClose { get; set; }
     private string colorValue = "";
     private string displayValue = "";
@@ -245,11 +255,11 @@
         if (e.Key == "Escape")
         {
             stateContainer.updateColor(initialValue);
-            await OnClose.InvokeAsync(false);
+            await CloseDialogAsync();
         }
         else if (e.Key == "Enter" && freeze)
         {
-            await OnClose.InvokeAsync(false);
+            await CloseDialogAsync();
         }
         else if (e.Key == " ")
         {
@@ -269,7 +279,7 @@
         {
             stateContainer.updateColor(initialValue);
         }
-        OnClose.InvokeAsync(false);
+        _ = CloseDialogAsync();
     }
     public async void FocusElement(string elementName)
     {

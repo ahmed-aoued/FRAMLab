@@ -30,7 +30,6 @@ public class FmiMacroDefinitionXmlTests
 
         Assert.NotNull(macro);
         Assert.Equal("clamp01", macro!.Name);
-        Assert.Equal(FmiMacroKind.Formula, macro.Kind);
         Assert.Equal(FmiValueType.Number, macro.ReturnType!.Kind);
         Assert.Equal("3", macro.FunctionId);
         Assert.Equal("Clamp", macro.Description);
@@ -43,15 +42,12 @@ public class FmiMacroDefinitionXmlTests
     }
 
     [Fact]
-    public void FromXml_DefaultsKindToFormula_WhenOmitted()
+    public void FromXml_AcceptsMissingOrFormulaKind()
     {
         var diagnostics = new List<FmiDiagnostic>();
-        var el = MacroElement("<Macro name=\"f\"><Body>1</Body></Macro>");
 
-        var macro = FmiMacroDefinition.FromXml(el, diagnostics);
-
-        Assert.NotNull(macro);
-        Assert.Equal(FmiMacroKind.Formula, macro!.Kind);
+        Assert.NotNull(FmiMacroDefinition.FromXml(MacroElement("<Macro name=\"f\"><Body>1</Body></Macro>"), diagnostics));
+        Assert.NotNull(FmiMacroDefinition.FromXml(MacroElement("<Macro name=\"g\" kind=\"formula\"><Body>1</Body></Macro>"), diagnostics));
         Assert.Empty(diagnostics);
     }
 
@@ -106,19 +102,17 @@ public class FmiMacroDefinitionXmlTests
     }
 
     [Fact]
-    public void FromXml_RuleWithReturn_WarnsAndIgnoresReturn()
+    public void FromXml_RejectsRuleMacros_WithGuidance()
     {
         var diagnostics = new List<FmiDiagnostic>();
-        var el = MacroElement("<Macro name=\"r\" kind=\"rule\" return=\"number\"><Body>SET X = 1</Body></Macro>");
+        var el = MacroElement("<Macro name=\"r\" kind=\"rule\"><Body>SET X = 1</Body></Macro>");
 
         var macro = FmiMacroDefinition.FromXml(el, diagnostics);
 
-        Assert.NotNull(macro);
-        Assert.Equal(FmiMacroKind.Rule, macro!.Kind);
-        Assert.Null(macro.ReturnType);
-        var warning = Assert.Single(diagnostics);
-        Assert.Equal(FmiDiagnosticSeverity.Warning, warning.Severity);
-        Assert.Contains("ignored", warning.Message);
+        Assert.Null(macro);
+        var error = Assert.Single(diagnostics);
+        Assert.Equal(FmiDiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("ST script", error.Message);
     }
 
     [Fact]
@@ -134,25 +128,11 @@ public class FmiMacroDefinitionXmlTests
     }
 
     [Fact]
-    public void FromXml_EmptyRuleBody_Allowed()
-    {
-        var diagnostics = new List<FmiDiagnostic>();
-        var el = MacroElement("<Macro name=\"r\" kind=\"rule\"></Macro>");
-
-        var macro = FmiMacroDefinition.FromXml(el, diagnostics);
-
-        Assert.NotNull(macro);
-        Assert.Equal(FmiMacroKind.Rule, macro!.Kind);
-        Assert.Empty(diagnostics);
-    }
-
-    [Fact]
     public void ToXml_WritesAllAttributes()
     {
         var macro = new FmiMacroDefinition
         {
             Name = "clamp01",
-            Kind = FmiMacroKind.Formula,
             Body = "min(max(x, 0), 1)",
             ReturnType = FmiTypeDescriptor.Number,
             FunctionId = "3",
@@ -163,7 +143,7 @@ public class FmiMacroDefinitionXmlTests
         var el = macro.ToXml(new XmlDocument());
 
         Assert.Equal("clamp01", el.GetAttribute("name"));
-        Assert.Equal("formula", el.GetAttribute("kind"));
+        Assert.False(el.HasAttribute("kind"));
         Assert.Equal("number", el.GetAttribute("return"));
         Assert.Equal("3", el.GetAttribute("function"));
         Assert.Equal("Clamp", el.GetAttribute("description"));
@@ -182,7 +162,6 @@ public class FmiMacroDefinitionXmlTests
         var el = macro.ToXml(new XmlDocument());
 
         Assert.Equal("f", el.GetAttribute("name"));
-        Assert.Equal("formula", el.GetAttribute("kind"));
         Assert.False(el.HasAttribute("return"));
         Assert.False(el.HasAttribute("function"));
         Assert.False(el.HasAttribute("description"));

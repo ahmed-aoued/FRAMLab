@@ -20,6 +20,19 @@
 <div class="navbar p-0">
     <div class="d-flex align-items-center w-100 text-FMI" title=@Loc["FMI_DELAY"] tabindex="26"><span class="btn-FMIs oi oi-timer unselectable"></span><input id="fmiCycleDelay" name="fmiCycleDelay" class="w-100" type="range" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" /><span class="unselectable">&nbsp;@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s"))</span></div>
 </div>
+@* what the model uses besides plain equations; click to open FMI Setup *@
+<div class="navbar p-0 pb-1">
+    <div class="d-flex flex-wrap align-items-center" style="gap:0.25rem;">
+        @{ var usage = stateContainer.fmiUsage(); }
+        <button type="button" class="fmi-chip @(usage.UsesScripts ? "fmi-chip-st" : "")" title="Functions with an ST script" @onclick=bFMI_setup>ST @usage.ScriptFunctions.Count</button>
+        <button type="button" class="fmi-chip @(usage.UsesMacros ? "fmi-chip-macro" : "")" title="Macros defined / functions calling them" @onclick=bFMI_setup>ƒ @usage.MacroCount/@usage.MacroCalls.Count</button>
+        <button type="button" class="fmi-chip" title="Typed FMI variables" @onclick=bFMI_setup>Var @usage.DeclaredVariableCount</button>
+        <button type="button" class="fmi-chip @(usage.DataSourceCount > 0 ? "fmi-chip-api" : "")" title="Live data sources / functions reading them" @onclick=bFMI_setup>API @usage.DataSourceCount/@usage.ApiCalls.Count</button>
+    </div>
+    <label class="fmi-text mb-0 d-flex align-items-center" style="gap:0.25rem;" title="Equations may read last cycle's value of a key as Prev_Key">
+        <input type="checkbox" checked="@stateContainer.fmiPrevVariables" @onchange="@((e) => stateContainer.fmiPrevVariables = (bool)(e.Value ?? false))" /> Prev_*
+    </label>
+</div>
 @if (stateContainer.showKeys != "")
 {
     <div class="navbar p-0 pt-2 pb-2">
@@ -34,22 +47,26 @@
             </div>
             <button type="button" class="btn btn-FMI oi oi-file" title=@Loc["FMI_SHOW_LOG"] tabindex="26" @onclick=bFMI_showlog></button>
             <button type="button" class="btn btn-FMI oi oi-dashboard" title="Display results setup" tabindex="26" @onclick=bFMI_results></button>
+            <button type="button" class="btn btn-FMI oi oi-wrench" title="FMI Setup: typed variables and macros" tabindex="26" @onclick=bFMI_setup></button>
         </div>
     </div>
-    <div class="navbar p-0">
-        <div></div>
-        <div class="float-right">
-            <div class="fmi-mode-wrap" title="Active FMI preset model">
-                <span class="fmi-mode-label">Mode</span>
-                <select id="fmiModeSelect" name="fmiModeSelect" class="fmi-mode-badge" value="@normalizedMode()" @onchange="changeActiveMode">
-                    <option value="BASIC">Basic</option>
-                    <option value="BBN">BBN</option>
-                    <option value="LOPA">LOPA</option>
-                    <option value="NEURON">Neuron</option>
-                </select>
+    @if (ShowExperimentalModes)
+    {
+        <div class="navbar p-0">
+            <div></div>
+            <div class="float-right">
+                <div class="fmi-mode-wrap" title="Active FMI preset model">
+                    <span class="fmi-mode-label">Mode</span>
+                    <select id="fmiModeSelect" name="fmiModeSelect" class="fmi-mode-badge" value="@normalizedMode()" @onchange="changeActiveMode">
+                        <option value="BASIC">Basic</option>
+                        <option value="BBN">BBN</option>
+                        <option value="LOPA">LOPA</option>
+                        <option value="NEURON">Neuron</option>
+                    </select>
+                </div>
             </div>
         </div>
-    </div>
+    }
     @if (stateContainer.selectedFn == "-1")
     {
         foreach (var key in stateContainer.metaDataKeys.Keys)
@@ -110,21 +127,23 @@
     [Parameter]
     public string Mode { get; set; } = "Basic";
 
-    private List<Coupling> activeAspectsArray = new List<Coupling>();
-    private List<Coupling> toActivateAspectsArray = new List<Coupling>();
-    private List<string> trackExitFunctions = new List<string>();
-    //private List<string[]> dataRows = new List<string[]>();
-    //private Dictionary<string, string> dataKeys = new Dictionary<string, string>();
-    private int? stepTOTAL = null;
+    /// <summary>The run loop lives in FmiRunEngine (testable without the UI); this component drives it.</summary>
+    private FmiRunEngine Engine => stateContainer.fmiRun ??= new FmiRunEngine(new StateContainerFmiRunHost(stateContainer, Logger));
+    private int? stepTOTAL
+    {
+        get => Engine.StepTotal;
+        set => Engine.StepTotal = value;
+    }
     private bool isPlaying = false;
-    private Random rnd = new Random();
     private bool gotoKey = false;
-    private int trackHighlights = 0;
     private string normalizedMode()
     {
         return (Mode ?? "Basic").Trim().ToUpperInvariant();
     }
-    private bool IsVariantMode => normalizedMode() != "BASIC";
+    /// <summary>BBN, LOPA and NEURON presets are kept out of the UI until their calculations exist
+    /// (the BBN preset's Execute(PBBN) has no implementation yet).</summary>
+    private static bool ShowExperimentalModes => false;
+    private bool IsVariantMode => ShowExperimentalModes && normalizedMode() != "BASIC";
     private string DefaultPresetButtonText()
     {
         return normalizedMode() switch
@@ -659,6 +678,11 @@
         stateContainer.showFMIPopup = !stateContainer.showFMIPopup;
         refreshParent.InvokeAsync();
     }
+    private void bFMI_setup()
+    {
+        stateContainer.showFMISetup = true;
+        refreshParent.InvokeAsync();
+    }
     private void bFMI_results()
     {
         if (stateContainer.displaySetup.ContainsKey("c_10_value"))
@@ -675,7 +699,9 @@
         stateContainer.cycleFMI = -1;
         stateContainer.fmiReset();
         stateContainer.Scripting?.Reset(); //clear Static + Global script stores for a fresh FMI run
-        stateContainer.fmiMessage = "";
+        stateContainer.clearFmiLog();
+        stateContainer.fmiUnknownVariables.Clear();
+        Engine.Reset();
         foreach (var fn in stateContainer.functionList)
         {
             fn.resetAspects();
@@ -748,23 +774,15 @@
     }
     private async void bFMI_play()
     {
-        var checkCycle = bFMI_cycle();
-        if (checkCycle == "error" || checkCycle == "End")
+        var checkCycle = await Engine.RunCycleAsync();
+        if (checkCycle is FmiRunEngine.ResultError or FmiRunEngine.ResultEnd or FmiRunEngine.ResultBlocked)
         {
             isPlaying = false;
-            if (checkCycle == "End")
-            {
-                foreach (var Exitfn in stateContainer.functionList.FindAll(x => x.fmiType == "Exit" && !trackExitFunctions.Contains(x.IDNr)))
-                {
-                    trackExitFunctions.Add(Exitfn.IDNr);
-                    Exitfn.fmiHighlight = "exit-fill";
-                }
-            }
+            HandleCycleResult(checkCycle);
         }
         await refreshParent.InvokeAsync();
-        //Console.WriteLine($"cycleDelay: {stateContainer.cycleDelay}");
         await Task.Delay(stateContainer.cycleDelay + 1);
-        bFMI_cycle_Couplings();
+        Engine.PropagateCouplings();
         await refreshParent.InvokeAsync();
         if (isPlaying)
         {
@@ -779,685 +797,22 @@
             isPlaying = false;
             return;
         }
-        var checkCycle = bFMI_cycle();
-        bFMI_cycle_Couplings();
+        var checkCycle = await Engine.RunCycleAsync();
+        Engine.PropagateCouplings();
+        HandleCycleResult(checkCycle);
         await refreshParent.InvokeAsync();
-        if (checkCycle == "End")
-        {
-            foreach (var Exitfn in stateContainer.functionList.FindAll(x => x.fmiType == "Exit" && !trackExitFunctions.Contains(x.IDNr)))
-            {
-                trackExitFunctions.Add(Exitfn.IDNr);
-                Exitfn.fmiHighlight = "exit-fill";
-            }
-        }
     }
-    private void bFMI_cycle_Couplings()
+    /// <summary>End of run: mark unreached Exit functions. Unknown variables: stop and ask the user.</summary>
+    private void HandleCycleResult(string checkCycle)
     {
-        foreach (var coupling in activeAspectsArray)
+        if (checkCycle == FmiRunEngine.ResultEnd)
         {
-            coupling.activated = true;
-            coupling.fmiHighlight = "entry-fill";
-            coupling.wasActive = true;
-            var nextFn = stateContainer.functionList.Find(x => x.IDNr == coupling.toFn);
-            if (nextFn is not null)
-            {
-                switch (coupling.toType)
-                {
-                    case "I": nextFn.ActivateCoupling("I", coupling.Name, coupling.outputFn); break;
-                    case "P": nextFn.ActivateCoupling("P", coupling.Name, coupling.outputFn); break;
-                    case "R": nextFn.ActivateCoupling("R", coupling.Name, coupling.outputFn); break;
-                    case "C": nextFn.ActivateCoupling("C", coupling.Name, coupling.outputFn); break;
-                    case "T": nextFn.ActivateCoupling("T", coupling.Name); break;
-                }
-                var outputFn = stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn);
-                if (outputFn is not null)
-                {
-                    foreach (var meta in outputFn.metadata)
-                    {
-                        var v = nextFn.getVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}") ?? nextFn.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", variableType.String);
-                        v.Value = meta[1];
-                    }
-                }
-            }
+            Engine.MarkPendingExits();
         }
-    }
-    private string bFMI_cycle() //private async Task<string> bFMI_cycle()
-    {
-        stateContainer.cycleFMI += 1;
-        stateContainer.fmiBeginCycle();
-        var returnString = "error";
-        var check1 = 0;
-        var fmiError = false;
-        trackHighlights = 0;
-        toActivateAspectsArray = new List<Coupling>();
-        foreach (var pCoupling in stateContainer.couplingList) //.FindAll(x => x.activated == true))
+        else if (checkCycle == FmiRunEngine.ResultBlocked)
         {
-            pCoupling.activated = false;
-            if (stateContainer.cycleFMI == 0)
-            {
-                pCoupling.wasActive = false;
-                pCoupling.fmiHighlight = "";
-                if (pCoupling.outputFn != pCoupling.toFn)
-                {
-                    var getFn = stateContainer.functionList.Find(x => x.IDNr == pCoupling.toFn);
-                    if (getFn is not null)
-                    {
-                        switch (pCoupling.toType)
-                        {
-                            case "I": getFn.EnsureCoupling("I", pCoupling.Name); break;
-                            case "P": getFn.EnsureCoupling("P", pCoupling.Name); break;
-                            case "R": getFn.EnsureCoupling("R", pCoupling.Name); break;
-                            case "C": getFn.EnsureCoupling("C", pCoupling.Name); break;
-                            case "T": getFn.EnsureCoupling("T", pCoupling.Name); break;
-                        }
-                    }
-                }
-            }
-        }
-        if (stateContainer.cycleFMI == 0)
-        {
-            stateContainer.fmiMessage = $"FRAM Model Interpreter - FMI Basic  -----  (c) Erik Hollnagel, 2020\nFMI session log: {DateTime.Now.ToString()}\n\n";
-            activeAspectsArray = new List<Coupling>();
-            trackExitFunctions = new List<string>();
-            //This loop checks for Orphans and then for functions that have Aspects but not an Input or Output
-            //(Can't be a Background Function if it has other Aspects)
-            foreach (var fnO in stateContainer.functionList)
-            {
-                if (fnO.orphans > 0)
-                {
-                    stateContainer.fmiMessage += $"WARNING: <{fnO.IDName}> has an orphan\n";
-                    fnO.fmiHighlight = "exit-fill";
-                    fmiError = true;
-                }
-                //number of other Aspects (not Input or Output)
-                check1 = stateContainer.aspectsList.FindAll(x => x.FunctionIDNr == fnO.IDNr && x.Type != "Input").Count;
-                if (check1 > 0)
-                {
-                    if (stateContainer.aspectsList.FindAll(x => x.FunctionIDNr == fnO.IDNr && x.Type == "Input").Count == 0)
-                    {
-                        stateContainer.fmiMessage += $"WARNING: <{fnO.IDName}> does not have any Inputs\n";
-                        fnO.fmiHighlight = "exit-fill";
-                        fmiError = true;
-                    }
-                    if (stateContainer.outputsList.FindAll(x => x.FunctionIDNr == fnO.IDNr && x.Type == "Output").Count == 0)
-                    {
-                        stateContainer.fmiMessage += $"WARNING: <{fnO.IDName}> does not have any Outputs\n";
-                        fnO.fmiHighlight = "exit-fill";
-                        fmiError = true;
-                    }
-                }
-            }
-            if (fmiError)
-            {
-                stateContainer.showFMIPopup = true;
-                return returnString;
-            }
-            //If the previous loop passes, then this loop starts the initialisation
-            var IProfile = "";
-            var IProfileExit = "";
-            var ICycle0 = "BEGIN CYCLE 0\n";
-            foreach (var fnBG in stateContainer.functionList)
-            {
-                fnBG.wasActive = false;
-                fnBG.fmiHighlight = "";
-                check1 = 0; //number of other Aspects (not Input or Output)
-                check1 = stateContainer.aspectsList.FindAll(x => x.FunctionIDNr == fnBG.IDNr && x.Type != "Input").Count;
-                var check2 = 0; //total number of outputs
-                var check3 = 0; //total number of Inputs
-                var checkOtoI = 0; //number of Outputs going to other function Inputs
-                var checkOtoA = 0; //number of Outputs going to other function Aspects (other than Input)
-                foreach (var hasOutput in stateContainer.outputsList.FindAll(x => x.FunctionIDNr == fnBG.IDNr && x.Type == "Output"))
-                {
-                    check2 += 1;
-                    checkOtoI += stateContainer.aspectsList.FindAll(x => x.IDName == hasOutput.IDName && x.Type == "Input").Count;
-                    checkOtoA += stateContainer.aspectsList.FindAll(x => x.IDName == hasOutput.IDName && x.Type != "Input").Count;
-                }
-                check3 = stateContainer.aspectsList.FindAll(x => x.FunctionIDNr == fnBG.IDNr && x.Type == "Input").Count;
-                if (check1 == 0) 
-                { //has only inputs or outputs (no other Aspects)
-                    if (check3 == 0 && checkOtoI > 0) //is Entry function (has no Input and has at least 1 Output going to other function Input)
-                    {
-                        fnBG.fmiType = "Entry";
-                        //if (fnBG.profileFn == "") fnBG.profileFn = "0"; // changed, blank FMI Profile is ok, will default
-                        stateContainer.fmiMessage += $"Entry function <{fnBG.IDName}>\n";
-                        ICycle0 += $"Entry function <{fnBG.IDName}> has been activated\n";
-                        // if (enableTheLab)
-                        evaluate(fnBG);
-                        activateFunction(fnBG);
-                        IProfile = $"Function <{fnBG.IDName}>:\n    Output: {(fnBG.profileFn == "" ? "0" : fnBG.profileFn)}\n{IProfile}";
-                    }
-                    else if (check2 == 0 && check3 > 0) //is Exit function (no Output and at least 1 Input)
-                    {
-                        fnBG.fmiType = "Exit";
-                        stateContainer.fmiMessage += $"Exit function <{fnBG.IDName}>\n";
-                        fnBG.fmiHighlight = "exit-fill";
-                        trackHighlights += 1;
-                        trackExitFunctions.Add(fnBG.IDNr);
-                        IProfileExit += $"Function <{fnBG.IDName}>:\n    Input: {Function.ProfileToString(fnBG.PrInputs)}{"        ".Substring(0, 8 - 3)}\n";
-                    }
-                    else if (check2 == 0 && check3 == 0)
-                    { //No Aspects or Couplings at all - ignore
-                        fnBG.fmiType = "";
-                    }
-                    else if (check2 == 0 || check3 == 0)
-                    { //other Background functions (not Entry or Exit, such as an Output going to other Aspects that are not Inputs)
-                        fnBG.fmiType = "Background";
-                        ICycle0 += $"Background function <{fnBG.IDName}> has been activated\n";
-                        //if (enableTheLab)
-                        evaluate(fnBG);
-                        activateFunction(fnBG);
-                    }
-                    else
-                    { //else Passthrough function (Input and Output but no other Aspects)
-                        fnBG.fmiType = "Passthrough";
-                        IProfile += $"Function <{fnBG.IDName}>:";
-                        IProfile += $"\n    Input: {Function.ProfileToString(fnBG.PrInputs)}{"        ".Substring(0, 8 - 3)}";
-                        IProfile += $"Precondition: {Function.ProfileToString(fnBG.PrPreconditions)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrPreconditions).Length)}";
-                        IProfile += $"Resource: {Function.ProfileToString(fnBG.PrResources)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrResources).Length)}";
-                        IProfile += $"Control: {Function.ProfileToString(fnBG.PrControls)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrControls).Length)}";
-                        IProfile += $"Time: All{"        ".Substring(0, 8 - 3)}\n";
-                    }
-                }
-                else
-                {
-                    fnBG.fmiType = "Foreground";
-                    IProfile += $"Function <{fnBG.IDName}>:";
-                    IProfile += $"\n    Input: {Function.ProfileToString(fnBG.PrInputs)}{"        ".Substring(0, 8 - 3)}";
-                    IProfile += $"Precondition: {Function.ProfileToString(fnBG.PrPreconditions)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrPreconditions).Length)}";
-                    IProfile += $"Resource: {Function.ProfileToString(fnBG.PrResources)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrResources).Length)}";
-                    IProfile += $"Control: {Function.ProfileToString(fnBG.PrControls)}{"        ".Substring(0, 8 - Function.ProfileToString(fnBG.PrControls).Length)}";
-                    IProfile += $"Time: All{"        ".Substring(0, 8 - 3)}\n";
-                }
-            }
-            stateContainer.fmiMessage += $"\nInterpretation Profile\n{IProfile}{IProfileExit}\nSummary of FMIlog\nBegin initialisation\n";
-            stateContainer.fmiMessage += "---  MODEL INITIALISATION COMPLETED.\n";
-            stateContainer.fmiMessage += ICycle0;
-            returnString = "0";
-        }
-        else if (stateContainer.cycleFMI > 0)
-        {
-            stateContainer.fmiMessage += $"BEGIN CYCLE {stateContainer.cycleFMI.ToString()}\n";
-            foreach (var fnBG2 in stateContainer.functionList.FindAll(x => x.fmiType != "Background"))
-            {
-                if (fnBG2.fmiType == "Entry")
-                {
-                    //CYCLE TEST
-                    double checkProfileFn = 0;
-                    double.TryParse(fnBG2.profileFn, CultureInfo.InvariantCulture, out checkProfileFn);
-                    if (checkProfileFn > 0)
-                    {
-                        var cycleFn = false;
-                        if (checkProfileFn >= 1)
-                        {
-                            double checkCycle = (double)stateContainer.cycleFMI / checkProfileFn;
-                            if (checkCycle == (int)checkCycle)
-                            {
-                                cycleFn = true;
-                            }
-                        }
-                        else
-                        {
-                            if (rnd.NextDouble() < checkProfileFn)
-                            {
-                                cycleFn = true;
-                            }
-                        }
-                        if (cycleFn)
-                        {
-                            //if (enableTheLab)
-                            evaluate(fnBG2);
-                            activateFunction(fnBG2);
-                            // if (activateFunction(fnBG2))
-                            // {
-                            //     stateContainer.fmiMessage += $"Entry Function <{fnBG2.IDName}> has been activated\n";
-                            // }
-                            foreach (var fnBGb in stateContainer.functionList.FindAll(x => x.fmiType == "Background"))
-                            {
-                                evaluate(fnBGb);
-                                activateFunction(fnBGb);
-                            }
-                        }
-                        else
-                        {
-                            fnBG2.fmiHighlight = "";
-                        }
-                    }
-                    else
-                    {
-                        fnBG2.fmiHighlight = "";
-                    }
-                    //CYCLE TEST
-                }
-                else //all other Functions that are not Entry and not Background (Exit not excluded. In other words, they all have Inputs)
-                {
-                    if (fnBG2.isActive())
-                    {
-                        //if (enableTheLab)
-                        evaluate(fnBG2);
-                        if (!activateFunction(fnBG2))
-                        {
-                            var fnMDC2 = fnBG2.metadata.Find(x => x[0] == "Consume");
-                            if (fnMDC2 is not null)
-                            {
-                                var consumeAll = true;
-                                var consumeOnly = "";
-                                if (fnMDC2[1] == "0" || fnMDC2[1] == "false")
-                                {
-                                    consumeAll = false;
-                                    consumeOnly = "";
-                                }
-                                if (fnMDC2[1] != "1" && fnMDC2[1] != "true")
-                                {
-                                    consumeAll = false;
-                                    consumeOnly = fnMDC2[1];
-                                    foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == fnBG2.IDNr && !x.activated && x.toType == "I" && (consumeAll || consumeOnly.Contains(x.label))))
-                                    {//This is about forcing an Input to be consumed (but not if also part of repeating cycle?)
-                                        fnBG2.DeactivateCoupling("I", coupling.Name);
-                                        activeAspectsArray.Remove(coupling);
-                                        fnBG2.variableList.RemoveAll(v => v.Name.StartsWith($"{coupling.toType}{coupling.outputFn}_"));
-                                        coupling.fmiHighlight = "";
-                                    }
-                                }
-                            }
-                        }
-                        /*
-                        var canActivate2 = true;
-                        var activateAll2 = true;
-                        var activateOnly = "";
-                        var consumeAll2 = true;
-                        var consumeOnly = "";
-                        var fnMD2 = fnBG2.metadata.Find(x => x[0] == "Activate");
-                        if (fnMD2 is not null)
-                        {
-                            if (fnMD2[1] == "0" || fnMD2[1] == "false")
-                            {
-                                canActivate2 = false;
-                            }
-                            if (fnMD2[1] != "1" && fnMD2[1] != "true")
-                            {
-                                activateAll2 = false;
-                                activateOnly = fnMD2[1];
-                            }
-                        }
-                        var fnMDC2 = fnBG2.metadata.Find(x => x[0] == "Consume");
-                        if (fnMDC2 is not null)
-                        {
-                            if (fnMDC2[1] != "1" && fnMDC2[1] != "true")
-                            {
-                                consumeAll2 = false;
-                                consumeOnly = fnMDC2[1];
-                                if (!canActivate2)
-                                {
-
-                                }
-                            }
-                        }
-                        var fnMDv2 = fnBG2.metadata.Find(x => x[0] == "Variable");
-                        if (fnMDv2 is not null && fnBG2.FunctionType != "2")
-                        {
-                            stateContainer.updateUndo();
-                            if (fnMDv2[1] == "1" || fnMDv2[1] == "true")
-                            {
-                                fnBG2.FunctionType = "1";
-                                stateContainer.setFunctionType(fnBG2.IDNr, "1", fnBG2);
-                            }
-                            else
-                            {
-                                fnBG2.FunctionType = "0";
-                                stateContainer.setFunctionType(fnBG2.IDNr, "0", fnBG2);
-                            }
-                        }
-                        if (canActivate2)
-                        {
-                            fnBG2.wasActive = true;
-                            trackHighlights += 1;
-                            fnBG2.fmiHighlight = $"{fnBG2.fmiType.ToLower()}-fill";
-                            //check group
-                            if (fnBG2.fmiType != "Exit")
-                            {
-                                stateContainer.fmiMessage += $"Function <{fnBG2.IDName}> has been activated\n";
-                            }
-                            else
-                            {
-                                trackExitFunctions.Remove(fnBG2.IDNr);
-                                stateContainer.fmiMessage += $"Exit function <{fnBG2.IDName}> has been activated\n";
-                            }
-                            foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == fnBG2.IDNr && !x.activated))
-                            {//This is about clearing the Aspects that were consumed, but not if also part of repeating cycle
-                                if (stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn)?.fmiType != "Background")
-                                {
-                                    switch (coupling.toType)
-                                    {
-                                        case "I": fnBG2.activeI.Remove(coupling.Name); break;
-                                        case "P": fnBG2.activeP.Remove(coupling.Name); break;
-                                        case "R": fnBG2.activeR.Remove(coupling.Name); break;
-                                        case "C": fnBG2.activeC.Remove(coupling.Name); break;
-                                        case "T": fnBG2.activeT.Remove(coupling.Name); break;
-                                    }
-                                    activeAspectsArray.Remove(coupling);
-                                    //Console.WriteLine("=====================");
-                                    //Console.WriteLine($"Coupling: {coupling.Name}, {coupling.toType}{coupling.outputFn}_");
-                                    //Console.WriteLine($"Function: {fnBG2.IDNr}, {fnBG2.IDName}");
-                                    //Console.WriteLine("=====================");
-                                    fnBG2.removeVariable($"{coupling.toType}{coupling.outputFn}_");
-                                }
-                                coupling.fmiHighlight = "";
-                            }
-                            foreach (var coupling in stateContainer.couplingList.FindAll(x => x.outputFn == fnBG2.IDNr && x.outputFn != x.toFn && (activateAll2 || activateOnly.Contains(x.label))))
-                            { //This activates the Outputs of the current Function
-                                if (!toActivateAspectsArray.Contains(coupling))
-                                {
-                                    toActivateAspectsArray.Add(coupling);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            fnBG2.fmiHighlight = "hold-fill";
-                        }
-                        */
-                    }
-                    else
-                    {
-                        //check for group?
-                        fnBG2.fmiHighlight = "";
-                    }
-                }
-            }
-            returnString = stateContainer.cycleFMI.ToString();
-            if (stepTOTAL == null)
-            {
-                if (trackExitFunctions.Count == 0)
-                {
-                    //bFMI.enabled = false;
-                    //stateContainer.fmiMessage += "\nEnd";
-                    returnString = "End";
-                }
-            }
-            else if (stepTOTAL.HasValue && stepTOTAL != 0 && stepTOTAL <= stateContainer.cycleFMI)
-            {
-                //bFMI.enabled = false;
-                //stateContainer.fmiMessage += "\nEnd";
-                returnString = "End";
-            }
-        }
-        //activeAspectsArray.AddRange(toActivateAspectsArray);
-        foreach (var item in toActivateAspectsArray)
-        {
-            if (!activeAspectsArray.Contains(item))
-            {
-                activeAspectsArray.Add(item);
-            }
-        }
-        if (trackHighlights == 0)
-        {
-            stateContainer.fmiMessage += "No functions were activated during this cycle.\n"; 
-            if (!stepTOTAL.HasValue)
-            {
-                //bFMI.enabled = false;
-                //stateContainer.fmiMessage += "\nEnd";
-                returnString = "End";
-            }
-        }
-        stateContainer.fmiEndCycle();
-        return returnString;
-    }
-    private bool activateFunction(Function fnBG)
-    {
-        var canActivate = true;
-        var activateAll = true;
-        var activateOnly = "";
-        var fnMD = fnBG.metadata.Find(x => x[0] == "Activate");
-        if (fnMD is not null)
-        {
-            if (fnMD[1] == "0" || fnMD[1] == "false")
-            {
-                canActivate = false;
-            }
-            if (fnMD[1] != "1" && fnMD[1] != "true")
-            {
-                activateAll = false;
-                activateOnly = fnMD[1];
-            }
-        }
-        var fnMDv2 = fnBG.metadata.Find(x => x[0] == "Variable");
-        if (fnMDv2 is not null && fnBG.FunctionType != "2")
-        {
-            stateContainer.updateUndo();
-            if (fnMDv2[1] == "1" || fnMDv2[1] == "true")
-            {
-                fnBG.FunctionType = "1";
-                stateContainer.setFunctionType(fnBG.IDNr, "1", fnBG);
-            }
-            else
-            {
-                fnBG.FunctionType = "0";
-                stateContainer.setFunctionType(fnBG.IDNr, "0", fnBG);
-            }
-        }
-        if (canActivate)
-        {
-            fnBG.wasActive = true;
-            trackHighlights += 1;
-            fnBG.fmiHighlight = $"{fnBG.fmiType.ToLower()}-fill";
-            if (fnBG.fmiType == "Entry")
-            {
-                stateContainer.fmiMessage += $"Entry Function <{fnBG.IDName}> has been activated\n";
-                foreach (var coupling in stateContainer.couplingList.FindAll(x => x.outputFn == fnBG.IDNr && (activateAll || fnMD![1].Contains(x.label))))
-                {
-                    if (!toActivateAspectsArray.Contains(coupling))
-                    {
-                        toActivateAspectsArray.Add(coupling);
-                    }
-                }
-            }
-            else if (fnBG.fmiType == "Background") // && stateContainer.cycleFMI == 0)
-            {
-                foreach (var coupling in stateContainer.couplingList.FindAll(x => x.outputFn == fnBG.IDNr && (activateAll || fnMD![1].Contains(x.label))))
-                {
-                    coupling.wasActive = true;
-                    coupling.activated = true;
-                    coupling.fmiHighlight = "background-fill";
-                    var nextFn = stateContainer.functionList.Find(x => x.IDNr == coupling.toFn);
-                    if (nextFn is not null)
-                    {
-                        switch (coupling.toType)
-                        {
-                            case "I": nextFn.ActivateCoupling("I", coupling.Name, coupling.outputFn); break;
-                            case "P": nextFn.ActivateCoupling("P", coupling.Name, coupling.outputFn); break;
-                            case "R": nextFn.ActivateCoupling("R", coupling.Name, coupling.outputFn); break;
-                            case "C": nextFn.ActivateCoupling("C", coupling.Name, coupling.outputFn); break;
-                            case "T": nextFn.ActivateCoupling("T", coupling.Name); break;
-                        }
-                        var outputFn2 = stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn);
-                        if (outputFn2 is not null)
-                        {
-                            foreach (var meta in outputFn2.metadata)
-                            {
-                                var v = nextFn.getVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}") ?? nextFn.newVariable($"{coupling.toType}{coupling.outputFn}_{meta[0]}", variableType.String);
-                                v.Value = meta[1];
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                var holdAll = false;
-                var holdOnly = "";
-                var fnMDH = fnBG.metadata.Find(x => x[0] == "Hold");
-                if (fnMDH is not null)
-                {
-                    holdAll = true;
-                    if (fnMDH[1] == "0" || fnMDH[1] == "false")
-                    {
-                        holdAll = false;
-                    }
-                    if (fnMDH[1] != "1" && fnMDH[1] != "true")
-                    {
-                        holdAll = false;
-                        holdOnly = fnMDH[1];
-                    }
-                }
-                if (fnBG.fmiType != "Exit")
-                {
-                    fnBG.fmiHighlight = "entry-fill";
-                    stateContainer.fmiMessage += $"Function <{fnBG.IDName}> has been activated\n";
-                }
-                else
-                {
-                    trackExitFunctions.Remove(fnBG.IDNr);
-                    stateContainer.fmiMessage += $"Exit function <{fnBG.IDName}> has been activated\n";
-                }
-                foreach (var coupling in stateContainer.couplingList.FindAll(x => x.toFn == fnBG.IDNr && !x.activated && !holdAll && !holdOnly.Contains(x.label)))
-                {//This is about clearing the Aspects that were consumed, but not if also part of repeating cycle, and not if explicitly on Hold
-                    if (stateContainer.functionList.Find(x => x.IDNr == coupling.outputFn)?.fmiType != "Background")
-                    {
-                        switch (coupling.toType)
-                        {
-                            case "I": fnBG.DeactivateCoupling("I", coupling.Name); break;
-                            case "P": fnBG.DeactivateCoupling("P", coupling.Name); break;
-                            case "R": fnBG.DeactivateCoupling("R", coupling.Name); break;
-                            case "C": fnBG.DeactivateCoupling("C", coupling.Name); break;
-                            case "T": fnBG.DeactivateCoupling("T", coupling.Name); break;
-                        }
-                        activeAspectsArray.Remove(coupling);
-                        //Console.WriteLine("=====================");
-                        //Console.WriteLine($"Coupling: {coupling.Name}, {coupling.toType}{coupling.outputFn}_");
-                        //Console.WriteLine($"Function: {fnBG2.IDNr}, {fnBG2.IDName}");
-                        //Console.WriteLine("=====================");
-                        fnBG.variableList.RemoveAll(v => v.Name.StartsWith($"{coupling.toType}{coupling.outputFn}_"));
-                    }
-                    coupling.fmiHighlight = "";
-                }
-                foreach (var coupling in stateContainer.couplingList.FindAll(x => x.outputFn == fnBG.IDNr && x.outputFn != x.toFn && (activateAll || activateOnly.Contains(x.label))))
-                { //This activates the Outputs of the current Function, unless selectively not included in Activate
-                    if (!toActivateAspectsArray.Contains(coupling))
-                    {
-                        toActivateAspectsArray.Add(coupling);
-                    }
-                }
-            }
-        }
-        else
-        {
-            fnBG.fmiHighlight = "hold-fill";
-        }
-        return canActivate;
-    }
-    private void evaluate(Function iBG) //private async Task evaluate(Function iBG)
-    {
-        var showVariability = false;
-        var result = stateContainer.fmiEvaluate(iBG); //CalcVariables + the metadata equation loop, moved into IFmiInterpreter
-        ExecuteFunctionScript(iBG); //run the per-cycle ST script (if any), after inputs are calculated
-        foreach (var (key, value) in result.EvaluatedKeys)
-        {
-            for (var i = 1; i <= 6; i++)
-            {
-                if (stateContainer.displaySetup.ContainsKey($"tracer_{i}") && key == stateContainer.displaySetup[$"tracer_{i}"])
-                {
-                    stateContainer.updateKvalue(iBG, $"K{i}", value);
-                    showVariability = true;
-                }
-            }
-        }
-        //showVariability = true;
-        if (showVariability && (iBG.FunctionType != "2" || iBG.fmiType == "Exit")) //ignore Background but do include Exit functions
-        {
-            checkVariability_DrawResults(iBG);
-        }
-        stateContainer.addMetadataResults(iBG); //this adds a new row to the Metadata table for the results of the evaluated Function (for the current Cycle)
-    }
-    /// <summary>Run the function's ST script for this cycle. Executes after inputs are
-    /// calculated, surfaces runtime issues to the FMI log, and flags the function on errors.</summary>
-    private void ExecuteFunctionScript(Function fn)
-    {
-        if (stateContainer.Scripting is null || fn.Script is null) return;
-        if (!fn.Script.Enabled || string.IsNullOrWhiteSpace(fn.Script.Source)) return;
-        try
-        {
-            // keep the scripting service's global declarations in sync with the editor's globals
-            stateContainer.Scripting.GlobalVariableDeclarations.Clear();
-            stateContainer.Scripting.GlobalVariableDeclarations.AddRange(stateContainer.globalScriptVariables);
-            var ctx = stateContainer.Scripting.ExecuteCycle(fn, stateContainer.cycleFMI);
-            if (ctx is null) return;
-            foreach (var issue in ctx.RuntimeIssues)
-            {
-                stateContainer.fmiMessage += $"Script [{fn.IDName}] {issue.StartLine}:{issue.StartColumn} {issue.Message}\n";
-                if (issue.Severity == "Error")
-                {
-                    fn.fmiHighlight = "hold-fill";
-                }
-            }
-            foreach (var trace in ctx.Trace)
-            {
-                stateContainer.fmiMessage += trace + "\n";
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(LogEvents.FmiScript, ex,
-                "Script runtime error in function {FunctionName} ({FunctionId}) at cycle {Cycle}.",
-                fn.IDName, fn.IDNr, stateContainer.cycleFMI);
-            stateContainer.fmiMessage += $"Script [{fn.IDName}] runtime error: {ex.Message}\n";
-            fn.fmiHighlight = "hold-fill";
-        }
-    }
-    private void checkVariability_DrawResults(Function iBG)
-    {
-        iBG.toolTip = "";
-        iBG.Cvalues = new Dictionary<string, string>();
-        for (var i = 1; i <= 6; i++)
-        {
-            if (stateContainer.displaySetup[$"tracer_{i}"].Length > 0 && iBG.Kvalues.ContainsKey($"K{i}"))
-            {
-                iBG.toolTip += $"{stateContainer.displaySetup[$"tracer_{i}"]} = {iBG.Kvalues[$"K{i}"]}\n";
-                double d_t0 = stateContainer.displayValue[$"colour_{i}0"];
-                double d_t1 = stateContainer.displayValue[$"colour_{i}1"];
-                double d_t2 = stateContainer.displayValue[$"colour_{i}2"];
-                double d_t3 = stateContainer.displayValue[$"colour_{i}3"];
-                double d_t4 = stateContainer.displayValue[$"colour_{i}4"];
-                // Console.WriteLine($"d_t0: {d_t0}");
-                // Console.WriteLine($"d_t1: {d_t1}");
-                // Console.WriteLine($"d_t2: {d_t2}");
-                // Console.WriteLine($"d_t3: {d_t3}");
-                // Console.WriteLine($"d_t4: {d_t4}");
-                // Console.WriteLine($"K{i}: {iBG.Kvalues[$"K{i}"]}");
-                if (d_t1 is not double.NaN && iBG.Kvalues[$"K{i}"] <= d_t1)
-                {
-                    //var d_t0 = stateContainer.displayValue[$"colour_{i}0"];
-                    iBG.Cvalues[$"{i}C_stroke"] = stateContainer.displaySetup[$"c_{i}0_value"];
-                    iBG.Cvalues[$"{i}C_opacity"] = (0.75 - (iBG.Kvalues[$"K{i}"] - d_t0) * 0.25 / (d_t1 - d_t0)).ToString("0.##", CultureInfo.InvariantCulture);
-                    iBG.Cvalues[$"{i}Y_stroke"] = stateContainer.displaySetup[$"c_{i}2_value"];
-                    iBG.Cvalues[$"{i}Y_opacity"] = ((iBG.Kvalues[$"K{i}"] - d_t0) * 0.5 / (d_t1 - d_t0)).ToString("0.##", CultureInfo.InvariantCulture);
-                }
-                else if (d_t2 is not double.NaN && iBG.Kvalues[$"K{i}"] <= d_t2)
-                {
-                    iBG.Cvalues[$"{i}C_stroke"] = stateContainer.displaySetup[$"c_{i}0_value"];
-                    iBG.Cvalues[$"{i}C_opacity"] = (0.5 - (iBG.Kvalues[$"K{i}"] - d_t1) * 0.5 / (d_t2 - d_t1)).ToString("0.##", CultureInfo.InvariantCulture);
-                    iBG.Cvalues[$"{i}Y_stroke"] = stateContainer.displaySetup[$"c_{i}2_value"];
-                    iBG.Cvalues[$"{i}Y_opacity"] = (0.5 + (iBG.Kvalues[$"K{i}"] - d_t1) * 0.25 / (d_t2 - d_t1)).ToString("0.##", CultureInfo.InvariantCulture);
-                }
-                else if (d_t3 is not double.NaN && iBG.Kvalues[$"K{i}"] <= d_t3)
-                {
-                    iBG.Cvalues[$"{i}Y_stroke"] = stateContainer.displaySetup[$"c_{i}2_value"];
-                    iBG.Cvalues[$"{i}Y_opacity"] = (0.75 - (iBG.Kvalues[$"K{i}"] - d_t2) * 0.25 / (d_t3 - d_t2)).ToString("0.##", CultureInfo.InvariantCulture);
-                    iBG.Cvalues[$"{i}M_stroke"] = stateContainer.displaySetup[$"c_{i}4_value"];
-                    iBG.Cvalues[$"{i}M_opacity"] = ((iBG.Kvalues[$"K{i}"] - d_t2) * 0.5 / (d_t3 - d_t2)).ToString("0.##", CultureInfo.InvariantCulture);
-                }
-                else if (d_t4 is not double.NaN && iBG.Kvalues[$"K{i}"] <= d_t4)
-                {
-                    iBG.Cvalues[$"{i}Y_stroke"] = stateContainer.displaySetup[$"c_{i}2_value"];
-                    iBG.Cvalues[$"{i}Y_opacity"] = (0.5 - (iBG.Kvalues[$"K{i}"] - d_t3) * 0.5 / (d_t4 - d_t3)).ToString("0.##", CultureInfo.InvariantCulture);
-                    iBG.Cvalues[$"{i}M_stroke"] = stateContainer.displaySetup[$"c_{i}4_value"];
-                    iBG.Cvalues[$"{i}M_opacity"] = (0.5 + (iBG.Kvalues[$"K{i}"] - d_t3) * 0.25 / (d_t4 - d_t3)).ToString("0.##", CultureInfo.InvariantCulture);
-                }
-                else
-                {
-                    iBG.Cvalues[$"{i}M_stroke"] = stateContainer.displaySetup[$"c_{i}4_value"];
-                    iBG.Cvalues[$"{i}M_opacity"] = "0.75";
-                }
-            }
+            stateContainer.fmiUnknownVariables = Engine.UnknownVariables.ToList();
+            stateContainer.showFMIUnknownVariables = true;
         }
     }
 }

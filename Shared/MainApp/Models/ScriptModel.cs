@@ -86,31 +86,102 @@ namespace FRAMLab.Shared.MainApp.Models
 
             if (fn.SelectSingleNode("variables") is XmlNode varsNode)
             {
-                foreach (XmlNode varNode in varsNode.SelectNodes("var")!)
-                {
-                    var v = new ScriptVariable
-                    {
-                        Name = varNode.SelectSingleNode("@name")?.Value ?? "",
-                        InitialValue = varNode.SelectSingleNode("@init")?.Value ?? "",
-                        IsOutput = varNode.SelectSingleNode("@output")?.Value == "true"
-                    };
-                    if (Enum.TryParse<ScriptScope>(varNode.SelectSingleNode("@scope")?.Value ?? "Temp", true, out var scope))
-                    {
-                        v.Scope = scope;
-                    }
-                    if (Enum.TryParse<ScriptVarType>(varNode.SelectSingleNode("@type")?.Value ?? "REAL", true, out var type))
-                    {
-                        v.Type = type;
-                    }
-                    if (v.Name != "")
-                    {
-                        model.Variables.Add(v);
-                    }
-                }
+                model.Variables.AddRange(ReadVars(varsNode, ScriptScope.Temp));
             }
 
             model.ReadAspectTypes(fn);
             return model;
+        }
+
+        private static List<ScriptVariable> ReadVars(XmlNode container, ScriptScope defaultScope)
+        {
+            var result = new List<ScriptVariable>();
+            foreach (XmlNode varNode in container.SelectNodes("var")!)
+            {
+                var v = new ScriptVariable
+                {
+                    Name = varNode.SelectSingleNode("@name")?.Value ?? "",
+                    InitialValue = varNode.SelectSingleNode("@init")?.Value ?? "",
+                    IsOutput = varNode.SelectSingleNode("@output")?.Value == "true",
+                    IsArray = varNode.SelectSingleNode("@array")?.Value == "true",
+                    Dimensions = varNode.SelectSingleNode("@dims")?.Value == "2" ? 2 : 1,
+                    Scope = defaultScope
+                };
+                if (Enum.TryParse<ScriptScope>(varNode.SelectSingleNode("@scope")?.Value ?? defaultScope.ToString(), true, out var scope))
+                {
+                    v.Scope = scope;
+                }
+                if (Enum.TryParse<ScriptVarType>(varNode.SelectSingleNode("@type")?.Value ?? "REAL", true, out var type))
+                {
+                    v.Type = type;
+                }
+                if (int.TryParse(varNode.SelectSingleNode("@lower")?.Value, out var lower)) v.LowerBound = lower;
+                if (int.TryParse(varNode.SelectSingleNode("@upper")?.Value, out var upper)) v.UpperBound = upper;
+                if (v.IsArray && v.UpperBound < v.LowerBound) v.UpperBound = v.LowerBound;
+                if (v.Name != "")
+                {
+                    result.Add(v);
+                }
+            }
+            return result;
+        }
+
+        private static XmlElement WriteVar(XmlDocument doc, ScriptVariable v)
+        {
+            var varNode = doc.CreateElement("var");
+            AppendAttr(doc, varNode, "name", v.Name);
+            AppendAttr(doc, varNode, "scope", v.Scope.ToString());
+            AppendAttr(doc, varNode, "type", v.Type.ToString());
+            if (!string.IsNullOrEmpty(v.InitialValue))
+            {
+                AppendAttr(doc, varNode, "init", v.InitialValue);
+            }
+            if (v.IsOutput)
+            {
+                AppendAttr(doc, varNode, "output", "true");
+            }
+            if (v.IsArray)
+            {
+                AppendAttr(doc, varNode, "array", "true");
+                if (v.IsTable) AppendAttr(doc, varNode, "dims", "2");
+                if (v.HasLegacyBounds)
+                {
+                    // arrays have no size; bounds are only kept when an older file declared them
+                    AppendAttr(doc, varNode, "lower", v.LowerBound.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    AppendAttr(doc, varNode, "upper", v.UpperBound.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+            }
+            return varNode;
+        }
+
+        /// <summary>Model-wide script globals (the IDE's Global variables panel), stored as
+        /// &lt;FM&gt;&lt;ScriptGlobals&gt;&lt;var .../&gt;&lt;/ScriptGlobals&gt;. Empty when absent.</summary>
+        public static List<ScriptVariable> ReadGlobals(XmlDocument doc)
+        {
+            if (doc.SelectSingleNode("//FM/ScriptGlobals") is not XmlNode node)
+            {
+                return new List<ScriptVariable>();
+            }
+            var globals = ReadVars(node, ScriptScope.Global);
+            foreach (var g in globals) g.Scope = ScriptScope.Global;
+            return globals;
+        }
+
+        /// <summary>Write the model-wide script globals; removes the node when there are none,
+        /// so models without globals save unchanged.</summary>
+        public static void WriteGlobals(XmlDocument doc, IEnumerable<ScriptVariable> globals)
+        {
+            if (doc.SelectSingleNode("//FM") is not XmlNode fm) return;
+            if (fm.SelectSingleNode("ScriptGlobals") is XmlNode existing) fm.RemoveChild(existing);
+            var declared = globals.Where(v => !string.IsNullOrWhiteSpace(v.Name)).ToList();
+            if (declared.Count == 0) return;
+            var node = doc.CreateElement("ScriptGlobals");
+            foreach (var v in declared)
+            {
+                v.Scope = ScriptScope.Global;
+                node.AppendChild(WriteVar(doc, v));
+            }
+            fm.AppendChild(node);
         }
 
         /// <summary>
@@ -181,16 +252,7 @@ namespace FRAMLab.Shared.MainApp.Models
 
                 foreach (var v in declaredVars)
                 {
-                    var varNode = doc.CreateElement("var");
-                    AppendAttr(doc, varNode, "name", v.Name);
-                    AppendAttr(doc, varNode, "scope", v.Scope.ToString());
-                    AppendAttr(doc, varNode, "type", v.Type.ToString());
-                    AppendAttr(doc, varNode, "init", v.InitialValue);
-                    if (v.IsOutput)
-                    {
-                        AppendAttr(doc, varNode, "output", "true");
-                    }
-                    varsNode.AppendChild(varNode);
+                    varsNode.AppendChild(WriteVar(doc, v));
                 }
             }
             else if (existingVars is not null)

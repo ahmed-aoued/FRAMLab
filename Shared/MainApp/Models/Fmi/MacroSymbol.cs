@@ -6,8 +6,7 @@ namespace FRAMLab.Shared
     public sealed record MacroSymbol(
         string Name,
         IReadOnlyList<MacroParameterSymbol> Parameters,
-        FmiTypeDescriptor? ReturnType,                    //null for rule macros
-        FmiMacroKind Kind,
+        FmiTypeDescriptor? ReturnType,                    //null = inferred
         string FunctionId,                                //"" = global; editor filters by current function
         string Description,
         string Signature)                                 //pre-rendered "clamp01(x: number): number"

@@ -372,7 +372,8 @@ text {
     display: flex;
     overflow: hidden;
 }
-.main {
+/* Scoped to the page's main area: Monaco's suggestion rows also contain a ".main" element */
+#mainWindow.main {
     display: inline-flex;
     padding-top: var(--appbar-h);
     flex-direction: row;
@@ -701,7 +702,7 @@ text {
     .main .top-row a, .main .top-row .btn-link {
         margin-left: 0;
     }
-    .main {
+    #mainWindow.main {
         margin-left: 175px;
     }
 }
@@ -724,7 +725,7 @@ text {
     .main-half-m {
         width: 50vw;
     }
-    .main {
+    #mainWindow.main {
         margin-left: 200px;
     }
         .main .top-row {
@@ -755,7 +756,7 @@ text {
     .main-half-s {
         width: calc(50vw - 225px);
     }
-    .main {
+    #mainWindow.main {
         margin-left: 225px;
         padding-top: var(--appbar-h);
     }
@@ -776,7 +777,7 @@ text {
     .main-half-m {
         width: 50vw;
     }
-    .main {
+    #mainWindow.main {
         margin-left: 250px;
     }
 }
@@ -796,7 +797,7 @@ text {
     .main-half-m {
         width: 50vw;
     }
-    .main {
+    #mainWindow.main {
         margin-left: 275px;
     }
 }
@@ -865,9 +866,11 @@ text {
     width: 100%;
 }
 .script-ide-vars {
-    width: 520px;
+    /* Wide enough for the full variable grid (name, scope, array, type,
+       initial value, out, delete) without squeezing the columns. */
+    width: clamp(620px, 44vw, 760px);
     flex: 0 0 auto;
-    overflow-y: auto;
+    overflow: auto;
     padding: 0.75rem;
     border-right: 1px solid #e0e0e0;
     background-color: #f8f9fa;
@@ -920,20 +923,22 @@ text {
 .vt {
     border: 1px solid #d6d9dc;
     border-radius: 6px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     margin-bottom: 1rem;
 }
 .vt-grid {
     width: 100%;
+    min-width: 560px;
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.82rem;
 }
-/* column width distribution (name flexes, others fixed) */
-.vt-col-name { width: 26%; }
-.vt-col-init { width: 22%; }
+/* The name column takes the remaining space; the others keep readable widths. */
+.vt-col-name { width: auto; }
+.vt-col-init { width: 120px; }
 .vt-grid thead th {
     background: #f1f3f4;
     color: #5f6368;
@@ -944,20 +949,24 @@ text {
     border-right: 1px solid #e4e6e8;
     user-select: none;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .vt-grid thead th:last-child { border-right: none; }
 .vt-rownum-head, .vt-rownum {
-    width: 30px;
+    width: 28px;
     text-align: center;
     color: #9aa0a6;
     background: #f8f9fa;
     font-size: 0.72rem;
 }
 .vt-rownum { border-right: 1px solid #e4e6e8; border-bottom: 1px solid #eceef0; }
-.vt-col-out, .vt-cell-out { width: 36px; text-align: center; }
-.vt-col-del, .vt-cell-del { width: 30px; text-align: center; }
-.vt-col-scope { width: 92px; }
-.vt-col-type { width: 80px; }
+.vt-col-out, .vt-cell-out { width: 40px; text-align: center; }
+.vt-col-del, .vt-cell-del { width: 32px; text-align: center; }
+.vt-col-scope { width: 86px; }
+.vt-col-array { width: 54px; text-align: center; }
+.vt-cell-array { text-align: center; }
+.vt-col-type { width: 70px; }
 .vt-row:hover .vt-cell { background: #f6fafd; }
 .vt-cell {
     border-bottom: 1px solid #eceef0;
@@ -1139,3 +1148,54 @@ text {
 .diag-pos { color: #9aa0a6; font-family: ui-monospace, monospace; white-space: nowrap; }
 .diag-error { color: #c5221f; }
 .diag-warning { color: #e37400; }
+
+/* ---- FMI run log (FMIPopup) ---- */
+.fmi-log-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem; margin-bottom: 0.5rem; }
+.fmi-log-sep { width: 0.75rem; }
+.fmi-log-list { max-height: 60vh; overflow-y: auto; font-size: 0.85rem; }
+.fmi-log-entry { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.15rem 0.25rem; border-left: 3px solid transparent; }
+.fmi-log-entry.fmi-log-warning { border-left-color: #f0ad4e; background: rgba(240, 173, 78, 0.08); }
+.fmi-log-entry.fmi-log-error { border-left-color: #d9534f; background: rgba(217, 83, 79, 0.08); }
+.fmi-log-cycle { min-width: 1.75rem; text-align: right; color: #888; font-variant-numeric: tabular-nums; }
+.fmi-log-origin { min-width: 4.5rem; font-size: 0.75rem; text-transform: uppercase; color: #666; }
+.fmi-log-fn { white-space: nowrap; font-weight: 600; }
+.fmi-log-message { white-space: pre-wrap; overflow-wrap: anywhere; }
+.fmi-unknown-value { width: 4.5rem; }
+
+/* ---- FMI Setup dialog + usage chips ---- */
+.fmi-setup-summary { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.fmi-chip { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 0.6rem; font-size: 0.75rem; background: #e9ecef; color: #333; white-space: nowrap; }
+.fmi-chip-st { background: #5B3FA0; color: #fff; }
+.fmi-chip-macro { background: #B05A00; color: #fff; }
+button.fmi-chip { border: none; cursor: pointer; }
+.fmi-setup-order { font-size: 0.85rem; padding-left: 1.25rem; }
+.fmi-setup-order li { margin-bottom: 0.25rem; }
+.fmi-setup-form { margin-top: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6; border-radius: 0.35rem; }
+.fmi-setup-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.85rem; }
+.fmi-setup-row label { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; }
+.fmi-setup-row label.fmi-setup-check { flex-direction: row; align-items: center; gap: 0.3rem; }
+.fmi-setup-grow { flex: 1 1 18rem; }
+.fmi-setup-label { font-weight: 600; }
+.fmi-setup-param { display: inline-flex; align-items: center; gap: 0.2rem; }
+.fmi-setup-body { white-space: pre-wrap; }
+.vt-dims-select { width: auto; margin-left: 0.2rem; padding: 0 0.1rem; font-size: 0.75rem; }
+
+/* ---- Script editor: run one cycle ---- */
+.script-testrun { border-top: 1px solid #dee2e6; font-size: 0.85rem; }
+.script-testrun-header { display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.5rem; cursor: pointer; user-select: none; }
+.script-testrun-body { padding: 0 0.5rem 0.5rem; max-height: 45vh; overflow-y: auto; }
+.script-testrun-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem; }
+.script-testrun-title { font-weight: 600; margin: 0.4rem 0 0.2rem; }
+.script-testrun-row { display: flex; align-items: center; gap: 0.35rem; margin: 0 0 0.2rem; }
+.script-testrun-name { min-width: 7rem; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.script-testrun-row .vt-input { flex: 1 1 auto; min-width: 4rem; }
+.script-testrun-result { margin-top: 0.5rem; }
+.script-testrun-table td { padding: 0.05rem 0.75rem 0.05rem 0; }
+.script-testrun-trace { background: #f6f8fa; padding: 0.35rem 0.5rem; margin: 0; white-space: pre-wrap; font-size: 0.8rem; }
+.fmi-chip-api { background: #1E7F5C; color: #fff; }
+.fmi-data-status-ok { color: #1E7F5C; }
+.fmi-data-status-error { color: #c0392b; }
+.fmi-data-paths { max-height: 14rem; overflow-y: auto; font-size: 0.8rem; }
+.fmi-data-paths td { padding: 0.05rem 0.75rem 0.05rem 0; }
+.fmi-data-address { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+.fmi-unknown-reason { font-size: 0.75rem; color: #c0392b; max-width: 26rem; }

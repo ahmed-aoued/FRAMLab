@@ -13,10 +13,15 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
         public Function Function { get; }
         public int Cycle { get; }
         public Dictionary<string, STValue> Globals { get; }
+        /// <summary>All variable declarations visible to this run (function + shared globals),
+        /// used to distinguish uninitialized declarations from undeclared names.</summary>
+        public IReadOnlyList<Models.ScriptVariable> DeclaredVariables { get; set; } = Array.Empty<Models.ScriptVariable>();
         /// <summary>Runtime diagnostics (e.g. div-by-zero, guard trips) appended here.</summary>
         public List<ScriptDiagnostic> RuntimeIssues { get; } = new();
         /// <summary>Messages from Print/Trace, surfaced to the FMI log.</summary>
         public List<string> Trace { get; } = new();
+        /// <summary>Reads API('source', 'path') live data; null when no data service is connected.</summary>
+        public FmiApiReader? Api { get; set; }
 
         public ScriptExecutionContext(Function function, int cycle, Dictionary<string, STValue> globals)
         {
@@ -41,6 +46,8 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
         private readonly Dictionary<string, STValue> outputs = new(StringComparer.OrdinalIgnoreCase);
         /// <summary>Values of aspect variables read/written during this cycle's run.</summary>
         private readonly Dictionary<string, STValue> aspectCache = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Declarations by name, used for array element types and uninitialized checks.</summary>
+        private readonly Dictionary<string, Models.ScriptVariable> declarations = new(StringComparer.OrdinalIgnoreCase);
         private readonly ILogger? logger;
 
         private long statementCount = 0;
@@ -59,7 +66,17 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
 
         public void Run(ProgramNode program, Models.ScriptModel model)
         {
-            // init Temp variables from their initial values
+            declarations.Clear();
+            foreach (var v in model.Variables)
+            {
+                if (!string.IsNullOrWhiteSpace(v.Name)) declarations[v.Name] = v;
+            }
+            foreach (var v in ctx.DeclaredVariables)
+            {
+                if (!string.IsNullOrWhiteSpace(v.Name)) declarations[v.Name] = v;
+            }
+
+            // init Temp variables from their initial values (or mark them uninitialized)
             foreach (var v in model.Variables)
             {
                 if (v.Scope == Models.ScriptScope.Temp)
@@ -78,7 +95,7 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             // collect Output-category variables into the outputs map
             foreach (var v in model.Variables)
             {
-                if (v.IsOutput && TryGet(v.Name, out var val))
+                if (v.IsOutput && TryGet(v.Name, out var val) && val.Type != STValueType.Uninitialized)
                 {
                     outputs[v.Name] = val;
                 }
@@ -87,15 +104,27 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
 
         private STValue InitialValueOf(Models.ScriptVariable v)
         {
+            if (v.IsArray && !v.HasInitialValue)
+            {
+                return STValue.FromArray(new STArray(v.Type, rank: v.Dimensions)); // arrays start empty and grow on write
+            }
+            if (!v.HasInitialValue)
+            {
+                return STValue.Uninitialized;
+            }
             try
             {
+                if (v.IsArray)
+                {
+                    return STValue.FromArray(ScriptArrayFactory.Create(v));
+                }
                 return v.Type switch
                 {
                     Models.ScriptVarType.BOOL => STValue.FromBool(v.InitialValue is "TRUE" or "true" or "1"),
                     Models.ScriptVarType.INT => STValue.FromInt(long.Parse(v.InitialValue, System.Globalization.CultureInfo.InvariantCulture)),
                     Models.ScriptVarType.REAL => STValue.FromReal(double.Parse(v.InitialValue, System.Globalization.CultureInfo.InvariantCulture)),
                     Models.ScriptVarType.STRING => STValue.FromString(v.InitialValue),
-                    Models.ScriptVarType.TIME => STValue.FromTime(TimeSpan.Zero),
+                    Models.ScriptVarType.TIME => STValue.FromTime(ScriptArrayFactory.ParseTime(v.InitialValue)),
                     _ => STValue.FromReal(0),
                 };
             }
@@ -130,8 +159,22 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             switch (stmt)
             {
                 case Assignment a:
-                    var val = Eval(a.Value);
-                    Set(a.Target, val, a);
+                    if (a.Index is not null)
+                    {
+                        ExecuteIndexedAssignment(a);
+                    }
+                    else
+                    {
+                        var val = Eval(a.Value);
+                        if (val.Type == STValueType.Array)
+                        {
+                            AssignArray(a.Target, val.AsArray()!, a);
+                        }
+                        else
+                        {
+                            Set(a.Target, val, a);
+                        }
+                    }
                     break;
                 case IfStatement i:
                     if (Eval(i.Condition).AsBool()) ExecuteBlock(i.ThenBlock.Statements);
@@ -153,7 +196,8 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                     while (Eval(w.Condition).AsBool())
                     {
                         if (++wIter > MaxLoopIterations) { LoopGuard(w); break; }
-                        ExecuteBlock(w.Body.Statements);
+                        try { ExecuteBlock(w.Body.Statements); }
+                        catch (ScriptSignal s) when (s.Kind == "Exit") { break; }
                     }
                     break;
                 case RepeatStatement r:
@@ -161,8 +205,15 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                     do
                     {
                         if (++rIter > MaxLoopIterations) { LoopGuard(r); break; }
-                        ExecuteBlock(r.Body.Statements);
+                        try { ExecuteBlock(r.Body.Statements); }
+                        catch (ScriptSignal s) when (s.Kind == "Exit") { break; }
                     } while (!Eval(r.Until).AsBool());
+                    break;
+                case CaseStatement cs:
+                    var selector = Eval(cs.Selector).AsInt();
+                    var branch = cs.Branches.Find(b => b.Matches(selector));
+                    if (branch is not null) ExecuteBlock(branch.Body.Statements);
+                    else if (cs.ElseBlock is not null) ExecuteBlock(cs.ElseBlock.Statements);
                     break;
                 case ReturnStatement:
                     throw new ScriptSignal("Return");
@@ -308,9 +359,19 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
 
         private void Set(string name, STValue value, AstNode node)
         {
-            if (tempStore.ContainsKey(name)) { tempStore[name] = value; return; }
-            if (staticStore.ContainsKey(name)) { staticStore[name] = value; return; }
-            if (ctx.Globals.ContainsKey(name)) { ctx.Globals[name] = value; return; }
+            if (TryResolveStore(name, out var store))
+            {
+                var declaredAsArray = declarations.TryGetValue(name, out var decl) && decl.IsArray;
+                if ((declaredAsArray || store[name].Type == STValueType.Array) && value.Type != STValueType.Array)
+                {
+                    ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                        $"'{name}' is an array; assign an array literal or write an element with '{name}[index] := ...'.",
+                        node.Line, node.Column));
+                    return;
+                }
+                store[name] = value;
+                return;
+            }
             // writing an Output aspect: cache it and record it as a script output
             var aspect = FindAspect(name);
             if (aspect is not null)
@@ -338,8 +399,125 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 BinaryExpr b => EvalBinary(b),
                 CallExpr c => EvalCall(c),
                 IndexExpr ix => EvalIndex(ix),
+                ArrayLiteralExpr al => EvalArrayLiteral(al),
                 _ => STValue.Void,
             };
+        }
+
+        private bool TryResolveStore(string name, out Dictionary<string, STValue> store)
+        {
+            if (tempStore.ContainsKey(name)) { store = tempStore; return true; }
+            if (staticStore.ContainsKey(name)) { store = staticStore; return true; }
+            if (ctx.Globals.ContainsKey(name)) { store = ctx.Globals; return true; }
+            store = null!;
+            return false;
+        }
+
+        private bool TryGetArray(string name, out STArray? array)
+        {
+            array = null;
+            if (!TryGet(name, out var value) || value.Type != STValueType.Array) return false;
+            array = value.AsArray();
+            return array is not null;
+        }
+
+        private void ExecuteIndexedAssignment(Assignment a)
+        {
+            var index = Eval(a.Index!).AsInt();
+            long? column = a.Index2 is null ? null : Eval(a.Index2).AsInt();
+            if (TryGet(a.Target, out var current) && current.Type == STValueType.Uninitialized)
+            {
+                ReportUninitialized(a.Target, a.Line, a.Column);
+                return;
+            }
+            if (!TryGetArray(a.Target, out var array) || array is null)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    $"'{a.Target}' is not an array; tick the Array checkbox for it in the variable table.", a.Line, a.Column));
+                return;
+            }
+            if (!CheckIndexCount(a.Target, array, column is not null, a)) return;
+            var value = Eval(a.Value);
+            if (value.Type == STValueType.Array)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    $"Cannot assign an array to element '{a.Target}[...]'.", a.Line, a.Column));
+                return;
+            }
+            var coerced = ScriptArrayFactory.Coerce(value, array.ElementType);
+            if (column is long col)
+            {
+                if (!array.Set(index, col, coerced)) // grows rows and columns as needed
+                {
+                    ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                        $"Cell [{index}, {col}] is outside '{a.Target}': indexes start at 0 and a table holds at most {STArray.MaxLength} cells.",
+                        a.Index!.Line, a.Index.Column));
+                }
+                return;
+            }
+            if (!STArray.IsValidIndex(index))
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    $"Index {index} is outside '{a.Target}': indexes run from 0 to {STArray.MaxLength - 1}.",
+                    a.Index!.Line, a.Index.Column));
+                return;
+            }
+            array.Set(index, coerced); // grows the array if needed
+        }
+
+        /// <summary>A list takes one index (a[i]), a table two (m[row, col]).</summary>
+        private bool CheckIndexCount(string name, STArray array, bool twoIndexes, AstNode node)
+        {
+            if (array.Rank == 2 && !twoIndexes)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error($"'{name}' is a 2-D array; write {name}[row, column].", node.Line, node.Column));
+                return false;
+            }
+            if (array.Rank == 1 && twoIndexes)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error($"'{name}' is a 1-D array; write {name}[index].", node.Line, node.Column));
+                return false;
+            }
+            return true;
+        }
+
+        private void AssignArray(string name, STArray source, AstNode node)
+        {
+            if (!TryResolveStore(name, out var store))
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error($"'{name}' is not declared.", node.Line, node.Column));
+                return;
+            }
+
+            declarations.TryGetValue(name, out var decl);
+            if (decl is { IsArray: false })
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    $"'{name}' is not an array and cannot be assigned an array value.", node.Line, node.Column));
+                return;
+            }
+
+            // Whole-array assignment replaces the contents, whatever the size.
+            var current = store[name];
+            if (current.Type != STValueType.Array && current.Type != STValueType.Uninitialized)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    $"'{name}' is not an array and cannot be assigned an array value.", node.Line, node.Column));
+                return;
+            }
+            var existing = current.AsArray();
+            var rank = decl?.Dimensions ?? existing?.Rank ?? source.Rank;
+            if (source.Rank != rank && source.Length > 0)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(rank == 2
+                    ? $"'{name}' is a 2-D array; assign a table such as [[1, 2], [3, 4]]."
+                    : $"'{name}' is a 1-D array; assign a list such as [1, 2, 3].", node.Line, node.Column));
+                return;
+            }
+            var elementType = decl?.Type ?? existing?.ElementType ?? source.ElementType;
+            store[name] = STValue.FromArray(rank == 2
+                ? STArray.FromRows(elementType, source.Items.Select(r => r.AsArray()!.Items.Select(i => ScriptArrayFactory.Coerce(i, elementType))))
+                : new STArray(elementType, source.Items.Select(i => ScriptArrayFactory.Coerce(i, elementType))));
         }
 
         private STValue ToValue(Literal l) => l.LiteralType switch
@@ -354,9 +532,31 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
 
         private STValue EvalIdentifier(IdentifierExpr id)
         {
-            if (TryGet(id.Name, out var v)) return v;
+            // Built-in read-only cycle counter, usable as `Cycle` or `Cycle()`.
+            if (string.Equals(id.Name, "Cycle", StringComparison.OrdinalIgnoreCase))
+            {
+                return STValue.FromInt(ctx.Cycle);
+            }
+            if (TryGet(id.Name, out var v))
+            {
+                if (v.Type == STValueType.Uninitialized)
+                {
+                    ReportUninitialized(id.Name, id.Line, id.Column);
+                    return STValue.Void;
+                }
+                return v;
+            }
             ctx.RuntimeIssues.Add(ScriptDiagnostic.Error($"'{id.Name}' is not declared.", id.Line, id.Column));
             return STValue.Void;
+        }
+
+        private void ReportUninitialized(string name, int line, int column)
+        {
+            var isArray = declarations.TryGetValue(name, out var decl) && decl.IsArray;
+            var message = isArray
+                ? $"Array '{name}' is not initialized. Assign an array literal (e.g. {name} := [0, 0, 0]) before using it."
+                : $"Variable '{name}' is not initialized. Assign a value before using it, or provide an initial value in the IDE.";
+            ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(message, line, column));
         }
 
         private STValue EvalUnary(UnaryExpr u)
@@ -454,26 +654,77 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
 
         private STValue EvalIndex(IndexExpr ix)
         {
-            // array support arrives in a later phase; for now report a clear runtime issue
-            ctx.RuntimeIssues.Add(ScriptDiagnostic.Error("Array indexing is not supported yet.", ix.Line, ix.Column));
-            return STValue.Void;
+            var target = Eval(ix.Target);
+            var name = (ix.Target as IdentifierExpr)?.Name ?? "array";
+            if (target.Type == STValueType.Uninitialized)
+            {
+                ReportUninitialized(name, ix.Line, ix.Column);
+                return STValue.Void;
+            }
+            if (target.Type != STValueType.Array || target.AsArray() is not { } array)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    "This expression is not an array and cannot be indexed.", ix.Line, ix.Column));
+                return STValue.Void;
+            }
+            if (!CheckIndexCount(name, array, ix.Index2 is not null, ix)) return ScriptArrayFactory.ZeroOf(array.ElementType);
+            var index = Eval(ix.Index).AsInt();
+            if (ix.Index2 is not null)
+            {
+                var col = Eval(ix.Index2).AsInt();
+                if (!array.Has(index, col))
+                {
+                    ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                        $"'{name}[{index}, {col}]' has not been written yet ({array.Describe()}).", ix.Index.Line, ix.Index.Column));
+                    return ScriptArrayFactory.ZeroOf(array.ElementType);
+                }
+                return array.Get(index, col);
+            }
+            if (!array.Has(index))
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    $"'{name}[{index}]' has not been written yet ({array.Describe()}).", ix.Index.Line, ix.Index.Column));
+                return ScriptArrayFactory.ZeroOf(array.ElementType);
+            }
+            return array.Get(index);
+        }
+
+        /// <summary>[1, 2, 3] is a list; [[1, 2], [3, 4]] is a table (rows padded to the widest).</summary>
+        private STValue EvalArrayLiteral(ArrayLiteralExpr literal)
+        {
+            var values = literal.Elements.Select(Eval).ToArray();
+            var arrays = values.Count(v => v.Type == STValueType.Array);
+            if (arrays == 0)
+            {
+                return STValue.FromArray(new STArray(ScriptArrayFactory.InferElementType(values), values));
+            }
+            if (arrays != values.Length || values.Any(v => v.AsArray()!.Rank != 1))
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error(
+                    "A table literal must contain only rows, e.g. [[1, 2], [3, 4]]; deeper nesting is not supported.", literal.Line, literal.Column));
+                return STValue.Void;
+            }
+            var rows = values.Select(v => v.AsArray()!.Items).ToList();
+            var elementType = ScriptArrayFactory.InferElementType(rows.SelectMany(r => r).ToList());
+            return STValue.FromArray(STArray.FromRows(elementType, rows));
         }
 
         private STValue EvalCall(CallExpr c)
         {
             var name = c.FunctionName;
-            // host interface
-            switch (name)
+            // host interface (names are case-insensitive, like the rest of ST)
+            switch (name.ToUpperInvariant())
             {
-                case "Cycle": return STValue.FromInt(ctx.Cycle);
-                case "IsActive": return STValue.FromBool(ctx.Function.isActive());
-                case "GetInput": return HostGet("I", c);
-                case "GetPrecondition": return HostGet("P", c);
-                case "GetResource": return HostGet("R", c);
-                case "GetControl": return HostGet("C", c);
-                case "GetTime": return HostGet("T", c);
-                case "SetOutput": return HostSetOutput(c);
-                case "Print": case "Trace":
+                case "CYCLE": return STValue.FromInt(ctx.Cycle);
+                case "ISACTIVE": return STValue.FromBool(ctx.Function.isActive());
+                case "GETINPUT": return HostGet("I", c);
+                case "GETPRECONDITION": return HostGet("P", c);
+                case "GETRESOURCE": return HostGet("R", c);
+                case "GETCONTROL": return HostGet("C", c);
+                case "GETTIME": return HostGet("T", c);
+                case "SETOUTPUT": return HostSetOutput(c);
+                case "API": return HostApi(c);
+                case "PRINT": case "TRACE":
                     // Variadic: users log a label plus values, e.g. Print('hits=', n).
                     // Concatenate the arguments in order (IEC CONCAT semantics).
                     var msg = string.Concat(c.Arguments.Select(a => Eval(a).AsString()));
@@ -532,6 +783,26 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
                 }
             }
             return STValue.FromReal(0);
+        }
+
+        /// <summary>API('source', 'path'): a live data value (number or text). A missing value is a runtime error.</summary>
+        private STValue HostApi(CallExpr c)
+        {
+            var source = c.Arguments.Count > 0 ? Eval(c.Arguments[0]).AsString() : "";
+            var path = c.Arguments.Count > 1 ? Eval(c.Arguments[1]).AsString() : "";
+            if (ctx.Api is null)
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error("API() needs a data source; none is connected here.", c.Line, c.Column));
+                return STValue.FromReal(0);
+            }
+            if (!ctx.Api(source, path, out var value, out var error))
+            {
+                ctx.RuntimeIssues.Add(ScriptDiagnostic.Error($"API('{source}', '{path}') has no value: {error}", c.Line, c.Column));
+                return STValue.FromReal(0);
+            }
+            return double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
+                ? STValue.FromReal(number)
+                : STValue.FromString(value);
         }
 
         private STValue HostSetOutput(CallExpr c)
