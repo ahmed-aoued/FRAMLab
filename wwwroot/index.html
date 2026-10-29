@@ -9,7 +9,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="FRAMLab.styles.css" rel="stylesheet" />
@@ -17,7 +16,6 @@
     <link rel="apple-touch-icon" sizes="192x192" href="FRAM_192.png" />
     <link href="favicon.ico" rel="icon" type="image/x-icon" />
     <link rel="SHORTCUT ICON" href="FRAM_512.png" />
-    <link href="_content/Microsoft.AspNetCore.Components.QuickGrid/QuickGrid.razor.css" rel="stylesheet" />
 </head>
 
 <body>
@@ -34,6 +32,11 @@
                 width: window.innerWidth,
                 height: window.innerHeight
             };
+        };
+        // Visible size of the area that holds the model canvas (excludes side panels and toolbar)
+        window.getCanvasViewport = function () {
+            const host = document.getElementById('canvas_1')?.parentElement;
+            return host ? { width: host.clientWidth, height: host.clientHeight } : null;
         };
     </script>
     <script src="SaveFile.js"></script>

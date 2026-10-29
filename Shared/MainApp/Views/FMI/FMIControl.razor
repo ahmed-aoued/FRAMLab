@@ -1,3 +1,4 @@
+@using MudBlazor
 @using Microsoft.Extensions.Logging
 @using FRAMLab.Shared.MainApp.Services.Logging
 @inject IJSRuntime JSRuntime
@@ -5,106 +6,117 @@
 @inject IStringLocalizer<Localization.SharedResource> Loc
 @inject ILogger<FMIControl> Logger
 
-<div class="navbar p-0 pt-2">
-    <div>
-        <button type="button" class="btn btn-FMI oi oi-reload" style="transform:scale(-1,1)" title=@Loc["FMI_RESET"] tabindex="26" @onclick=bFMI_reset></button>
-        <button type="button" class="btn btn-FMI oi oi-media-step-forward" title=@Loc["FMI_STEP"] tabindex="26" @onclick=bFMI_step></button>
-        <button type="button" class=@checkForPlay() title=@Loc["FMI_PLAY"] tabindex="26" @onclick=bFMI_start></button>
+@{ var usage = stateContainer.fmiUsage(); }
+<div class="fmi-panel">
+    <div class="fmi-head">
+        <span class="sb-title">@L("SIMULATION", "Simulation")</span>
+        @if (stateContainer.cycleFMI > -1)
+        {
+            <span class="fmi-cycle-badge" title="@L("CURRENT_CYCLE", "Current cycle")">@L("CYCLE", "Cycle") @stateContainer.cycleFMI</span>
+        }
     </div>
-    <div class="float-right">
-        <button type="button" class="btn btn-FMI oi oi-circle-check" title=@Loc["FMI_SHOW_ACTIVATED"] tabindex="26" @onclick=bFMI_wasActive></button>
-        <button type="button" class="btn btn-FMI oi oi-circle-x" title=@Loc["FMI_NOT_ACTIVATED"] tabindex="26" @onclick=bFMI_notActive></button>
-        <button type="button" class="btn btn-FMI oi oi-code" title="Metadata" tabindex="26" @onclick=bFMI_MD></button>
+    <div class="fmi-run-row">
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_RESET"] tabindex="26" @onclick=bFMI_reset><MudIcon Icon="@Icons.Material.Filled.RestartAlt" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_STEP"] tabindex="26" @onclick=bFMI_step><MudIcon Icon="@Icons.Material.Filled.SkipNext" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn fmi-icon-btn-primary" title=@(isPlaying ? L("FMI_STOP", "Stop") : Loc["FMI_PLAY"]) tabindex="26" @onclick=bFMI_start>
+            <MudIcon Icon="@(isPlaying ? Icons.Material.Filled.Stop : Icons.Material.Filled.PlayArrow)" Size="Size.Small" />
+        </button>
+        <label class="fmi-speed" title=@Loc["FMI_DELAY"]>
+            <MudIcon Icon="@Icons.Material.Outlined.Timer" Size="Size.Small" />
+            <input id="fmiCycleDelay" name="fmiCycleDelay" type="range" tabindex="26" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" />
+            <span class="fmi-speed-value">@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s", CultureInfo.InvariantCulture))</span>
+        </label>
     </div>
-</div>
-<div class="navbar p-0">
-    <div class="d-flex align-items-center w-100 text-FMI" title=@Loc["FMI_DELAY"] tabindex="26"><span class="btn-FMIs oi oi-timer unselectable"></span><input id="fmiCycleDelay" name="fmiCycleDelay" class="w-100" type="range" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" /><span class="unselectable">&nbsp;@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s"))</span></div>
-</div>
-@* what the model uses besides plain equations; click to open FMI Setup *@
-<div class="navbar p-0 pb-1">
-    <div class="d-flex flex-wrap align-items-center" style="gap:0.25rem;">
-        @{ var usage = stateContainer.fmiUsage(); }
+    @* what the model uses besides plain equations; click to open FMI Setup *@
+    <div class="fmi-chip-row">
         <button type="button" class="fmi-chip @(usage.UsesScripts ? "fmi-chip-st" : "")" title="Functions with an ST script" @onclick=bFMI_setup>ST @usage.ScriptFunctions.Count</button>
         <button type="button" class="fmi-chip @(usage.UsesMacros ? "fmi-chip-macro" : "")" title="Macros defined / functions calling them" @onclick=bFMI_setup>ƒ @usage.MacroCount/@usage.MacroCalls.Count</button>
         <button type="button" class="fmi-chip" title="Typed FMI variables" @onclick=bFMI_setup>Var @usage.DeclaredVariableCount</button>
         <button type="button" class="fmi-chip @(usage.DataSourceCount > 0 ? "fmi-chip-api" : "")" title="Live data sources / functions reading them" @onclick=bFMI_setup>API @usage.DataSourceCount/@usage.ApiCalls.Count</button>
+        <label class="fmi-check" title="Equations may read last cycle's value of a key as Prev_Key">
+            <input type="checkbox" checked="@stateContainer.fmiPrevVariables" @onchange="@((e) => stateContainer.fmiPrevVariables = (bool)(e.Value ?? false))" /> Prev_*
+        </label>
     </div>
-    <label class="fmi-text mb-0 d-flex align-items-center" style="gap:0.25rem;" title="Equations may read last cycle's value of a key as Prev_Key">
-        <input type="checkbox" checked="@stateContainer.fmiPrevVariables" @onchange="@((e) => stateContainer.fmiPrevVariables = (bool)(e.Value ?? false))" /> Prev_*
-    </label>
-</div>
+    <div class="fmi-tool-row">
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_SHOW_ACTIVATED"] tabindex="26" @onclick=bFMI_wasActive><MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_NOT_ACTIVATED"] tabindex="26" @onclick=bFMI_notActive><MudIcon Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" /></button>
+        <span class="fmi-tool-sep"></span>
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_SHOW_LOG"] tabindex="26" @onclick=bFMI_showlog><MudIcon Icon="@Icons.Material.Outlined.Article" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title="Display results setup" tabindex="26" @onclick=bFMI_results><MudIcon Icon="@Icons.Material.Outlined.Speed" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title="FMI Setup: variables, macros and data sources" tabindex="26" @onclick=bFMI_setup><MudIcon Icon="@Icons.Material.Outlined.Build" Size="Size.Small" /></button>
+        <span class="fmi-icon-btn fmi-file-btn" title="Link a CSV file for lookup() and xref()" tabindex="26">
+            <InputFile id="fmiDataImportBtn" OnChange="bFMI_dataImport" single accept=".csv" />
+            <MudIcon Icon="@Icons.Material.Outlined.TableView" Size="Size.Small" />
+        </span>
+    </div>
+    <button type="button" class="fmi-keys-toggle @(stateContainer.showKeys != "" ? "open" : "")" title="Metadata" tabindex="26" @onclick=bFMI_MD>
+        <MudIcon Icon="@Icons.Material.Outlined.DataObject" Size="Size.Small" />
+        <span>@L("KEYS_EQUATIONS", "Keys & equations")</span>
+        <MudIcon Icon="@(stateContainer.showKeys != "" ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)" Size="Size.Small" Class="ml-auto" />
+    </button>
 @if (stateContainer.showKeys != "")
 {
-    <div class="navbar p-0 pt-2 pb-2">
-        <div>
-            <input id="fmiStepTotal" name="fmiStepTotal" type="number" min="0" class="fmi-cycle oi" title=@cycleTooltip() tabindex="26" @bind=stepTOTAL />
-            <button type="button" class="btn btn-FMI oi oi-arrow-circle-top" title="Move up" tabindex="26" @onclick=bKey_MoveUp></button>
-            <button type="button" class="btn btn-FMI oi oi-arrow-circle-bottom" title="Move down" tabindex="26" @onclick=bKey_MoveDown></button>
-        </div>
-        <div class="float-right">
-            <div class="btn btn-FMI file-input-zone oi oi-external-link" tabindex="26">
-                <InputFile id="openFileBtn" OnChange="bFMI_dataImport" single accept=".csv" title="Link to external data" />
-            </div>
-            <button type="button" class="btn btn-FMI oi oi-file" title=@Loc["FMI_SHOW_LOG"] tabindex="26" @onclick=bFMI_showlog></button>
-            <button type="button" class="btn btn-FMI oi oi-dashboard" title="Display results setup" tabindex="26" @onclick=bFMI_results></button>
-            <button type="button" class="btn btn-FMI oi oi-wrench" title="FMI Setup: typed variables and macros" tabindex="26" @onclick=bFMI_setup></button>
-        </div>
+    <div class="fmi-keys-tools">
+        <label class="fmi-stop-after" title=@cycleTooltip()>
+            @L("STOP_AFTER", "Stop after")
+            <input id="fmiStepTotal" name="fmiStepTotal" type="number" min="0" class="fmi-cycle" tabindex="26" @bind=stepTOTAL placeholder="∞" />
+            @L("CYCLES", "cycles")
+        </label>
+        <span class="ml-auto"></span>
+        <button type="button" class="fmi-icon-btn" title="Move the selected key up" tabindex="26" @onclick=bKey_MoveUp><MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title="Move the selected key down" tabindex="26" @onclick=bKey_MoveDown><MudIcon Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" /></button>
     </div>
     @if (ShowExperimentalModes)
     {
-        <div class="navbar p-0">
-            <div></div>
-            <div class="float-right">
-                <div class="fmi-mode-wrap" title="Active FMI preset model">
-                    <span class="fmi-mode-label">Mode</span>
-                    <select id="fmiModeSelect" name="fmiModeSelect" class="fmi-mode-badge" value="@normalizedMode()" @onchange="changeActiveMode">
-                        <option value="BASIC">Basic</option>
-                        <option value="BBN">BBN</option>
-                        <option value="LOPA">LOPA</option>
-                        <option value="NEURON">Neuron</option>
-                    </select>
-                </div>
+        <div class="fmi-keys-tools">
+            <div class="fmi-mode-wrap" title="Active FMI preset model">
+                <span class="fmi-mode-label">Mode</span>
+                <select id="fmiModeSelect" name="fmiModeSelect" class="fmi-mode-badge" value="@normalizedMode()" @onchange="changeActiveMode">
+                    <option value="BASIC">Basic</option>
+                    <option value="BBN">BBN</option>
+                    <option value="LOPA">LOPA</option>
+                    <option value="NEURON">Neuron</option>
+                </select>
             </div>
         </div>
     }
     @if (stateContainer.selectedFn == "-1")
     {
-        foreach (var key in stateContainer.metaDataKeys.Keys)
-        {
-            <div class="navbar p-0">
-                <input name=@($"metaKey-{key}") class="fmi-key" type="text" value="@key" @onfocus=@((e) => highlightKey(e, key)) readonly />
-            </div>
-        }
-    } 
+        <p class="sb-hint">@L("KEYS_MODEL_HINT", "Keys used in this model. Select a function to edit its values and equations.")</p>
+        <div class="fmi-keylist">
+            @foreach (var key in stateContainer.metaDataKeys.Keys)
+            {
+                <input name=@($"metaKey-{key}") class="fmi-keychip" type="text" value="@key" size="@Math.Max(4, key.Length)" @onfocus=@((e) => highlightKey(e, key)) readonly />
+            }
+        </div>
+    }
     else
     {
         if (stateContainer.selectedFunction?.metadata is not null)
         {
             @if (IsVariantMode)
             {
-                <div class="navbar p-0 pb-1">
-                    <div class="d-flex w-100 align-items-center">
-                        <span class="fmi-text pr-2">@Mode</span>
-                        <button type="button" class="btn btn-menu btn-textp" title="Human" @onclick=@(() => ApplyModePreset("Human"))>H</button>
-                        <button type="button" class="btn btn-menu btn-textp" title="Organisational" @onclick=@(() => ApplyModePreset("Organisational"))>O</button>
-                        <button type="button" class="btn btn-menu btn-textp" title="Technological" @onclick=@(() => ApplyModePreset("Technological"))>T</button>
-                        <button type="button" class="btn btn-menu btn-textp" title="Default" @onclick=@(() => ApplyModePreset("Default"))>@DefaultPresetButtonText()</button>
-                    </div>
+                <div class="fmi-keys-tools">
+                    <span class="fmi-text">@Mode</span>
+                    <button type="button" class="fmi-icon-btn" title="Human" @onclick=@(() => ApplyModePreset("Human"))>H</button>
+                    <button type="button" class="fmi-icon-btn" title="Organisational" @onclick=@(() => ApplyModePreset("Organisational"))>O</button>
+                    <button type="button" class="fmi-icon-btn" title="Technological" @onclick=@(() => ApplyModePreset("Technological"))>T</button>
+                    <button type="button" class="fmi-icon-btn" title="Default" @onclick=@(() => ApplyModePreset("Default"))>@DefaultPresetButtonText()</button>
                 </div>
             }
-            foreach (var keyValue in stateContainer.selectedFunction.metadata) //\u00C0-\u02FF\u0370-\u04FF^0-9\u00D7\u00F7\u037E
+            foreach (var keyValue in stateContainer.selectedFunction.metadata) //À-˿Ͱ-ӿ^0-9×÷;
             {
-                <div class="navbar p-0">
-                    <div class="d-flex">
-                        <input id=@($"Key_{keyValue[0]}") class="fmi-key" type="text" pattern="[A-Z][A-Za-z0-9_]*" @onchange=@((e) => keyCheckChange(e, keyValue[0])) @oninput=@((e) => checkValidKey(e, $"Key_{keyValue[0]}")) @onfocusout=@((e) => setLastKey(e, $"{keyValue[0]}")) value="@keyValue[0]" spellcheck="false" />
-                        <input name=@($"metaValue-{keyValue[0]}") class="w-50" type="text" value="@keyValue[1]" disabled="@equationCheck(keyValue[2])" @onchange=@((e) => valueCheckChange(e, keyValue)) spellcheck="false" />
-                    </div>
-                    <div class="d-flex">
-                        <input id=@($"eqCheck_{keyValue[0]}") class="m-0 ml-2" type="checkbox" checked="@equationCheck(keyValue[2])" @onchange=@((e) => eqCheckChange(e, keyValue[0])) />
-                        <label for=@($"eqCheck_{keyValue[0]}") class="btn p-1"><i>f(x)=</i></label>
-                        <textarea name=@($"metaEquation-{keyValue[0]}") class="fmi-equation" value="@keyValue[3]" disabled="@(!equationCheck(keyValue[2]))" @onchange=@((e) => equationCheckChange(e, keyValue)) spellcheck="false"
-                        @onfocusin=@((e) => variablesUpdateShow(e, keyValue[0])) />
-                    </div>
+                <div class="fmi-keyrow">
+                    <input id=@($"Key_{keyValue[0]}") class="fmi-key" type="text" title="Key" pattern="[A-Z][A-Za-z0-9_]*" @onchange=@((e) => keyCheckChange(e, keyValue[0])) @oninput=@((e) => checkValidKey(e, $"Key_{keyValue[0]}")) @onfocusout=@((e) => setLastKey(e, $"{keyValue[0]}")) value="@keyValue[0]" spellcheck="false" />
+                    <input name=@($"metaValue-{keyValue[0]}") class="fmi-value" type="text" title="Value" value="@keyValue[1]" disabled="@equationCheck(keyValue[2])" @onchange=@((e) => valueCheckChange(e, keyValue)) spellcheck="false" />
+                    <label class="fmi-eq-toggle" title="Calculate this key with an equation">
+                        <input id=@($"eqCheck_{keyValue[0]}") type="checkbox" checked="@equationCheck(keyValue[2])" @onchange=@((e) => eqCheckChange(e, keyValue[0])) /><i>f(x)</i>
+                    </label>
+                    @if (equationCheck(keyValue[2]))
+                    {
+                        <textarea name=@($"metaEquation-{keyValue[0]}") class="fmi-equation" value="@keyValue[3]" @onchange=@((e) => equationCheckChange(e, keyValue)) spellcheck="false" placeholder="= equation"
+                                  @onfocusin=@((e) => variablesUpdateShow(e, keyValue[0])) />
+                    }
                 </div>
                 @if (stateContainer.showVariables == keyValue[0])
                 {
@@ -112,14 +124,12 @@
                 }
             }
         }
-        <div class="navbar p-0 pb-2">
-            <div class="d-flex">
-                <input id="New_Key" class="fmi-key" type="text" title="Key names must start with a capital letter and only contain letters, numbers, _ or |" pattern="[A-Z][A-Za-z0-9_]*" @onchange=addNewMetadata @oninput=@((e) => checkValidKey(e, "New_Key")) spellcheck="false" placeholder="New_Key0" />
-                <input name="newMetaValue" class="w-50" type="text" value="" disabled />
-            </div>
+        <div class="fmi-keyrow fmi-keyrow-new">
+            <input id="New_Key" class="fmi-key" type="text" title="Key names must start with a capital letter and only contain letters, numbers, _ or |" pattern="[A-Z][A-Za-z0-9_]*" @onchange=addNewMetadata @oninput=@((e) => checkValidKey(e, "New_Key")) spellcheck="false" placeholder="+ New_Key" />
         </div>
     }
 }
+</div>
 
 @code {
     [Parameter]
@@ -128,6 +138,12 @@
     public string Mode { get; set; } = "Basic";
 
     /// <summary>The run loop lives in FmiRunEngine (testable without the UI); this component drives it.</summary>
+    // Localization helper: falls back to a default English string if the resx key is missing.
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
     private FmiRunEngine Engine => stateContainer.fmiRun ??= new FmiRunEngine(new StateContainerFmiRunHost(stateContainer, Logger));
     private int? stepTOTAL
     {
@@ -759,17 +775,6 @@
         {
             isPlaying = true;
             bFMI_play();
-        }
-    }
-    private string checkForPlay()
-    {
-        if (isPlaying)
-        {
-            return "btn btn-FMIp oi oi-media-stop";
-        } 
-        else
-        {
-            return "btn btn-FMIp oi oi-media-play";
         }
     }
     private async void bFMI_play()

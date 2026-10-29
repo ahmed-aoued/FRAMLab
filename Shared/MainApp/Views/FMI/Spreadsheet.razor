@@ -11,16 +11,18 @@
     --hold-fill: @($"{render[$"{stateContainer.newFnStyle}:hold-fill"]}80");
     }
 </style>
-<div>
-    <div class="d-inline-flex align-items-center mb-2">
-        @Loc["S_SHOW"]:
-        <label class="show-properties"><input id="showProperties" name="showProperties" type="checkbox" @bind="stateContainer.showProperties" /> @Loc["S_PROPERTIES"]</label>
-        <label class="show-aspects"><input id="showAspects" name="showAspects" type="checkbox" @bind="stateContainer.showAspects" /> @Loc["S_ASPECTS"]</label>
-        <label class="show-fmiprofile"><input id="showFMIProfile" name="showFMIProfile" type="checkbox" @bind="stateContainer.showFMIProfile" /> @Loc["FMI_PROFILE_SHORT"]</label>
-        <label class="show-metadata"><input id="showMetadata" name="showMetadata" type="checkbox" @bind="stateContainer.showMetadata" /> Metadata</label>
-        <button class="btn btn-menu oi oi-file ml-2" title=@Loc["S_SAVE_FN"] @onclick=saveSpreadsheet></button>
-        <button class="btn btn-menu oi oi-file ml-2" title=@Loc["S_SAVE_COUPLING"] @onclick=saveCouplings></button>
-        <button class="btn btn-menu oi oi-document ml-2" title="Metadata" @onclick=saveMetadata></button>
+<div class="sheet">
+    <div class="sheet-toolbar">
+        <span class="sheet-toolbar-label">@Loc["S_SHOW"]</span>
+        <label class="sheet-toggle show-properties"><input id="showProperties" name="showProperties" type="checkbox" @bind="stateContainer.showProperties" /> @Loc["S_PROPERTIES"]</label>
+        <label class="sheet-toggle show-aspects"><input id="showAspects" name="showAspects" type="checkbox" @bind="stateContainer.showAspects" /> @Loc["S_ASPECTS"]</label>
+        <label class="sheet-toggle show-fmiprofile"><input id="showFMIProfile" name="showFMIProfile" type="checkbox" @bind="stateContainer.showFMIProfile" /> @Loc["FMI_PROFILE_SHORT"]</label>
+        <label class="sheet-toggle show-metadata"><input id="showMetadata" name="showMetadata" type="checkbox" @bind="stateContainer.showMetadata" /> Metadata</label>
+        <span class="sheet-toolbar-actions">
+            <button type="button" class="sheet-action" title=@Loc["S_SAVE_FN"] @onclick=saveSpreadsheet><MudBlazor.MudIcon Icon="@MudBlazor.Icons.Material.Outlined.FileDownload" Size="MudBlazor.Size.Small" />@L("FUNCTIONS_SHORT", "Functions")</button>
+            <button type="button" class="sheet-action" title=@Loc["S_SAVE_COUPLING"] @onclick=saveCouplings><MudBlazor.MudIcon Icon="@MudBlazor.Icons.Material.Outlined.FileDownload" Size="MudBlazor.Size.Small" />@L("COUPLINGS", "Couplings")</button>
+            <button type="button" class="sheet-action" title="Save metadata per cycle as CSV" @onclick=saveMetadata><MudBlazor.MudIcon Icon="@MudBlazor.Icons.Material.Outlined.FileDownload" Size="MudBlazor.Size.Small" />Metadata</button>
+        </span>
     </div>
     <QuickGrid @ref="thisGrid" Items=@FilteredFunctions Theme="fmv">
         <TemplateColumn Title="IDNr" SortBy="@sortByIDNr" Align="Align.End" IsDefaultSortColumn="true" >
@@ -147,6 +149,13 @@
     string? aspectFilter;
     [Parameter]
     public EventCallback refreshParent { get; set; }
+
+    // Localization helper: falls back to a default English string if the resx key is missing.
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
 
     //public async Task UpdateState()
     //{

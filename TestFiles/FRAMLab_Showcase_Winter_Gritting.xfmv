@@ -503,7 +503,7 @@ Print('report: ', Roads_treated, ' km treated, effective for about ', Hours, ' h
     <Level color="#E8DAEF">
       <IDNr>0</IDNr>
       <Name>Strategic</Name>
-      <Hierarchy>2</Hierarchy>
+      <Hierarchy>0</Hierarchy>
     </Level>
     <Level color="#FCF3CF">
       <IDNr>1</IDNr>
@@ -513,7 +513,7 @@ Print('report: ', Roads_treated, ' km treated, effective for about ', Hours, ' h
     <Level color="#D5F5E3">
       <IDNr>2</IDNr>
       <Name>Operational</Name>
-      <Hierarchy>0</Hierarchy>
+      <Hierarchy>2</Hierarchy>
     </Level>
   </Levels>
   <ScriptGlobals>

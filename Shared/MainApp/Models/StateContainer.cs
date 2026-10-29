@@ -230,6 +230,12 @@ namespace FRAMLab.Shared
         public string fmiMessage { get; set; } = "";
         public string fileName { get; set; } = "FMV_new.xfmv";
         public bool fileLoaded { get; set; } = false;
+        /// <summary>Set when a model was opened or the layout switched; the page fits it to the window after the next render.</summary>
+        public bool fitPending { get; set; } = false;
+        /// <summary>True after an edit since the model was opened or saved (shown as a dot next to the file name).</summary>
+        public bool isDirty { get; set; } = false;
+        /// <summary>Phones only: whether the editing panel is slid in over the canvas.</summary>
+        public bool phonePanelOpen { get; set; } = false;
         public string inputDropStatus { get; set; } = "file-input-zone-drop";
         public string debugOutput { get; set; } = "";
         public bool isBackup { get; set; } = false;
@@ -420,6 +426,7 @@ namespace FRAMLab.Shared
         }
         public void updateUndo()
         {
+            isDirty = true;
             undoService.UpdateUndo(_selectedFn);
         }
         public void reSetAspect(string[] dictArray, double xO, double yO, double aX, double aY, int aFW)

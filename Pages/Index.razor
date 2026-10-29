@@ -47,6 +47,14 @@
 {
     <RightPanel refreshParent="refreshParent" />
 }
+@if (!phoneNoticeDismissed)
+{
+    <div class="phone-notice" role="status">
+        <MudBlazor.MudIcon Icon="@MudBlazor.Icons.Material.Outlined.DesktopWindows" Size="MudBlazor.Size.Small" />
+        <span>@Loc["PHONE_NOTICE"]</span>
+        <button type="button" class="sb-btn sb-btn-tonal" @onclick="DismissPhoneNotice">@Loc["DISMISS"]</button>
+    </div>
+}
 <div id="mainWindow" class="main" @onkeyup=NextFn @onkeydown=OnKeyDown tabindex="0">
     @if (stateContainer.spreadsheetVisible > 0)
     {
@@ -197,6 +205,14 @@
         return Task.CompletedTask;
     }
 
+    // The phone notice is shown by CSS on narrow screens only; once dismissed it stays away (per browser).
+    private bool phoneNoticeDismissed = true;
+    private async Task DismissPhoneNotice()
+    {
+        phoneNoticeDismissed = true;
+        try { await localStorage.SetItemAsync("framlab.phoneNoticeDismissed", true); } catch { }
+    }
+
     private string ReturnTitle()
     {
         if (stateContainer.fileName != "" && stateContainer.fileName != "FMV_new.xfmv")
@@ -254,8 +270,9 @@
     {
         if (firstRender)
         {
-            FocusElement("openFileBtn");
             UpdateFileContent = OpenFileContent;
+            try { phoneNoticeDismissed = await localStorage.GetItemAsync<bool>("framlab.phoneNoticeDismissed"); } catch { phoneNoticeDismissed = false; }
+            if (!phoneNoticeDismissed) StateHasChanged();
             // Listen for the Script IDE tab saving the model back.
             scriptSyncRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("ScriptSync.listen", scriptSyncRef, nameof(OnScriptSavedFromTab));
@@ -268,6 +285,11 @@
         }
         else
         {
+            if (stateContainer.fitPending && stateContainer.fileLoaded && menuBar is not null)
+            {
+                stateContainer.fitPending = false;
+                await menuBar.FitToWindow(true);
+            }
             try
             {
                 await localStorage.SetItemAsync("backupData", agentLevelService.DocumentForSave().OuterXml);
@@ -309,6 +331,8 @@
             stateContainer.fileName = name;
             stateContainer.inputDropStatus = "file-input-zone-hide";
             FileIsLoaded();
+            stateContainer.fitPending = true;
+            stateContainer.isDirty = false;
             StateHasChanged();
         }
         else
@@ -468,6 +492,8 @@
         stateContainer.fileName = e.File.Name;
         stateContainer.inputDropStatus = "file-input-zone-hide";
         FileIsLoaded();
+        stateContainer.fitPending = true;
+        stateContainer.isDirty = false;
     }
     private void FileIsLoaded()
     {
@@ -1194,6 +1220,7 @@
                 stateContainer.inputDropStatus = "file-input-zone-hide";
                 stateContainer.isBackup = false;
                 FileIsLoaded();
+                stateContainer.fitPending = true;
                 await localStorage.SetItemAsync("isBackup", false);
                 StateHasChanged();
             }

@@ -118,217 +118,369 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="ASPECT_FONT_DECREASE" xml:space="preserve">
-    <value>Decrease Aspect text (Esc=default)</value>
+    <value>Kleinere Aspekt-Beschriftung (Esc = Standard)</value>
   </data>
   <data name="ASPECT_FONT_INCREASE" xml:space="preserve">
-    <value>Increase Aspect text (Esc=default)</value>
+    <value>Größere Aspekt-Beschriftung (Esc = Standard)</value>
   </data>
   <data name="ASPECT_LABEL" xml:space="preserve">
-    <value>Bestandteilebeschriftungen</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Aspekt-Beschriftung</value>
   </data>
   <data name="COLOUR" xml:space="preserve">
     <value>Farbe</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="CONTROL" xml:space="preserve">
     <value>Control</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="COUPLING_NAME" xml:space="preserve">
-    <value>Coupling Name</value>
+    <value>Kopplungsname</value>
   </data>
   <data name="DESCRIPTION" xml:space="preserve">
     <value>Beschreibung</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="FMI_ACTIVATED" xml:space="preserve">
     <value>Aktiviert</value>
-    <comment>Google translate</comment>
   </data>
   <data name="FMI_ALL" xml:space="preserve">
-    <value>∀ = All</value>
+    <value>∀ = Alle</value>
   </data>
   <data name="FMI_ANY" xml:space="preserve">
-    <value>∃ = Any</value>
+    <value>∃ = Mindestens eine</value>
   </data>
   <data name="FMI_DELAY" xml:space="preserve">
-    <value>Verzögern</value>
-    <comment>Google translate</comment>
+    <value>Pause zwischen den Zyklen</value>
   </data>
   <data name="FMI_EVERY_NTH" xml:space="preserve">
-    <value>Integer N = Every Nth Cycle</value>
+    <value>Ganzzahl N = jeden N-ten Zyklus</value>
   </data>
   <data name="FMI_INITIAL_ONLY" xml:space="preserve">
-    <value>0 = Initial only</value>
+    <value>0 = nur im ersten Zyklus</value>
   </data>
   <data name="FMI_NONE" xml:space="preserve">
-    <value>∅ = None</value>
+    <value>∅ = Keine</value>
   </data>
   <data name="FMI_NOT_ACTIVATED" xml:space="preserve">
-    <value>Show not activated</value>
+    <value>Nicht aktivierte Funktionen hervorheben</value>
   </data>
   <data name="FMI_PLAY" xml:space="preserve">
-    <value>Continue Interpretation</value>
+    <value>Abspielen</value>
   </data>
   <data name="FMI_PROFILE" xml:space="preserve">
-    <value>Interpretation Profile</value>
+    <value>Aktivierungsprofil</value>
   </data>
   <data name="FMI_PROFILE_SHORT" xml:space="preserve">
-    <value>FMI Profil</value>
-    <comment>Google translate</comment>
+    <value>Aktivierungsprofil</value>
   </data>
   <data name="FMI_RANDOM" xml:space="preserve">
-    <value>0&lt;p&lt;1 = Random Probability p()</value>
+    <value>0&lt;p&lt;1 = zufällig, mit Wahrscheinlichkeit p</value>
   </data>
   <data name="FMI_RESET" xml:space="preserve">
-    <value>FMI zurücksetzen</value>
-    <comment>Google translate</comment>
+    <value>Simulation zurücksetzen</value>
   </data>
   <data name="FMI_SHOW_ACTIVATED" xml:space="preserve">
-    <value>Show activated</value>
+    <value>Aktivierte Funktionen hervorheben</value>
   </data>
   <data name="FMI_SHOW_LOG" xml:space="preserve">
-    <value>Show FMI LOG</value>
+    <value>Ablaufprotokoll</value>
   </data>
   <data name="FMI_STEP" xml:space="preserve">
-    <value>Advance one cycle</value>
+    <value>Einen Zyklus weiter</value>
   </data>
   <data name="FMI_TYPE" xml:space="preserve">
-    <value>FMI Type</value>
+    <value>FMI-Typ</value>
   </data>
   <data name="FN_COLOUR" xml:space="preserve">
     <value>Farbe der Funktion</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="FN_FONT_DECREASE" xml:space="preserve">
-    <value>Decrease Function text (Esc=default)</value>
+    <value>Kleinere Funktionsbeschriftung (Esc = Standard)</value>
   </data>
   <data name="FN_FONT_INCREASE" xml:space="preserve">
-    <value>Increase Function text (Esc=default)</value>
+    <value>Größere Funktionsbeschriftung (Esc = Standard)</value>
   </data>
   <data name="FN_INPUT" xml:space="preserve">
-    <value>Has Input</value>
+    <value>Hat Input</value>
   </data>
   <data name="FN_ORPHAN" xml:space="preserve">
-    <value>Has Orphans</value>
+    <value>Hat offene Aspekte</value>
   </data>
   <data name="FN_OUTPUT" xml:space="preserve">
-    <value>Output Function</value>
+    <value>Output-Funktion</value>
   </data>
   <data name="FN_TO" xml:space="preserve">
-    <value>To Function</value>
+    <value>Zur Funktion</value>
   </data>
   <data name="FN_TO_ASPECT" xml:space="preserve">
-    <value>To Function Aspect Type</value>
+    <value>Aspekttyp der Zielfunktion</value>
   </data>
   <data name="IMAGE_TOOLTIP" xml:space="preserve">
-    <value>Bild speichern</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Bild speichern (SVG)</value>
   </data>
   <data name="INFO_TOOLTIP" xml:space="preserve">
     <value>Info</value>
-    <comment>Google translate</comment>
   </data>
   <data name="INPUT" xml:space="preserve">
     <value>Input</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="LOGIN" xml:space="preserve">
-    <value>Login</value>
-    <comment>Google translate</comment>
+    <value>Anmelden</value>
   </data>
   <data name="LOGOUT" xml:space="preserve">
-    <value>Logout</value>
-    <comment>Google translate</comment>
+    <value>Abmelden</value>
   </data>
   <data name="NAME_FN" xml:space="preserve">
     <value>Name der Funktion</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="NEW_TOOLTIP" xml:space="preserve">
     <value>Neue Funktion</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="OPEN_TOOLTIP" xml:space="preserve">
-    <value>Öffnen (upload)</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Modell öffnen (.xfmv)</value>
   </data>
   <data name="OUTPUT" xml:space="preserve">
     <value>Output</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="PRECONDITION" xml:space="preserve">
     <value>Precondition</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="REDO_TOOLTIP" xml:space="preserve">
-    <value>Redo</value>
-    <comment>Google translate</comment>
+    <value>Wiederholen (Strg+Y)</value>
   </data>
   <data name="RELOAD" xml:space="preserve">
-    <value>Nachladen</value>
-    <comment>Google translate</comment>
+    <value>Letztes Modell wiederherstellen</value>
   </data>
   <data name="RENDER" xml:space="preserve">
-    <value>Modelldarstellung</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Darstellung der Funktionen</value>
   </data>
   <data name="RESOURCE" xml:space="preserve">
     <value>Resource</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="SAVE_TOOLTIP" xml:space="preserve">
-    <value>Speichern (download)</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Modell speichern (Download)</value>
   </data>
   <data name="SEARCH_CONTAINS" xml:space="preserve">
-    <value>enthält...</value>
-    <comment>Google translate</comment>
+    <value>enthält…</value>
   </data>
   <data name="SHOW_LABEL" xml:space="preserve">
-    <value>Anzeigen der Funktionsbeschriftungen</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Aspekt-Beschriftungen anzeigen</value>
   </data>
   <data name="S_ASPECTS" xml:space="preserve">
-    <value>Bestandteile</value>
-    <comment>Source: FRAMLab v0.6</comment>
+    <value>Aspekte</value>
   </data>
   <data name="S_PROPERTIES" xml:space="preserve">
     <value>Eigenschaften</value>
-    <comment>Google translate</comment>
   </data>
   <data name="S_SAVE_COUPLING" xml:space="preserve">
-    <value>Save Couplings as CSV</value>
+    <value>Kopplungen als CSV speichern</value>
   </data>
   <data name="S_SAVE_FN" xml:space="preserve">
-    <value>Save Functions as CSV</value>
+    <value>Funktionen als CSV speichern</value>
   </data>
   <data name="S_SHOW" xml:space="preserve">
-    <value>Anzeige</value>
-    <comment>Google translate</comment>
+    <value>Anzeigen</value>
   </data>
   <data name="TABLE_VIEW" xml:space="preserve">
     <value>Tabellenansicht</value>
   </data>
   <data name="TIME" xml:space="preserve">
     <value>Time</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="UNDO_TOOLTIP" xml:space="preserve">
-    <value>Rückgängig machen</value>
-    <comment>Google translate</comment>
+    <value>Rückgängig (Strg+Z)</value>
   </data>
   <data name="ZOOM_FULLSCREEN" xml:space="preserve">
-    <value>Zoomen Sie zum Ausfüllen</value>
-    <comment>Google translate</comment>
+    <value>An Fenster anpassen</value>
   </data>
   <data name="ZOOM_MINUS_TOOLTIP" xml:space="preserve">
     <value>Verkleinern</value>
-    <comment>Source: FRAMLab v0.6</comment>
   </data>
   <data name="ZOOM_PLUS_TOOLTIP" xml:space="preserve">
     <value>Vergrößern</value>
-    <comment>Source: FRAMLab v0.6</comment>
+  </data>
+  <data name="FN_DESCRIPTION" xml:space="preserve">
+    <value>Beschreibung</value>
+  </data>
+  <data name="GROUP_TOOLTIP" xml:space="preserve">
+    <value>Ausgewählte Funktionen gruppieren</value>
+  </data>
+  <data name="MORE_ACTIONS" xml:space="preserve">
+    <value>Weitere Aktionen</value>
+  </data>
+  <data name="IMPORT_SELECTION" xml:space="preserve">
+    <value>Auswahl importieren (.sxfmv)</value>
+  </data>
+  <data name="EXPORT_SELECTION" xml:space="preserve">
+    <value>Auswahl exportieren (.sxfmv)</value>
+  </data>
+  <data name="PDF_REPORT" xml:space="preserve">
+    <value>Bericht (HTML)</value>
+  </data>
+  <data name="AGENTS_LEVELS_VIEW" xml:space="preserve">
+    <value>Ansicht Akteure &amp; Ebenen</value>
+  </data>
+  <data name="MANAGE_AGENTS_LEVELS" xml:space="preserve">
+    <value>Akteure und Ebenen verwalten</value>
+  </data>
+  <data name="CLOSE" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
+  <data name="AGENTS" xml:space="preserve">
+    <value>Akteure</value>
+  </data>
+  <data name="NO_AGENTS" xml:space="preserve">
+    <value>Noch keine Akteure angelegt.</value>
+  </data>
+  <data name="AGENT_COLOR" xml:space="preserve">
+    <value>Farbe des Akteurs</value>
+  </data>
+  <data name="DELETE_AGENT" xml:space="preserve">
+    <value>Akteur löschen</value>
+  </data>
+  <data name="AGENT_NAME" xml:space="preserve">
+    <value>Name des Akteurs</value>
+  </data>
+  <data name="AGENT_TYPE" xml:space="preserve">
+    <value>Typ (optional)</value>
+  </data>
+  <data name="NEW_AGENT_COLOR" xml:space="preserve">
+    <value>Farbe</value>
+  </data>
+  <data name="ADD_AGENT" xml:space="preserve">
+    <value>Akteur hinzufügen</value>
+  </data>
+  <data name="LEVELS" xml:space="preserve">
+    <value>Ebenen</value>
+  </data>
+  <data name="NO_LEVELS" xml:space="preserve">
+    <value>Noch keine Ebenen angelegt.</value>
+  </data>
+  <data name="LEVEL_COLOR" xml:space="preserve">
+    <value>Farbe der Ebene</value>
+  </data>
+  <data name="DELETE_LEVEL" xml:space="preserve">
+    <value>Ebene löschen</value>
+  </data>
+  <data name="LEVEL_NAME" xml:space="preserve">
+    <value>Name der Ebene</value>
+  </data>
+  <data name="HIERARCHY" xml:space="preserve">
+    <value>Hierarchie</value>
+  </data>
+  <data name="HIERARCHY_HINT" xml:space="preserve">
+    <value>0 = oberste Zeile</value>
+  </data>
+  <data name="NEW_LEVEL_COLOR" xml:space="preserve">
+    <value>Farbe</value>
+  </data>
+  <data name="ADD_LEVEL" xml:space="preserve">
+    <value>Ebene hinzufügen</value>
+  </data>
+  <data name="FUNCTION" xml:space="preserve">
+    <value>Funktion</value>
+  </data>
+  <data name="NEW_FUNCTION" xml:space="preserve">
+    <value>Neu</value>
+  </data>
+  <data name="SELECT_FN_HINT" xml:space="preserve">
+    <value>Wählen Sie eine Funktion im Modell aus oder legen Sie eine neue an, um ihre Aspekte zu bearbeiten.</value>
+  </data>
+  <data name="ASPECTS" xml:space="preserve">
+    <value>Aspekte</value>
+  </data>
+  <data name="ADD" xml:space="preserve">
+    <value>Hinzufügen:</value>
+  </data>
+  <data name="ENTRY_TIMING" xml:space="preserve">
+    <value>Startzeitpunkt</value>
+  </data>
+  <data name="ORPHAN_HINT" xml:space="preserve">
+    <value>Noch keine passende Kopplung</value>
+  </data>
+  <data name="PROFILE_DEFAULT" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="ORGANISATION" xml:space="preserve">
+    <value>Organisation</value>
+  </data>
+  <data name="NO_AGENTS_LEVELS_HINT" xml:space="preserve">
+    <value>Noch keine Akteure oder Ebenen.</value>
+  </data>
+  <data name="AGENT" xml:space="preserve">
+    <value>Akteur</value>
+  </data>
+  <data name="LEVEL" xml:space="preserve">
+    <value>Ebene</value>
+  </data>
+  <data name="SCRIPT_AND_LOOK" xml:space="preserve">
+    <value>Skript &amp; Darstellung</value>
+  </data>
+  <data name="SCRIPT_TOOLTIP" xml:space="preserve">
+    <value>ST-Skripteditor für diese Funktion öffnen</value>
+  </data>
+  <data name="EDIT_SCRIPT" xml:space="preserve">
+    <value>Skript bearbeiten</value>
+  </data>
+  <data name="ADD_SCRIPT" xml:space="preserve">
+    <value>Skript hinzufügen</value>
+  </data>
+  <data name="COLOUR_BUTTON" xml:space="preserve">
+    <value>Farbe</value>
+  </data>
+  <data name="TEXT_SIZE" xml:space="preserve">
+    <value>Textgröße (ganzes Modell)</value>
+  </data>
+  <data name="TEXT_SIZE_FN" xml:space="preserve">
+    <value>Funktionsbeschriftung</value>
+  </data>
+  <data name="TEXT_SIZE_ASPECT" xml:space="preserve">
+    <value>Aspekt-Beschriftung</value>
+  </data>
+  <data name="FUNCTIONS_SHORT" xml:space="preserve">
+    <value>Funktionen</value>
+  </data>
+  <data name="ASPECTS_SHORT" xml:space="preserve">
+    <value>Aspekte</value>
+  </data>
+  <data name="SIMULATION" xml:space="preserve">
+    <value>Simulation</value>
+  </data>
+  <data name="CYCLE" xml:space="preserve">
+    <value>Zyklus</value>
+  </data>
+  <data name="CURRENT_CYCLE" xml:space="preserve">
+    <value>Aktueller Zyklus</value>
+  </data>
+  <data name="FMI_STOP" xml:space="preserve">
+    <value>Anhalten</value>
+  </data>
+  <data name="KEYS_EQUATIONS" xml:space="preserve">
+    <value>Schlüssel &amp; Gleichungen</value>
+  </data>
+  <data name="STOP_AFTER" xml:space="preserve">
+    <value>Stopp nach</value>
+  </data>
+  <data name="CYCLES" xml:space="preserve">
+    <value>Zyklen</value>
+  </data>
+  <data name="KEYS_MODEL_HINT" xml:space="preserve">
+    <value>Schlüssel in diesem Modell. Wählen Sie eine Funktion, um Werte und Gleichungen zu bearbeiten.</value>
+  </data>
+  <data name="UNSAVED" xml:space="preserve">
+    <value>Ungespeicherte Änderungen</value>
+  </data>
+  <data name="UNTITLED" xml:space="preserve">
+    <value>Unbenanntes Modell</value>
+  </data>
+  <data name="PHONE_NOTICE" xml:space="preserve">
+    <value>FRAMLab ist für größere Bildschirme gemacht. Modelle lassen sich hier ansehen, bearbeiten geht am besten am Tablet oder Computer.</value>
+  </data>
+  <data name="DISMISS" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="COUPLINGS" xml:space="preserve">
+    <value>Kopplungen</value>
+  </data>
+  <data name="DESKTOP_ONLY_TITLE" xml:space="preserve">
+    <value>Am besten auf einem größeren Bildschirm</value>
   </data>
 </root>

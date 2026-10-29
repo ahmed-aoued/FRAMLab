@@ -7,686 +7,106 @@
 @using System.Linq
 @using System.Globalization
 
-<div class="sidebar">
-    <div class="v-panel pr-2">
-        @if (stateContainer.showKeys != "")
+<div class="sidebar @(stateContainer.showKeys != "" ? "sidebar-keys-open" : "") @(stateContainer.phonePanelOpen ? "sidebar-phone-open" : "")">
+    <div class="sidebar-editor v-panel">
+        <div class="sb-head">
+            <span class="sb-title">@L("FUNCTION", "Function")</span>
+            <button id="newFnButton" type="button" class="sb-btn sb-btn-primary" title="@Loc["NEW_TOOLTIP"]" tabindex="3"
+                    @onclick=newFunction @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup=NextFn>
+                <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />@L("NEW_FUNCTION", "New")
+            </button>
+        </div>
+        <MudTextField @key="@("fnname-" + stateContainer.selectedFn)" T="string" InputId="fnNameText"
+                      Value="@stateContainer.fnName" ValueChanged="OnFnNameChanged"
+                      Label="@Loc["NAME_FN"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Disabled="@stateContainer.isDisabled" tabindex="4"
+                      Immediate="false" Class="sb-field" />
+        <MudTextField @key="@("fndesc-" + stateContainer.selectedFn)" T="string"
+                      Value="@(stateContainer.selectedFunction?.Description ?? "")" ValueChanged="OnFnDescChanged"
+                      Label="@Loc["FN_DESCRIPTION"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Disabled="@stateContainer.isDisabled" tabindex="5"
+                      Lines="2" MaxLines="5" Sizing="InputSizing.Auto" Class="sb-field sb-field-desc" />
+
+        @if (!HasSelection)
         {
-            <hr class="mt-0 mb-0" />
-            <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
-            <hr class="mt-2 mb-2" />
+            <p class="sb-hint">@L("SELECT_FN_HINT", "Select a function on the canvas, or create a new one, to edit its aspects.")</p>
         }
-        <div class="d-flex pt-2 pb-0 align-start">
-            <div class="d-flex flex-column sidebar-btn-col">
-                <MudIconButton id="newFnButton" Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Medium"
-                               title="@Loc["NEW_TOOLTIP"]" tabindex="3" OnClick=newFunction
-                               @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup=NextFn
-                               aria-label="@Loc["NEW_TOOLTIP"]" Class="sidebar-new-fn" />
-                <div class="d-flex">
-                    <button class="btn btn-half btn-half-s" title=@Loc["FN_FONT_DECREASE"] tabindex="1" @onclick=zoomFs @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>A</button>
-                    <button class="btn btn-half btn-half-l" title=@Loc["FN_FONT_INCREASE"] tabindex="2" @onclick=zoomFl @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>A</button>
-                </div>
+        else
+        {
+            <div class="sb-head">
+                <span class="sb-title">@L("ASPECTS", "Aspects")</span>
             </div>
-            <div class="flex-grow-1">
-                <MudTextField @key="@("fnname-" + stateContainer.selectedFn)" T="string"
-                              Value="@stateContainer.fnName" ValueChanged="OnFnNameChanged"
-                              Label="@Loc["NAME_FN"]" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              Disabled="@stateContainer.isDisabled" tabindex="4"
-                              Immediate="false" Class="sidebar-fn-name" />
-            </div>
-        </div>
-        <div class="d-flex pt-1 align-start">
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default"
-                           title="@Loc["FN_DESCRIPTION"]" OnClick=expandDesc aria-label="@Loc["FN_DESCRIPTION"]" Class="sidebar-desc-toggle" />
-            <div class="flex-grow-1">
-                <MudTextField @key="@("fndesc-" + stateContainer.selectedFn)" T="string"
-                              Value="@(stateContainer.selectedFunction?.Description ?? "")" ValueChanged="OnFnDescChanged"
-                              Label="@Loc["FN_DESCRIPTION"]" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              Disabled="@stateContainer.isDisabled" tabindex="5"
-                              Lines="@(descriptionClass == "fmi-descE" ? 5 : 2)" Class="sidebar-fn-desc" />
-            </div>
-        </div>
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-center">
-                <button id="newOButton" class="btn btn-menu btn-textp" title=@Loc["OUTPUT"] tabindex="5" @onclick="@((e) => NewAspect(e, "Output"))" @onkeyup=NextFn>O</button>
-                <input type="text" name="fnProfileInput" class="btn btn-menu btn-menu-s" title=@profileFnTooltip() tabindex="27" value=@showFnProfile() disabled=@disableFnProfile() @onchange="@((e) => changeFnProfile(e, "Fn"))">
-            </div>
-            @if (stateContainer.selectedFn != "-1")
+            @foreach (var type in AspectTypes)
             {
-                GetNodesO = stateContainer.outputsList.FindAll(x => x.Type == "Output" && x.FunctionIDNr == stateContainer.selectedFn);
-                if (GetNodesO.Count > 0)
-                {
-                    var aspect = GetNodesO[0];
-                    <div class="autocomplete-wrapper">
-                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                               type="text" name="@($"output-{aspect.IDNr}")"
-                               @ref="aspect.elementReference"
-                               tabindex="6"
-                               value="@aspect.IDName"
-                               @oninput="@(e => HandleAspectInput(e, "Output", aspect.IDNr))"
-                               @onkeydown="@(e => HandleAspectKeyDown(e, "Output", aspect.IDNr))"
-                               @onfocus="@(e => OpenDropdown("Output", aspect.IDNr))"
-                               @onblur="@(async () => await HandleBlur("Output", aspect.IDNr))"
-                               @onchange="@(e => CommitAspect(e, "Output", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1"
-                                @onclick="@(async () => await ButtonClick("Output", aspect.IDNr, aspect.elementReference))"
-                                @onmousedown:preventDefault @onmousedown:stopPropagation
-                                type="button">▼</button>
-                        @if (IsDropdownOpen("Output", aspect.IDNr))
-                        {
-                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Output", aspect.IDNr))">
-                                @foreach (var item in GetFilteredExisting("Output", aspectFilterText))
-                                {
-                                    int idx = suggestionsActiveList.IndexOf(item);
-                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                        @onclick="@(() => SelectSuggestion("Output", aspect.IDNr, item))"
-                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                }
+                @AspectGroup(type)
+            }
+
+            <div class="sb-head">
+                <span class="sb-title">@L("ORGANISATION", "Organisation")</span>
+            </div>
+            @if (stateContainer.agentList.Count == 0 && stateContainer.levelList.Count == 0)
+            {
+                <p class="sb-hint">
+                    @L("NO_AGENTS_LEVELS_HINT", "No agents or levels yet.")
+                    <button type="button" class="sb-link" @onclick=OpenAgentsLevelsPanel>@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")</button>
+                </p>
             }
             else
             {
-                GetNodesO = null;
-            }
-        </div>
-        @if (GetNodesO is not null && GetNodesO.Count > 1)
-        {
-            int ListCount = 0;
-            @foreach (var aspect in GetNodesO)
-            {
-                if (ListCount > 0)
-                {
-                    <div class="d-flex aspect-list">
-                        <div class="autocomplete-wrapper">
-                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                                   type="text" name="@($"output-{aspect.IDNr}")"
-                                   @ref="aspect.elementReference"
-                                   tabindex="7"
-                                   value="@aspect.IDName"
-                                   @oninput="@(e => HandleAspectInput(e, "Output", aspect.IDNr))"
-                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Output", aspect.IDNr))"
-                                   @onfocus="@(e => OpenDropdown("Output", aspect.IDNr))"
-                                   @onblur="@(async () => await HandleBlur("Output", aspect.IDNr))"
-                                   @onchange="@(e => CommitAspect(e, "Output", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1"
-                                    @onclick="@(async () => await ButtonClick("Output", aspect.IDNr, aspect.elementReference))"
-                                    @onmousedown:preventDefault @onmousedown:stopPropagation
-                                    type="button">▼</button>
-                            @if (IsDropdownOpen("Output", aspect.IDNr))
-                            {
-                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Output", aspect.IDNr))">
-                                    @foreach (var item in GetFilteredExisting("Output", aspectFilterText))
-                                    {
-                                        int idx = suggestionsActiveList.IndexOf(item);
-                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                            @onclick="@(() => SelectSuggestion("Output", aspect.IDNr, item))"
-                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                    }
-                                </ul>
-                            }
-                        </div>
-                    </div>
-                }
-                ListCount++;
-            }
-        }
-        <!-- Input -->
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-center">
-                <button id="newIButton" class="btn btn-menu btn-textp" title=@Loc["INPUT"] tabindex="8" @onclick="@((e) => NewAspect(e, "Input"))" @onkeyup=NextFn>I</button>
-                <button class="btn btn-half profile-symbol-btn" title=@profileITooltip() tabindex="28" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("I"))">@showProfile("I")</button>
-            </div>
-            @if (stateContainer.selectedFn != "-1")
-            {
-                GetNodesI = stateContainer.aspectsList.FindAll(x => x.Type == "Input" && x.FunctionIDNr == stateContainer.selectedFn);
-                if (GetNodesI.Count > 0)
-                {
-                    var aspect = GetNodesI[0];
-                    <div class="autocomplete-wrapper">
-                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                               type="text" name="@($"input-{aspect.IDNr}")"
-                               @ref="aspect.elementReference"
-                               tabindex="9"
-                               value="@aspect.IDName"
-                               @oninput="@(e => HandleAspectInput(e, "Input", aspect.IDNr))"
-                               @onkeydown="@(e => HandleAspectKeyDown(e, "Input", aspect.IDNr))"
-                               @onfocus="@(e => OpenDropdown("Input", aspect.IDNr))"
-                               @onblur="@(async () => await HandleBlur("Input", aspect.IDNr))"
-                               @onchange="@(e => CommitAspect(e, "Input", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1"
-                                @onclick="@(async () => await ButtonClick("Input", aspect.IDNr, aspect.elementReference))"
-                                @onmousedown:preventDefault @onmousedown:stopPropagation
-                                type="button">▼</button>
-                        @if (IsDropdownOpen("Input", aspect.IDNr))
-                        {
-                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Input", aspect.IDNr))">
-                                @foreach (var item in GetFilteredExisting("Input", aspectFilterText))
-                                {
-                                    int idx = suggestionsActiveList.IndexOf(item);
-                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                        @onclick="@(() => SelectSuggestion("Input", aspect.IDNr, item))"
-                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                GetNodesI = null;
-            }
-        </div>
-        @if (GetNodesI is not null && GetNodesI.Count > 1)
-        {
-            int ListCount = 0;
-            @foreach (var aspect in GetNodesI)
-            {
-                if (ListCount > 0)
-                {
-                    <div class="d-flex aspect-list">
-                        <div class="autocomplete-wrapper">
-                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                                   type="text" name="@($"input-{aspect.IDNr}")"
-                                   @ref="aspect.elementReference"
-                                   tabindex="10"
-                                   value="@aspect.IDName"
-                                   @oninput="@(e => HandleAspectInput(e, "Input", aspect.IDNr))"
-                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Input", aspect.IDNr))"
-                                   @onfocus="@(e => OpenDropdown("Input", aspect.IDNr))"
-                                   @onblur="@(async () => await HandleBlur("Input", aspect.IDNr))"
-                                   @onchange="@(e => CommitAspect(e, "Input", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1"
-                                    @onclick="@(async () => await ButtonClick("Input", aspect.IDNr, aspect.elementReference))"
-                                    @onmousedown:preventDefault @onmousedown:stopPropagation
-                                    type="button">▼</button>
-                            @if (IsDropdownOpen("Input", aspect.IDNr))
-                            {
-                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Input", aspect.IDNr))">
-                                    @foreach (var item in GetFilteredExisting("Input", aspectFilterText))
-                                    {
-                                        int idx = suggestionsActiveList.IndexOf(item);
-                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                            @onclick="@(() => SelectSuggestion("Input", aspect.IDNr, item))"
-                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                    }
-                                </ul>
-                            }
-                        </div>
-                    </div>
-                }
-                ListCount++;
-            }
-        }
-        <!-- Precondition -->
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-center">
-                <button id="newPButton" class="btn btn-menu btn-textp" title=@Loc["PRECONDITION"] tabindex="11" @onclick="@((e) => NewAspect(e, "Precondition"))" @onkeyup=NextFn>P</button>
-                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="29" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("P"))">@showProfile("P")</button>
-            </div>
-            @if (stateContainer.selectedFn != "-1")
-            {
-                GetNodesP = stateContainer.aspectsList.FindAll(x => x.Type == "Precondition" && x.FunctionIDNr == stateContainer.selectedFn);
-                if (GetNodesP.Count > 0)
-                {
-                    var aspect = GetNodesP[0];
-                    <div class="autocomplete-wrapper">
-                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                               type="text" name="@($"precondition-{aspect.IDNr}")"
-                               @ref="aspect.elementReference"
-                               tabindex="12"
-                               value="@aspect.IDName"
-                               @oninput="@(e => HandleAspectInput(e, "Precondition", aspect.IDNr))"
-                               @onkeydown="@(e => HandleAspectKeyDown(e, "Precondition", aspect.IDNr))"
-                               @onfocus="@(e => OpenDropdown("Precondition", aspect.IDNr))"
-                               @onblur="@(async () => await HandleBlur("Precondition", aspect.IDNr))"
-                               @onchange="@(e => CommitAspect(e, "Precondition", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1"
-                                @onclick="@(async () => await ButtonClick("Precondition", aspect.IDNr, aspect.elementReference))"
-                                @onmousedown:preventDefault @onmousedown:stopPropagation
-                                type="button">▼</button>
-                        @if (IsDropdownOpen("Precondition", aspect.IDNr))
-                        {
-                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Precondition", aspect.IDNr))">
-                                @foreach (var item in GetFilteredExisting("Precondition", aspectFilterText))
-                                {
-                                    int idx = suggestionsActiveList.IndexOf(item);
-                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                        @onclick="@(() => SelectSuggestion("Precondition", aspect.IDNr, item))"
-                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                GetNodesP = null;
-            }
-        </div>
-        @if (GetNodesP is not null && GetNodesP.Count > 1)
-        {
-            int ListCount = 0;
-            @foreach (var aspect in GetNodesP)
-            {
-                if (ListCount > 0)
-                {
-                    <div class="d-flex aspect-list">
-                        <div class="autocomplete-wrapper">
-                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                                   type="text" name="@($"precondition-{aspect.IDNr}")"
-                                   @ref="aspect.elementReference"
-                                   tabindex="13"
-                                   value="@aspect.IDName"
-                                   @oninput="@(e => HandleAspectInput(e, "Precondition", aspect.IDNr))"
-                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Precondition", aspect.IDNr))"
-                                   @onfocus="@(e => OpenDropdown("Precondition", aspect.IDNr))"
-                                   @onblur="@(async () => await HandleBlur("Precondition", aspect.IDNr))"
-                                   @onchange="@(e => CommitAspect(e, "Precondition", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1"
-                                    @onclick="@(async () => await ButtonClick("Precondition", aspect.IDNr, aspect.elementReference))"
-                                    @onmousedown:preventDefault @onmousedown:stopPropagation
-                                    type="button">▼</button>
-                            @if (IsDropdownOpen("Precondition", aspect.IDNr))
-                            {
-                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Precondition", aspect.IDNr))">
-                                    @foreach (var item in GetFilteredExisting("Precondition", aspectFilterText))
-                                    {
-                                        int idx = suggestionsActiveList.IndexOf(item);
-                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                            @onclick="@(() => SelectSuggestion("Precondition", aspect.IDNr, item))"
-                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                    }
-                                </ul>
-                            }
-                        </div>
-                    </div>
-                }
-                ListCount++;
-            }
-        }
-        <!-- Resource -->
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-center">
-                <button id="newRButton" class="btn btn-menu btn-textp" title=@Loc["RESOURCE"] tabindex="14" @onclick="@((e) => NewAspect(e, "Resource"))" @onkeyup=NextFn>R</button>
-                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="30" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("R"))">@showProfile("R")</button>
-            </div>
-            @if (stateContainer.selectedFn != "-1")
-            {
-                GetNodesR = stateContainer.aspectsList.FindAll(x => x.Type == "Resource" && x.FunctionIDNr == stateContainer.selectedFn);
-                if (GetNodesR.Count > 0)
-                {
-                    var aspect = GetNodesR[0];
-                    <div class="autocomplete-wrapper">
-                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                               type="text" name="@($"resource-{aspect.IDNr}")"
-                               @ref="aspect.elementReference"
-                               tabindex="15"
-                               value="@aspect.IDName"
-                               @oninput="@(e => HandleAspectInput(e, "Resource", aspect.IDNr))"
-                               @onkeydown="@(e => HandleAspectKeyDown(e, "Resource", aspect.IDNr))"
-                               @onfocus="@(e => OpenDropdown("Resource", aspect.IDNr))"
-                               @onblur="@(async () => await HandleBlur("Resource", aspect.IDNr))"
-                               @onchange="@(e => CommitAspect(e, "Resource", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1"
-                                @onclick="@(async () => await ButtonClick("Resource", aspect.IDNr, aspect.elementReference))"
-                                @onmousedown:preventDefault @onmousedown:stopPropagation
-                                type="button">▼</button>
-                        @if (IsDropdownOpen("Resource", aspect.IDNr))
-                        {
-                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Resource", aspect.IDNr))">
-                                @foreach (var item in GetFilteredExisting("Resource", aspectFilterText))
-                                {
-                                    int idx = suggestionsActiveList.IndexOf(item);
-                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                        @onclick="@(() => SelectSuggestion("Resource", aspect.IDNr, item))"
-                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                GetNodesR = null;
-            }
-        </div>
-        @if (GetNodesR is not null && GetNodesR.Count > 1)
-        {
-            int ListCount = 0;
-            @foreach (var aspect in GetNodesR)
-            {
-                if (ListCount > 0)
-                {
-                    <div class="d-flex aspect-list">
-                        <div class="autocomplete-wrapper">
-                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                                   type="text" name="@($"resource-{aspect.IDNr}")"
-                                   @ref="aspect.elementReference"
-                                   tabindex="16"
-                                   value="@aspect.IDName"
-                                   @oninput="@(e => HandleAspectInput(e, "Resource", aspect.IDNr))"
-                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Resource", aspect.IDNr))"
-                                   @onfocus="@(e => OpenDropdown("Resource", aspect.IDNr))"
-                                   @onblur="@(async () => await HandleBlur("Resource", aspect.IDNr))"
-                                   @onchange="@(e => CommitAspect(e, "Resource", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1"
-                                    @onclick="@(async () => await ButtonClick("Resource", aspect.IDNr, aspect.elementReference))"
-                                    @onmousedown:preventDefault @onmousedown:stopPropagation
-                                    type="button">▼</button>
-                            @if (IsDropdownOpen("Resource", aspect.IDNr))
-                            {
-                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Resource", aspect.IDNr))">
-                                    @foreach (var item in GetFilteredExisting("Resource", aspectFilterText))
-                                    {
-                                        int idx = suggestionsActiveList.IndexOf(item);
-                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                            @onclick="@(() => SelectSuggestion("Resource", aspect.IDNr, item))"
-                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                    }
-                                </ul>
-                            }
-                        </div>
-                    </div>
-                }
-                ListCount++;
-            }
-        }
-        <!-- Control -->
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-center">
-                <button id="newCButton" class="btn btn-menu btn-textp" title=@Loc["CONTROL"] tabindex="17" @onclick="@((e) => NewAspect(e, "Control"))" @onkeyup=NextFn>C</button>
-                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="31" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("C"))">@showProfile("C")</button>
-            </div>
-            @if (stateContainer.selectedFn != "-1")
-            {
-                GetNodesC = stateContainer.aspectsList.FindAll(x => x.Type == "Control" && x.FunctionIDNr == stateContainer.selectedFn);
-                if (GetNodesC.Count > 0)
-                {
-                    var aspect = GetNodesC[0];
-                    <div class="autocomplete-wrapper">
-                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                               type="text" name="@($"control-{aspect.IDNr}")"
-                               @ref="aspect.elementReference"
-                               tabindex="18"
-                               value="@aspect.IDName"
-                               @oninput="@(e => HandleAspectInput(e, "Control", aspect.IDNr))"
-                               @onkeydown="@(e => HandleAspectKeyDown(e, "Control", aspect.IDNr))"
-                               @onfocus="@(e => OpenDropdown("Control", aspect.IDNr))"
-                               @onblur="@(async () => await HandleBlur("Control", aspect.IDNr))"
-                               @onchange="@(e => CommitAspect(e, "Control", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1"
-                                @onclick="@(async () => await ButtonClick("Control", aspect.IDNr, aspect.elementReference))"
-                                @onmousedown:preventDefault @onmousedown:stopPropagation
-                                type="button">▼</button>
-                        @if (IsDropdownOpen("Control", aspect.IDNr))
-                        {
-                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Control", aspect.IDNr))">
-                                @foreach (var item in GetFilteredExisting("Control", aspectFilterText))
-                                {
-                                    int idx = suggestionsActiveList.IndexOf(item);
-                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                        @onclick="@(() => SelectSuggestion("Control", aspect.IDNr, item))"
-                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                GetNodesC = null;
-            }
-        </div>
-        @if (GetNodesC is not null && GetNodesC.Count > 1)
-        {
-            int ListCount = 0;
-            @foreach (var aspect in GetNodesC)
-            {
-                if (ListCount > 0)
-                {
-                    <div class="d-flex aspect-list">
-                        <div class="autocomplete-wrapper">
-                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                                   type="text" name="@($"control-{aspect.IDNr}")"
-                                   @ref="aspect.elementReference"
-                                   tabindex="19"
-                                   value="@aspect.IDName"
-                                   @oninput="@(e => HandleAspectInput(e, "Control", aspect.IDNr))"
-                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Control", aspect.IDNr))"
-                                   @onfocus="@(e => OpenDropdown("Control", aspect.IDNr))"
-                                   @onblur="@(async () => await HandleBlur("Control", aspect.IDNr))"
-                                   @onchange="@(e => CommitAspect(e, "Control", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1"
-                                    @onclick="@(async () => await ButtonClick("Control", aspect.IDNr, aspect.elementReference))"
-                                    @onmousedown:preventDefault @onmousedown:stopPropagation
-                                    type="button">▼</button>
-                            @if (IsDropdownOpen("Control", aspect.IDNr))
-                            {
-                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Control", aspect.IDNr))">
-                                    @foreach (var item in GetFilteredExisting("Control", aspectFilterText))
-                                    {
-                                        int idx = suggestionsActiveList.IndexOf(item);
-                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                            @onclick="@(() => SelectSuggestion("Control", aspect.IDNr, item))"
-                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                    }
-                                </ul>
-                            }
-                        </div>
-                    </div>
-                }
-                ListCount++;
-            }
-        }
-        <!-- Time -->
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-center">
-                <button id="newTButton" class="btn btn-menu btn-textp" title=@Loc["TIME"] tabindex="20" @onclick="@((e) => NewAspect(e, "Time"))" @onkeyup=NextFn>T</button>
-                <button class="btn btn-half profile-symbol-btn" title=@profileTooltip() tabindex="32" disabled=@disableAspectProfile() @onclick="@((e) => changeProfile("T"))">@showProfile("T")</button>
-            </div>
-            @if (stateContainer.selectedFn != "-1")
-            {
-                GetNodesT = stateContainer.aspectsList.FindAll(x => x.Type == "Time" && x.FunctionIDNr == stateContainer.selectedFn);
-                if (GetNodesT.Count > 0)
-                {
-                    var aspect = GetNodesT[0];
-                    <div class="autocomplete-wrapper">
-                        <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                               type="text" name="@($"time-{aspect.IDNr}")"
-                               @ref="aspect.elementReference"
-                               tabindex="21"
-                               value="@aspect.IDName"
-                               @oninput="@(e => HandleAspectInput(e, "Time", aspect.IDNr))"
-                               @onkeydown="@(e => HandleAspectKeyDown(e, "Time", aspect.IDNr))"
-                               @onfocus="@(e => OpenDropdown("Time", aspect.IDNr))"
-                               @onblur="@(async () => await HandleBlur("Time", aspect.IDNr))"
-                               @onchange="@(e => CommitAspect(e, "Time", aspect.IDNr))" />
-                        <button class="dropdown-btn" tabindex="-1"
-                                @onclick="@(async () => await ButtonClick("Time", aspect.IDNr, aspect.elementReference))"
-                                @onmousedown:preventDefault @onmousedown:stopPropagation
-                                type="button">▼</button>
-                        @if (IsDropdownOpen("Time", aspect.IDNr))
-                        {
-                            <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Time", aspect.IDNr))">
-                                @foreach (var item in GetFilteredExisting("Time", aspectFilterText))
-                                {
-                                    int idx = suggestionsActiveList.IndexOf(item);
-                                    <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                        @onclick="@(() => SelectSuggestion("Time", aspect.IDNr, item))"
-                                        @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                GetNodesT = null;
-            }
-        </div>
-        @if (GetNodesT is not null && GetNodesT.Count > 1)
-        {
-            int ListCount = 0;
-            @foreach (var aspect in GetNodesT)
-            {
-                if (ListCount > 0)
-                {
-                    <div class="d-flex aspect-list">
-                        <div class="autocomplete-wrapper">
-                            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
-                                   type="text" name="@($"time-{aspect.IDNr}")"
-                                   @ref="aspect.elementReference"
-                                   tabindex="22"
-                                   value="@aspect.IDName"
-                                   @oninput="@(e => HandleAspectInput(e, "Time", aspect.IDNr))"
-                                   @onkeydown="@(e => HandleAspectKeyDown(e, "Time", aspect.IDNr))"
-                                   @onfocus="@(e => OpenDropdown("Time", aspect.IDNr))"
-                                   @onblur="@(async () => await HandleBlur("Time", aspect.IDNr))"
-                                   @onchange="@(e => CommitAspect(e, "Time", aspect.IDNr))" />
-                            <button class="dropdown-btn" tabindex="-1"
-                                    @onclick="@(async () => await ButtonClick("Time", aspect.IDNr, aspect.elementReference))"
-                                    @onmousedown:preventDefault @onmousedown:stopPropagation
-                                    type="button">▼</button>
-                            @if (IsDropdownOpen("Time", aspect.IDNr))
-                            {
-                                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, "Time", aspect.IDNr))">
-                                    @foreach (var item in GetFilteredExisting("Time", aspectFilterText))
-                                    {
-                                        int idx = suggestionsActiveList.IndexOf(item);
-                                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
-                                            @onclick="@(() => SelectSuggestion("Time", aspect.IDNr, item))"
-                                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
-                                    }
-                                </ul>
-                            }
-                        </div>
-                    </div>
-                }
-                ListCount++;
-            }
-        }
-        <!-- Agent / Level panels unchanged -->
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-start pt-1">
-                <button class="btn btn-menu btn-textp" title="Assign Agent" tabindex="33" @onclick=ToggleAgentPanel>A</button>
-            </div>
-            <div class="flex-grow-1 pl-1 pt-2">
-                @if (showAgentPanel)
-                {
-                    if (stateContainer.agentList.Count == 0)
+                <MudSelect T="string" Value="@(stateContainer.selectedFunction!.AgentId)" ValueChanged="OnAgentChanged"
+                           Label="@L("AGENT", "Agent")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                           Clearable="true" Class="sb-field" tabindex="33">
+                    @foreach (var agent in stateContainer.agentList)
                     {
-                        <small class="text-muted">No agents defined. Use the menu bar shortcut to add agents.</small>
+                        <MudSelectItem T="string" Value="@agent.IDNr">@agent.Name</MudSelectItem>
                     }
-                    else if (stateContainer.selectedFn == "-1" || stateContainer.selectedFunction is null)
+                </MudSelect>
+                <MudSelect T="string" Value="@(stateContainer.selectedFunction!.LevelId)" ValueChanged="OnLevelChanged"
+                           Label="@L("LEVEL", "Level")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                           Clearable="true" Class="sb-field" tabindex="34">
+                    @foreach (var level in stateContainer.levelList.OrderBy(l => l.Hierarchy).ThenBy(l => l.Name))
                     {
-                        <small class="text-muted">Select a function to assign agents.</small>
+                        <MudSelectItem T="string" Value="@level.IDNr">@level.Name</MudSelectItem>
                     }
-                    else if (!string.IsNullOrEmpty(stateContainer.selectedFunction.AgentId))
-                    {
-                        var agent = stateContainer.agentList.Find(a => a.IDNr == stateContainer.selectedFunction.AgentId);
-                        <div class="assignment-display mb-1 d-flex align-center">
-                            <span class="text-truncate flex-grow-1">@(agent?.Name ?? $"Agent {stateContainer.selectedFunction.AgentId}")</span>
-                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
-                                           title="Remove" OnClick=ClearAgent aria-label="Remove agent" />
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="d-flex align-center assignment-select" style="gap:4px;">
-                            <MudSelect T="string" @bind-Value="selectedAgentId" Label="Select agent" Variant="Variant.Outlined"
-                                       Margin="Margin.Dense" Dense="true" Class="flex-grow-1">
-                                @foreach (var agent in stateContainer.agentList)
-                                {
-                                    <MudSelectItem T="string" Value="@agent.IDNr">@($"{agent.IDNr} - {agent.Name}")</MudSelectItem>
-                                }
-                            </MudSelect>
-                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
-                                           Variant="Variant.Outlined" title="Add agent to function"
-                                           OnClick=AssignAgent Disabled="@(string.IsNullOrEmpty(selectedAgentId))" aria-label="Add agent to function" />
-                        </div>
-                    }
-                }
+                </MudSelect>
+            }
+
+            <div class="sb-head">
+                <span class="sb-title">@L("SCRIPT_AND_LOOK", "Script & appearance")</span>
             </div>
-        </div>
-        <div class="d-flex pt-2">
-            <div class="d-flex flex-column align-items-start pt-1">
-                <button class="btn btn-menu btn-textp" title="Assign Level" tabindex="34" @onclick=ToggleLevelPanel>L</button>
-            </div>
-            <div class="flex-grow-1 pl-1 pt-2">
-                @if (showLevelPanel)
-                {
-                    if (stateContainer.levelList.Count == 0)
-                    {
-                        <small class="text-muted">No levels defined. Use the menu bar shortcut to add levels.</small>
-                    }
-                    else if (stateContainer.selectedFn == "-1" || stateContainer.selectedFunction is null)
-                    {
-                        <small class="text-muted">Select a function to assign levels.</small>
-                    }
-                    else if (!string.IsNullOrEmpty(stateContainer.selectedFunction.LevelId))
-                    {
-                        var level = stateContainer.levelList.Find(l => l.IDNr == stateContainer.selectedFunction.LevelId);
-                        <div class="assignment-display mb-1 d-flex align-center">
-                            <span class="text-truncate flex-grow-1">@(level?.Name ?? $"Level {stateContainer.selectedFunction.LevelId}")</span>
-                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
-                                           title="Remove" OnClick=ClearLevel aria-label="Remove level" />
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="d-flex align-center mb-1 assignment-select" style="gap:4px;">
-                            <MudSelect T="string" @bind-Value="selectedLevelId" Label="Select level" Variant="Variant.Outlined"
-                                       Margin="Margin.Dense" Dense="true" Class="flex-grow-1">
-                                @foreach (var level in stateContainer.levelList)
-                                {
-                                    <MudSelectItem T="string" Value="@level.IDNr">@($"{level.IDNr} - {level.Name}")</MudSelectItem>
-                                }
-                            </MudSelect>
-                            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary"
-                                           Variant="Variant.Outlined" title="Add level to function"
-                                           OnClick=AssignLevel Disabled="@(string.IsNullOrEmpty(selectedLevelId))" aria-label="Add level to function" />
-                        </div>
-                    }
-                }
-            </div>
-        </div>
-        <!-- Zoom and color buttons -->
-        <div class="d-flex pt-2 align-center">
-            <button class="btn btn-half btn-half-s" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
-            <button class="btn btn-half btn-half-l" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>A</button>
-            <MudIconButton Icon="@Icons.Material.Filled.Palette" Color="Color.Primary" Size="Size.Medium"
-                           title="@Loc["FN_COLOUR"]" tabindex="25" OnClick="ModalColor" @onkeyup="ModalKey"
-                           aria-label="@Loc["FN_COLOUR"]" Class="ml-1" />
-        </div>
-        <div class="d-flex pt-2 align-center">
-            @if (stateContainer.selectedFn != "-1")
-            {
+            <div class="sb-row">
                 @* Stash the model on pointer-down, then open the IDE. The click handler is explicit
                    so that browsers/embedded views that suppress window.open (target="_blank") still
                    navigate to the IDE in the current tab instead of silently doing nothing. *@
-                <a class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST)" tabindex="27"
+                <a class="sb-btn sb-btn-tonal sb-grow" title="@L("SCRIPT_TOOLTIP", "Open the ST script editor for this function")" tabindex="27"
                    href="@ScriptEditorUrl"
                    @onpointerdown="PrepareScriptIDE"
                    @onclick="OpenScriptIDE"
-                   @onclick:preventDefault></a>
-            }
-            else
-            {
-                <button class="btn btn-menu oi oi-puzzle-piece ml-1" title="Script (ST) - select a function first" tabindex="27" disabled></button>
-            }
-        </div>
-        @if (stateContainer.showKeys == "")
-        {
-            <hr class="mt-2 mb-0" />
-            <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
+                   @onclick:preventDefault>
+                    <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" />
+                    @(HasScript ? L("EDIT_SCRIPT", "Edit script") : L("ADD_SCRIPT", "Add script"))
+                </a>
+                <button type="button" class="sb-btn sb-btn-tonal sb-grow" title="@Loc["FN_COLOUR"]" tabindex="25" @onclick="ModalColor" @onkeyup="ModalKey">
+                    <MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" />@L("COLOUR_BUTTON", "Colour")
+                </button>
+            </div>
         }
+        <div class="sb-row sb-textsize">
+            <span class="sb-label">@L("TEXT_SIZE", "Text size")</span>
+            <span class="sb-stepper" title="@L("TEXT_SIZE_FN", "Function labels (whole model)")">
+                <span class="sb-stepper-label">@L("FUNCTIONS_SHORT", "Fn")</span>
+                <button type="button" class="sb-step" title=@Loc["FN_FONT_DECREASE"] tabindex="1" @onclick=zoomFs @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>−</button>
+                <button type="button" class="sb-step" title=@Loc["FN_FONT_INCREASE"] tabindex="2" @onclick=zoomFl @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>+</button>
+            </span>
+            <span class="sb-stepper" title="@L("TEXT_SIZE_ASPECT", "Aspect labels (whole model)")">
+                <span class="sb-stepper-label">@L("ASPECTS_SHORT", "Asp")</span>
+                <button type="button" class="sb-step" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>−</button>
+                <button type="button" class="sb-step" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>+</button>
+            </span>
+        </div>
+    </div>
+    <div class="sidebar-run">
+        <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
     </div>
 </div>
 
@@ -698,26 +118,139 @@
     [Parameter]
     public EventCallback<KeyboardEventArgs> nextFn { get; set; }
 
-    private List<Aspect>? GetNodesI;
-    private List<Aspect>? GetNodesO;
-    private List<Aspect>? GetNodesT;
-    private List<Aspect>? GetNodesC;
-    private List<Aspect>? GetNodesP;
-    private List<Aspect>? GetNodesR;
     private string setFocus = "";
     private string focusCheck = "";
     private string oldZoomText = "";
-    private string descriptionClass = "fmi-descS";
-
-    // Agent / Level assignment state
-    private bool showAgentPanel = true;
-    private bool showLevelPanel = true;
-    private string selectedAgentId = "";
-    private string selectedLevelId = "";
-    private string newAgentName = "";
-    private string newLevelName = "";
 
     private string ScriptEditorUrl => $"scripteditor/{stateContainer.selectedFn}";
+
+    private static readonly string[] AspectTypes = { "Output", "Input", "Precondition", "Resource", "Control", "Time" };
+    private bool HasSelection => stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null;
+    private bool HasScript => HasSelection && stateContainer.fmiUsage().HasScript(stateContainer.selectedFn);
+
+    // Localization helper: falls back to a default English string if the resx key is missing.
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
+
+    private List<Aspect> AspectsOf(string type) => type == "Output"
+        ? stateContainer.outputsList.FindAll(x => x.Type == "Output" && x.FunctionIDNr == stateContainer.selectedFn)
+        : stateContainer.aspectsList.FindAll(x => x.Type == type && x.FunctionIDNr == stateContainer.selectedFn);
+
+    private string AspectLabel(string type) => Loc[type.ToUpperInvariant()];
+
+    // One aspect type: coloured letter, name, optional activation profile, add button, then one row per aspect.
+    private RenderFragment AspectGroup(string type) => __builder =>
+    {
+        var letter = type.Substring(0, 1);
+        var aspects = AspectsOf(type);
+        var tab = Array.IndexOf(AspectTypes, type) * 3 + 6;
+        <div class="aspect-group">
+            <div class="aspect-head">
+                <span class="aspect-letter aspect-letter-@letter.ToLowerInvariant()">@letter</span>
+                <span class="aspect-name">@AspectLabel(type)</span>
+                @if (type != "Output" && type != "Time" && !disableAspectProfile())
+                {
+                    <button type="button" class="aspect-profile" title=@(type == "Input" ? profileITooltip() : profileTooltip())
+                            tabindex="@(28 + tab)" @onclick="@(() => changeProfile(letter))">@ProfileText(letter)</button>
+                }
+                <button id="@($"new{letter}Button")" type="button" class="aspect-add" title="@($"{L("ADD", "Add")} {AspectLabel(type)}")"
+                        tabindex="@tab" @onclick="@((e) => NewAspect(e, type))" @onkeyup=NextFn>
+                    <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />
+                </button>
+            </div>
+            @if (type == "Output" && !disableFnProfile())
+            {
+                <label class="aspect-row aspect-entry" title=@profileFnTooltip()>
+                    <span>@L("ENTRY_TIMING", "Entry timing")</span>
+                    <input type="text" name="fnProfileInput" class="aspect-input aspect-entry-input" tabindex="27" value=@showFnProfile() @onchange="@((e) => changeFnProfile(e, "Fn"))" placeholder="0, N or p" />
+                </label>
+            }
+            @foreach (var aspect in aspects)
+            {
+                <div class="aspect-row">@AspectInput(aspect, type, tab + 1)</div>
+            }
+        </div>
+    };
+
+    // The editable name of one aspect, with the dropdown of existing names of the same type.
+    private RenderFragment AspectInput(Aspect aspect, string type, int tab) => __builder =>
+    {
+        <div class="autocomplete-wrapper">
+            <input class="aspect-input @(aspect.Orphan=="true"?"aspect-orphan":"")"
+                   type="text" name="@($"{type.ToLowerInvariant()}-{aspect.IDNr}")"
+                   @ref="aspect.elementReference"
+                   tabindex="@tab"
+                   value="@aspect.IDName"
+                   title="@(aspect.Orphan == "true" ? L("ORPHAN_HINT", "No matching coupling yet") : aspect.IDName)"
+                   @oninput="@(e => HandleAspectInput(e, type, aspect.IDNr))"
+                   @onkeydown="@(e => HandleAspectKeyDown(e, type, aspect.IDNr))"
+                   @onfocus="@(e => OpenDropdown(type, aspect.IDNr))"
+                   @onblur="@(async () => await HandleBlur(type, aspect.IDNr))"
+                   @onchange="@(e => CommitAspect(e, type, aspect.IDNr))" />
+            <button class="dropdown-btn" tabindex="-1"
+                    @onclick="@(async () => await ButtonClick(type, aspect.IDNr, aspect.elementReference))"
+                    @onmousedown:preventDefault @onmousedown:stopPropagation
+                    type="button"><MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" /></button>
+            @if (IsDropdownOpen(type, aspect.IDNr))
+            {
+                <ul class="suggestion-list" @onkeydown="@(e => SuggestionKeyDown(e, type, aspect.IDNr))">
+                    @foreach (var item in GetFilteredExisting(type, aspectFilterText))
+                    {
+                        int idx = suggestionsActiveList.IndexOf(item);
+                        <li class="suggestion-item @(suggestionsActiveIndex == idx ? "active" : "")"
+                            @onclick="@(() => SelectSuggestion(type, aspect.IDNr, item))"
+                            @onmouseover="@(() => suggestionsActiveIndex = idx)">@item</li>
+                    }
+                </ul>
+            }
+        </div>
+    };
+
+    private string ProfileText(string type)
+    {
+        var fn = stateContainer.selectedFunction;
+        if (fn is null) return "";
+        var profile = type switch
+        {
+            "I" => Function.ProfileToString(fn.PrInputs),
+            "P" => Function.ProfileToString(fn.PrPreconditions),
+            "R" => Function.ProfileToString(fn.PrResources),
+            "C" => Function.ProfileToString(fn.PrControls),
+            _ => ""
+        };
+        return profile switch
+        {
+            "All" => "∀ all",
+            "Any" => "∃ any",
+            "None" => "∅ none",
+            _ => L("PROFILE_DEFAULT", "default")
+        };
+    }
+
+    private void OnAgentChanged(string? agentId)
+    {
+        if (stateContainer.selectedFunction is null) return;
+        if (string.IsNullOrEmpty(agentId)) stateContainer.ClearAgentFromFunction(stateContainer.selectedFunction);
+        else stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, agentId);
+        refreshParent.InvokeAsync();
+    }
+
+    private void OnLevelChanged(string? levelId)
+    {
+        if (stateContainer.selectedFunction is null) return;
+        if (string.IsNullOrEmpty(levelId)) stateContainer.ClearLevelFromFunction(stateContainer.selectedFunction);
+        else stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, levelId);
+        refreshParent.InvokeAsync();
+    }
+
+    private void OpenAgentsLevelsPanel()
+    {
+        stateContainer.rightPanel = "agents-levels";
+        refreshParent.InvokeAsync();
+    }
 
     // Runs on pointer-down (before the IDE opens), stashing the current model in
     // localStorage for the IDE page to load.
@@ -957,53 +490,6 @@
         CloseDropdownDelayed();
     }
 
-    private void ToggleAgentPanel() => showAgentPanel = !showAgentPanel;
-    private void ToggleLevelPanel() => showLevelPanel = !showLevelPanel;
-
-    private void AssignAgent()
-    {
-        if (stateContainer.selectedFunction is null || string.IsNullOrEmpty(selectedAgentId)) return;
-        stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, selectedAgentId);
-        selectedAgentId = "";
-        refreshParent.InvokeAsync();
-    }
-    private void ClearAgent()
-    {
-        if (stateContainer.selectedFunction is null) return;
-        stateContainer.ClearAgentFromFunction(stateContainer.selectedFunction);
-        refreshParent.InvokeAsync();
-    }
-    private void CreateAndAssignAgent()
-    {
-        if (stateContainer.selectedFunction is null || string.IsNullOrWhiteSpace(newAgentName)) return;
-        var agent = stateContainer.CreateAgent(newAgentName.Trim());
-        stateContainer.AssignAgentToFunction(stateContainer.selectedFunction, agent.IDNr);
-        newAgentName = "";
-        refreshParent.InvokeAsync();
-    }
-
-    private void AssignLevel()
-    {
-        if (stateContainer.selectedFunction is null || string.IsNullOrEmpty(selectedLevelId)) return;
-        stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, selectedLevelId);
-        selectedLevelId = "";
-        refreshParent.InvokeAsync();
-    }
-    private void ClearLevel()
-    {
-        if (stateContainer.selectedFunction is null) return;
-        stateContainer.ClearLevelFromFunction(stateContainer.selectedFunction);
-        refreshParent.InvokeAsync();
-    }
-    private void CreateAndAssignLevel()
-    {
-        if (stateContainer.selectedFunction is null || string.IsNullOrWhiteSpace(newLevelName)) return;
-        var level = stateContainer.CreateLevel(newLevelName.Trim());
-        stateContainer.AssignLevelToFunction(stateContainer.selectedFunction, level.IDNr);
-        newLevelName = "";
-        refreshParent.InvokeAsync();
-    }
-
     protected void updateAll()
     {
         refreshParent.InvokeAsync();
@@ -1115,35 +601,6 @@
                 return stateContainer.selectedFunction.profileFn;
         }
         return "";
-    }
-    RenderFragment showProfile(string type)
-    {
-        if (stateContainer.selectedFunction is not null)
-        {
-            // T button renders but has no associated enum property
-            if (type == "T") return @<a></a>;
-            var getProfile = "";
-            switch (type)
-            {
-                case "I": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrInputs); break;
-                case "P": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrPreconditions); break;
-                case "R": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrResources); break;
-                case "C": getProfile = Function.ProfileToString(stateContainer.selectedFunction.PrControls); break;
-                default: getProfile = ""; break;
-            }
-            switch (getProfile)
-            {
-                case "All": return @<a>&forall;</a>;
-                case "Any": return @<a>&exist;</a>;
-                case "None": return @<a>&empty;</a>;
-                case "": return @<a></a>;
-                default: return @<a></a>;
-            }
-        }
-        else
-        {
-            return @<a></a>;
-        }
     }
     private void ModalColor()
     {
@@ -1632,9 +1089,4 @@
         refreshParent.InvokeAsync();
     }
 
-    private void expandDesc()
-    {
-        descriptionClass = descriptionClass == "fmi-descS" ? "fmi-descE" : "fmi-descS";
-        StateHasChanged();
-    }
 }

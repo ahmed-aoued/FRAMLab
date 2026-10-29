@@ -1,5 +1,6 @@
 @page "/scripteditor/{FunctionId}"
 @layout MainLayout
+@using MudBlazor
 @inject IJSRuntime JSRuntime
 @inject ILocalStorageService localStorage
 @inject StateContainer stateContainer
@@ -27,22 +28,22 @@
     {
         <div class="script-ide">
             <div class="script-ide-header">
-                <span class="oi oi-puzzle-piece" aria-hidden="true"></span>
+                <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" Class="script-ide-icon" />
                 <span class="script-ide-title">Script (ST):</span>
                 <span class="script-ide-fnname text-truncate">@TargetFunction.IDName</span>
                 <span class="script-ide-idnr">IDNr @TargetFunction.IDNr</span>
-                <label class="mb-0 ml-2 d-flex align-items-center" style="gap:0.25rem;">
+                <label class="script-ide-enabled">
                     <input type="checkbox" checked="@script.Enabled" @onchange="ToggleEnabled" /> Enabled
                 </label>
                 @if (dirty)
                 {
-                    <span class="badge badge-warning">unsaved changes</span>
+                    <span class="script-ide-dirty">unsaved changes</span>
                 }
                 <span style="flex:1 1 auto;"></span>
                 <button class="btn btn-sm btn-primary" title="Save and notify the editor tab" @onclick="SaveAsync">
-                    <span class="oi oi-check" aria-hidden="true"></span> Save
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> Save
                 </button>
-                <button class="btn btn-menu oi oi-x script-ide-close" title="Save and close this tab" @onclick="CloseAsync"></button>
+                <button class="btn btn-light btn-sm script-ide-close" title="Save and close this tab" @onclick="CloseAsync"><MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" /></button>
             </div>
 
             <div class="script-ide-body">
@@ -117,7 +118,7 @@
                             @foreach (var w in typeMismatches)
                             {
                                 <div class="diag diag-warning" title="Cross-function type mismatch">
-                                    <span class="oi oi-warning"></span> @w
+                                    <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" /> @w
                                 </div>
                             }
                             @foreach (var d in diagnostics)
@@ -131,7 +132,7 @@
                     @* --- run one cycle with chosen inputs, without touching the model or an FMI run --- *@
                     <div class="script-testrun">
                         <div class="script-testrun-header" @onclick="ToggleTestRun">
-                            <span class="oi @(testRunOpen ? "oi-chevron-bottom" : "oi-chevron-right")"></span>
+                            <MudIcon Icon="@(testRunOpen ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
                             <strong>Run one cycle</strong>
                             <span class="vt-hint">try the script with your own input values</span>
                         </div>
@@ -176,7 +177,7 @@
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center" style="gap:0.5rem;">
-                                    <button class="btn btn-sm btn-primary" @onclick="RunTest"><span class="oi oi-media-play"></span> Run</button>
+                                    <button class="btn btn-sm btn-primary" @onclick="RunTest"><MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" /> Run</button>
                                     <button class="btn btn-sm btn-light" title="Reset the values from the model" @onclick="PrepareTestRun">Reset values</button>
                                 </div>
                                 @if (testResult is not null)

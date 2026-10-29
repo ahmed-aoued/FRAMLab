@@ -9,63 +9,114 @@
 @inject IConfiguration render
 @inject IStringLocalizer<Localization.SharedResource> Loc
 
-<MudAppBar Fixed="true" Dense="true" Elevation="1" Class="framlab-appbar">
-    <div class="d-flex align-center flex-grow-1" style="gap:4px; min-width:0; overflow:hidden;">
-        @* Project: open / save *@
-        <MudTooltip Text="@Loc["OPEN_TOOLTIP"]">
-            <div class="mud-icon-button-file">
-                <InputFile id="openFileBtn" OnChange="onInputFileChange" single accept=".xfmv" class="file-input-overlay" title="@Loc["OPEN_TOOLTIP"]" />
-                <MudIconButton Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" Size="Size.Medium" aria-label="@Loc["OPEN_TOOLTIP"]" />
-            </div>
-        </MudTooltip>
-        <MudTooltip Text="@Loc["SAVE_TOOLTIP"]">
-            <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary" Size="Size.Medium" OnClick="OnFileSave" aria-label="@Loc["SAVE_TOOLTIP"]" />
-        </MudTooltip>
+<MudAppBar Fixed="true" Dense="true" Elevation="0" Class="framlab-appbar">
+    <div class="ab-bar">
+        @* Phones: the editing panel slides in over the canvas *@
+        <MudIconButton Icon="@(stateContainer.phonePanelOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" Size="Size.Medium"
+                       Class="ab-show-sm" OnClick="TogglePhonePanel" aria-label="@L("FUNCTION", "Function")" />
+        @* Brand and the open model's name; the dot marks unsaved changes *@
+        <div class="ab-brand" title="@FileTitle">
+            <svg class="ab-logo" viewBox="0 0 100 100" aria-hidden="true">
+                <path d="M 8 50 L 29 13.6 L 71 13.6 L 92 50 L 71 86.4 L 29 86.4 Z" />
+            </svg>
+            <span class="ab-app">FRAMLab</span>
+            <span class="ab-file">@FileTitle</span>
+            @if (stateContainer.isDirty)
+            {
+                <span class="ab-dirty" title="@L("UNSAVED", "Unsaved changes")"></span>
+            }
+        </div>
 
-        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+        <div class="ab-group">
+            <MudTooltip Text="@Loc["OPEN_TOOLTIP"]" ShowOnFocus="false">
+                <div class="mud-icon-button-file">
+                    <InputFile id="openFileBtn" OnChange="onInputFileChange" single accept=".xfmv" class="file-input-overlay" title="@Loc["OPEN_TOOLTIP"]" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.FolderOpen" Size="Size.Medium" aria-label="@Loc["OPEN_TOOLTIP"]" />
+                </div>
+            </MudTooltip>
+            <MudTooltip Text="@Loc["SAVE_TOOLTIP"]">
+                <MudIconButton Icon="@Icons.Material.Outlined.Save" Size="Size.Medium" OnClick="OnFileSave" aria-label="@Loc["SAVE_TOOLTIP"]" />
+            </MudTooltip>
+        </div>
 
-        @* Zoom *@
-        <MudTooltip Text="@Loc["ZOOM_MINUS_TOOLTIP"]">
-            <MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Medium" OnClick="zoomMinus" aria-label="@Loc["ZOOM_MINUS_TOOLTIP"]" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["ZOOM_FULLSCREEN"]">
-            <MudIconButton Icon="@Icons.Material.Filled.FitScreen" Size="Size.Medium" OnClick="zoomFill" aria-label="@Loc["ZOOM_FULLSCREEN"]" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["ZOOM_PLUS_TOOLTIP"]">
-            <MudIconButton Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Medium" OnClick="zoomPlus" aria-label="@Loc["ZOOM_PLUS_TOOLTIP"]" />
-        </MudTooltip>
+        <div class="ab-group ab-hide-sm">
+            <MudTooltip Text="@Loc["UNDO_TOOLTIP"]">
+                <MudIconButton Icon="@Icons.Material.Filled.Undo" Size="Size.Medium" OnClick="actionUndo" aria-label="@Loc["UNDO_TOOLTIP"]" />
+            </MudTooltip>
+            <MudTooltip Text="@Loc["REDO_TOOLTIP"]">
+                <MudIconButton Icon="@Icons.Material.Filled.Redo" Size="Size.Medium" OnClick="actionRedo" aria-label="@Loc["REDO_TOOLTIP"]" />
+            </MudTooltip>
+            <MudTooltip Text="@L("GROUP_TOOLTIP", "Group")">
+                <MudIconButton Size="Size.Medium" OnClick="actionGroup" aria-label="@L("GROUP_TOOLTIP", "Group")">
+                    <svg viewBox="8 12 84 76" style="width:22px;height:22px;">
+                        <defs>
+                            <path transform="translate(-50, -50)" id="fno" d="M 14 50 L 32 18.8 L 67.5 18.8 L 85.5 50 L 67.5 81.1 L 32 81.1 L 14 50 Z" stroke="currentColor" stroke-width="5" fill-opacity="0" />
+                        </defs>
+                        <g transform="translate(50, 50)">
+                            <use xlink:href="#fno" transform="scale(0.75)" />
+                            <use xlink:href="#fno" />
+                        </g>
+                    </svg>
+                </MudIconButton>
+            </MudTooltip>
+        </div>
 
-        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+        <div class="ab-group">
+            <span class="ab-hide-md">
+                <MudTooltip Text="@Loc["ZOOM_MINUS_TOOLTIP"]">
+                    <MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Medium" OnClick="zoomMinus" aria-label="@Loc["ZOOM_MINUS_TOOLTIP"]" />
+                </MudTooltip>
+            </span>
+            <MudTooltip Text="@Loc["ZOOM_FULLSCREEN"]">
+                <MudIconButton Icon="@Icons.Material.Filled.FitScreen" Size="Size.Medium" OnClick="zoomFill" aria-label="@Loc["ZOOM_FULLSCREEN"]" />
+            </MudTooltip>
+            <span class="ab-hide-md">
+                <MudTooltip Text="@Loc["ZOOM_PLUS_TOOLTIP"]">
+                    <MudIconButton Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Medium" OnClick="zoomPlus" aria-label="@Loc["ZOOM_PLUS_TOOLTIP"]" />
+                </MudTooltip>
+            </span>
+        </div>
 
-        @* Undo / redo *@
-        <MudTooltip Text="@Loc["UNDO_TOOLTIP"]">
-            <MudIconButton Icon="@Icons.Material.Filled.Undo" Size="Size.Medium" OnClick="actionUndo" aria-label="@Loc["UNDO_TOOLTIP"]" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["REDO_TOOLTIP"]">
-            <MudIconButton Icon="@Icons.Material.Filled.Redo" Size="Size.Medium" OnClick="actionRedo" aria-label="@Loc["REDO_TOOLTIP"]" />
-        </MudTooltip>
+        <MudSpacer />
 
-        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
+        @* View: what the canvas shows *@
+        <div class="ab-group ab-hide-sm">
+            <MudTooltip Text="@Loc["SHOW_LABEL"]">
+                <MudToggleIconButton Toggled="@_labelsOn" ToggledChanged="OnLabelsToggled"
+                                     Icon="@Icons.Material.Outlined.Label" ToggledIcon="@Icons.Material.Filled.Label"
+                                     ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["SHOW_LABEL"]" />
+            </MudTooltip>
+            <MudTooltip Text="@Loc["RENDER"]">
+                <MudIconButton Icon="@Icons.Material.Outlined.Hexagon" Size="Size.Medium" OnClick="ChangeFnStyle" aria-label="@Loc["RENDER"]" />
+            </MudTooltip>
+            <MudTooltip Text="@Loc["TABLE_VIEW"]">
+                <MudToggleIconButton Toggled="@_spreadsheetOn" ToggledChanged="OnSpreadsheetToggled"
+                                     Icon="@Icons.Material.Outlined.TableChart" ToggledIcon="@Icons.Material.Filled.TableChart"
+                                     ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["TABLE_VIEW"]" />
+            </MudTooltip>
+            <MudTooltip Text="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")">
+                <MudToggleIconButton Toggled="@_agentsLevelsViewOn" ToggledChanged="OnAgentsLevelsViewToggled"
+                                     Icon="@Icons.Material.Outlined.GridView" ToggledIcon="@Icons.Material.Filled.GridView"
+                                     ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")" />
+            </MudTooltip>
+            <MudTooltip Text="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")">
+                <MudToggleIconButton Toggled="@_rightPanelOn" ToggledChanged="OnRightPanelToggled"
+                                     Icon="@Icons.Material.Outlined.Groups" ToggledIcon="@Icons.Material.Filled.Groups"
+                                     ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")" />
+            </MudTooltip>
+        </div>
 
-        @* Group *@
-        <MudTooltip Text="@L("GROUP_TOOLTIP", "Group")">
-            <MudIconButton Size="Size.Medium" OnClick="actionGroup" aria-label="@L("GROUP_TOOLTIP", "Group")">
-                <svg viewBox="5 12 90 100" style="width:20px;height:20px;">
-                    <defs>
-                        <path transform="translate(-50, -50)" id="fno" d="M 14 50 L 32 18.8 L 67.5 18.8 L 85.5 50 L 67.5 81.1 L 32 81.1 L 14 50 Z" stroke="currentColor" stroke-width="4" fill-opacity="0" />
-                    </defs>
-                    <g transform="translate(50, 50)">
-                        <use xlink:href="#fno" transform="scale(0.75)" />
-                        <use xlink:href="#fno" />
-                    </g>
-                </svg>
-            </MudIconButton>
-        </MudTooltip>
-
-        <MudDivider Vertical="true" FlexItem="true" Class="mx-1 my-2" />
-
-        @* Overflow: selection import/export, image, pdf *@
-        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Medium" Dense="true" AriaLabel="@L("MORE_ACTIONS", "More actions")" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+        @* Everything else; on narrow screens the hidden toolbar buttons appear here too *@
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Medium" Dense="true" AriaLabel="@L("MORE_ACTIONS", "More actions")" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <MudMenuItem OnClick="actionUndo" Class="ab-menu-sm" Icon="@Icons.Material.Filled.Undo">@Loc["UNDO_TOOLTIP"]</MudMenuItem>
+            <MudMenuItem OnClick="actionRedo" Class="ab-menu-sm" Icon="@Icons.Material.Filled.Redo">@Loc["REDO_TOOLTIP"]</MudMenuItem>
+            <MudMenuItem OnClick="zoomMinus" Class="ab-menu-md" Icon="@Icons.Material.Filled.ZoomOut">@Loc["ZOOM_MINUS_TOOLTIP"]</MudMenuItem>
+            <MudMenuItem OnClick="zoomPlus" Class="ab-menu-md" Icon="@Icons.Material.Filled.ZoomIn">@Loc["ZOOM_PLUS_TOOLTIP"]</MudMenuItem>
+            <MudMenuItem OnClick="ShowLabels" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.Label">@Loc["SHOW_LABEL"]</MudMenuItem>
+            <MudMenuItem OnClick="showSpreadsheet" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.TableChart">@Loc["TABLE_VIEW"]</MudMenuItem>
+            <MudMenuItem OnClick="ToggleAgentsLevelsView" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.GridView">@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")</MudMenuItem>
+            <MudMenuItem OnClick="ToggleAgentsLevelsPanel" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.Groups">@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")</MudMenuItem>
+            <MudDivider Class="ab-menu-md" />
             <MudMenuItem>
                 <div class="mud-menu-item-file">
                     <InputFile id="importSelectionBtn" OnChange="OnSelectionImport" single accept=".sxfmv" class="file-input-overlay" />
@@ -75,59 +126,14 @@
                     </div>
                 </div>
             </MudMenuItem>
-            <MudMenuItem OnClick="OnSelectionExport">
-                <div class="d-flex align-center" style="gap:8px;">
-                    <MudIcon Icon="@Icons.Material.Filled.FileDownload" Size="Size.Small" />
-                    <span>@L("EXPORT_SELECTION", "Export selection (.sxfmv)")</span>
-                </div>
-            </MudMenuItem>
+            <MudMenuItem OnClick="OnSelectionExport" Icon="@Icons.Material.Filled.FileDownload">@L("EXPORT_SELECTION", "Export selection (.sxfmv)")</MudMenuItem>
             <MudDivider />
-            <MudMenuItem OnClick="OnImageSave">
-                <div class="d-flex align-center" style="gap:8px;">
-                    <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
-                    <span>@Loc["IMAGE_TOOLTIP"]</span>
-                </div>
-            </MudMenuItem>
-            <MudMenuItem OnClick="b_showPDF">
-                <div class="d-flex align-center" style="gap:8px;">
-                    <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
-                    <span>@L("PDF_REPORT", "Report (HTML)")</span>
-                </div>
-            </MudMenuItem>
+            <MudMenuItem OnClick="OnImageSave" Icon="@Icons.Material.Outlined.Image">@Loc["IMAGE_TOOLTIP"]</MudMenuItem>
+            <MudMenuItem OnClick="b_showPDF" Icon="@Icons.Material.Outlined.Description">@L("PDF_REPORT", "Report (HTML)")</MudMenuItem>
+            <MudDivider />
+            <MudMenuItem OnClick="Recover" Icon="@Icons.Material.Filled.Restore">@Loc["RELOAD"]</MudMenuItem>
+            <MudMenuItem OnClick="ShowInfo" Icon="@Icons.Material.Outlined.Info">@Loc["INFO_TOOLTIP"]</MudMenuItem>
         </MudMenu>
-
-        <MudSpacer />
-
-        @* Right side: view toggles *@
-        <MudTooltip Text="@Loc["SHOW_LABEL"]">
-            <MudToggleIconButton Toggled="@_labelsOn" ToggledChanged="OnLabelsToggled"
-                                 Icon="@Icons.Material.Outlined.Label" ToggledIcon="@Icons.Material.Filled.Label"
-                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["SHOW_LABEL"]" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["RENDER"]">
-            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Medium" OnClick="ChangeFnStyle" aria-label="@Loc["RENDER"]" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["TABLE_VIEW"]">
-            <MudToggleIconButton Toggled="@_spreadsheetOn" ToggledChanged="OnSpreadsheetToggled"
-                                 Icon="@Icons.Material.Outlined.GridOn" ToggledIcon="@Icons.Material.Filled.GridOn"
-                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@Loc["TABLE_VIEW"]" />
-        </MudTooltip>
-        <MudTooltip Text="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")">
-            <MudToggleIconButton Toggled="@_agentsLevelsViewOn" ToggledChanged="OnAgentsLevelsViewToggled"
-                                 Icon="@Icons.Material.Outlined.AccountTree" ToggledIcon="@Icons.Material.Filled.AccountTree"
-                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["RELOAD"]">
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Medium" OnClick="Recover" aria-label="@Loc["RELOAD"]" />
-        </MudTooltip>
-        <MudTooltip Text="@Loc["INFO_TOOLTIP"]">
-            <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Medium" OnClick="ShowInfo" aria-label="@Loc["INFO_TOOLTIP"]" />
-        </MudTooltip>
-        <MudTooltip Text="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")">
-            <MudToggleIconButton Toggled="@_rightPanelOn" ToggledChanged="OnRightPanelToggled"
-                                 Icon="@Icons.Material.Outlined.Tune" ToggledIcon="@Icons.Material.Filled.Tune"
-                                 Color="Color.Default" ToggledColor="Color.Primary" Size="Size.Medium" aria-label="@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")" />
-        </MudTooltip>
     </div>
 </MudAppBar>
 
@@ -145,6 +151,10 @@
         var value = Loc[key];
         return value.ResourceNotFound ? fallback : value.Value;
     }
+
+    private string FileTitle => !stateContainer.fileLoaded || string.IsNullOrEmpty(stateContainer.fileName) || stateContainer.fileName == "FMV_new.xfmv"
+        ? L("UNTITLED", "Untitled model")
+        : Path.GetFileNameWithoutExtension(stateContainer.fileName);
 
     // Toggle state derived from StateContainer (kept in sync on each render).
     private bool _labelsOn => stateContainer.aspectLabelsDisplay != "none";
@@ -169,6 +179,12 @@
     private void ToggleAgentsLevelsView()
     {
         stateContainer.ToggleAgentsLevelsView();
+        stateContainer.fitPending = true;
+        refreshParent.InvokeAsync();
+    }
+    private void TogglePhonePanel()
+    {
+        stateContainer.phonePanelOpen = !stateContainer.phonePanelOpen;
         refreshParent.InvokeAsync();
     }
     private void ToggleAgentsLevelsPanel()
@@ -197,6 +213,8 @@
                 stateContainer.fileName,
                 saveXfmv
             );
+            stateContainer.isDirty = false;
+            await refreshParent.InvokeAsync();
         }
     }
     public async Task OnSelectionExport()
@@ -766,26 +784,36 @@
             refreshParent.InvokeAsync();
         }
     }
-    public async void zoomFill()
+    public async void zoomFill() => await FitToWindow(false);
+
+    private sealed record ViewportSize(double width, double height);
+
+    /// <summary>Scales the model so all of it is visible in the canvas area. With
+    /// <paramref name="onlyIfOverflowing"/>, a model that already fits keeps its saved zoom.</summary>
+    public async Task FitToWindow(bool onlyIfOverflowing)
     {
-        if (stateContainer.fileLoaded)
+        if (!stateContainer.fileLoaded || stateContainer.viewWidth <= 0 || stateContainer.viewHeight <= 0)
         {
-            var dimensions = await Service.getDimensions();
-            if (stateContainer.canvasWidth / stateContainer.canvasHeight > Convert.ToDouble(dimensions.width - 270) / Convert.ToDouble(dimensions.height - 90))
-            {
-                stateContainer.canvasWidth = dimensions.width - 270;
-                stateContainer.scaleZoom = stateContainer.canvasWidth / stateContainer.viewWidth;
-                stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
-            }
-            else
-            {
-                stateContainer.canvasHeight = dimensions.height - 90;
-                stateContainer.scaleZoom = stateContainer.canvasHeight / stateContainer.viewHeight;
-                stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
-            }
-            stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
-            await refreshParent.InvokeAsync();
+            return;
         }
+        var viewport = await JSRuntime.InvokeAsync<ViewportSize?>("getCanvasViewport");
+        if (viewport is null)
+        {
+            var window = await Service.getDimensions();
+            viewport = new ViewportSize(window.width - 280, window.height - 90);
+        }
+        // leave a small margin so the outermost aspects are not glued to the edge
+        var availableWidth = Math.Max(100, viewport.width - 16);
+        var availableHeight = Math.Max(100, viewport.height - 16);
+        if (onlyIfOverflowing && stateContainer.canvasWidth <= availableWidth && stateContainer.canvasHeight <= availableHeight)
+        {
+            return;
+        }
+        stateContainer.scaleZoom = Math.Min(4, Math.Min(availableWidth / stateContainer.viewWidth, availableHeight / stateContainer.viewHeight));
+        stateContainer.canvasWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+        stateContainer.canvasHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+        stateContainer.projectData_Undo[0].SelectSingleNode("//FM/Aspects/@scaleZoom")!.Value = stateContainer.scaleZoom.ToString("0.##", CultureInfo.InvariantCulture);
+        await refreshParent.InvokeAsync();
     }
     /// <summary>Keyboard entry points (Ctrl/Cmd+Z, Ctrl/Cmd+Y) used by the main page.</summary>
     public void Undo() => actionUndo();
@@ -880,6 +908,7 @@
                 stateContainer.inputDropStatus = "file-input-zone-hide";
                 stateContainer.isBackup = false;
                 await fileIsLoaded.InvokeAsync();
+                stateContainer.fitPending = true;
                 await localStorage.SetItemAsync("isBackup", false);
             }
         }

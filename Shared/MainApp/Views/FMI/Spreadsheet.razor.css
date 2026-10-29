@@ -41,17 +41,16 @@
     font-size: smaller;
 }
 ::deep th {
-    font-weight: normal;
+    font-weight: 600;
     border: thin solid var(--line-strong);
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
-    font-size: initial;
+    padding: var(--sp-1) var(--sp-2);
+    font-size: var(--fs-sm);
+    text-align: left;
 }
 ::deep td {
     border: thin solid var(--line);
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
-    font-size: smaller;
+    padding: 0 var(--sp-2);
+    font-size: var(--fs-sm);
 }
 /* Stop the last page from collapsing to the number of rows on it */
 ::deep tr {
@@ -99,46 +98,78 @@
         border-color: var(--teal-400);
         box-shadow: 0 0 0 3px var(--focus-ring);
     }
-label {
-    gap: 0.5rem;
-    border: 1px solid var(--line);
-    padding: 0 0.75rem;
-    margin-left: 0.5rem;
-    margin-bottom: 0;
-    border-radius: var(--radius-sm);
+.sheet {
+    padding: var(--sp-3);
+    min-width: 100%;
+}
+.sheet-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+}
+.sheet-toolbar-label {
+    font-size: var(--fs-sm);
+    color: var(--muted);
+}
+.sheet-toggle {
     display: inline-flex;
     align-items: center;
-    background: var(--teal-50);
-    cursor: pointer;
-    transition: border-color var(--t-fast), background-color var(--t-fast);
-}
-    label:hover {
-        border: 1px solid var(--teal-400);
-        background: var(--teal-100);
-    }
-.show-properties {
-    background: rgb(253, 168, 112, 0.75);
-    font-size: smaller;
-    margin-top: 2px;
+    gap: var(--sp-1);
+    height: var(--target-min);
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    font-size: var(--fs-sm);
     white-space: nowrap;
+    cursor: pointer;
+}
+    .sheet-toggle input {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--teal-700);
+    }
+    .sheet-toggle:hover {
+        border-color: var(--teal-400);
+    }
+.sheet-toolbar-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    margin-left: auto;
+}
+.sheet-action {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    height: var(--target-min);
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+    .sheet-action:hover {
+        background: var(--teal-50);
+        border-color: var(--teal-300);
+    }
+::deep table {
+    width: 100%;
+}
+.show-properties {
+    background: rgb(253, 168, 112, 0.35);
 }
 .show-aspects {
-    background: rgb(154, 224, 140, 0.75);
-    font-size: smaller;
-    margin-top: 2px;
-    white-space: nowrap;
+    background: rgb(154, 224, 140, 0.35);
 }
 .show-fmiprofile {
-    background: rgb(141, 180, 226, 0.75);
-    font-size: smaller;
-    margin-top: 2px;
-    white-space: nowrap;
+    background: rgb(141, 180, 226, 0.35);
 }
 .show-metadata {
-    background: rgb(180, 141, 226, 0.75);
-    font-size: smaller;
-    margin-top: 2px;
-    white-space: nowrap;
+    background: rgb(180, 141, 226, 0.35);
 }
 a {
     cursor: pointer;

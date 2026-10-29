@@ -44,6 +44,12 @@ builder.Configuration.AddJsonStream(stream);
 
 var host = builder.Build();
 
+// The UI text is English until the German translation is complete (translations are postponed);
+// pinning the UI culture keeps a German browser from mixing the few German strings into it.
+// Number formatting is unaffected (CurrentCulture stays the browser's).
+CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en");
+CultureInfo.CurrentUICulture = new CultureInfo("en");
+
 // Link the scripting engine to the central state after construction (avoids a DI cycle).
 var stateContainer = host.Services.GetRequiredService<StateContainer>();
 stateContainer.Scripting = host.Services.GetRequiredService<FRAMLab.Shared.MainApp.Services.Scripting.ScriptingService>();

@@ -3,16 +3,16 @@
 @inject IStringLocalizer<Localization.SharedResource> Loc
 
 <div class="right-sidebar">
-    <div class="v-panel pr-2">
-        <div class="d-flex align-items-center justify-content-between pb-2">
-            <strong>@PanelTitle()</strong>
+    <div class="v-panel rp-body">
+        <div class="rp-head">
+            <span class="rp-title">@PanelTitle()</span>
             <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default"
                            title="@L("CLOSE", "Close")" OnClick=Close aria-label="@L("CLOSE", "Close")" />
         </div>
 
         @if (stateContainer.rightPanel == "agents-levels")
         {
-            <MudText Typo="Typo.subtitle2" Class="mt-1 mb-1">@L("AGENTS", "Agents")</MudText>
+            <div class="sb-title rp-section">@L("AGENTS", "Agents")</div>
             @if (stateContainer.agentList.Count == 0)
             {
                 <MudText Typo="Typo.caption" Class="d-block mt-1 mb-2" Style="color:var(--muted)">@L("NO_AGENTS", "No agents created.")</MudText>
@@ -32,7 +32,7 @@
                             <small class="text-muted">@agent.AgentType</small>
                         }
                     </div>
-                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Class="rp-delete"
                                    title="@L("DELETE_AGENT", "Delete agent")" OnClick="@(() => DeleteAgent(agent))" aria-label="@L("DELETE_AGENT", "Delete agent")" />
                 </div>
             }
@@ -40,12 +40,12 @@
                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true" />
             <MudTextField T="string" @bind-Value="newAgentType" Label="@L("AGENT_TYPE", "Type (optional)")"
                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1" Immediate="true" />
-            <input type="color" class="form-control form-control-sm mt-1 entity-color-input-wide" title="@L("NEW_AGENT_COLOR", "New agent color")" @bind="newAgentColor" />
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" FullWidth="true" Class="mt-1"
+            <label class="rp-color">@L("NEW_AGENT_COLOR", "Colour")<input type="color" class="entity-color-input" @bind="newAgentColor" /></label>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" FullWidth="true" Class="mt-2" DropShadow="false"
                        Disabled="@(string.IsNullOrWhiteSpace(newAgentName))" OnClick=AddAgent>@L("ADD_AGENT", "Add agent")</MudButton>
 
-            <MudDivider Class="mt-3 mb-2" />
-            <MudText Typo="Typo.subtitle2" Class="mt-1 mb-1">@L("LEVELS", "Levels")</MudText>
+            
+            <div class="sb-title rp-section">@L("LEVELS", "Levels")</div>
             @if (stateContainer.levelList.Count == 0)
             {
                 <MudText Typo="Typo.caption" Class="d-block mt-1 mb-2" Style="color:var(--muted)">@L("NO_LEVELS", "No levels created.")</MudText>
@@ -62,16 +62,16 @@
                         <span class="text-truncate">@level.Name</span>
                         <small class="text-muted">@L("HIERARCHY", "Hierarchy") @level.Hierarchy</small>
                     </div>
-                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Class="rp-delete"
                                    title="@L("DELETE_LEVEL", "Delete level")" OnClick="@(() => DeleteLevel(level))" aria-label="@L("DELETE_LEVEL", "Delete level")" />
                 </div>
             }
             <MudTextField T="string" @bind-Value="newLevelName" Label="@L("LEVEL_NAME", "Level name")"
                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true" />
-            <MudNumericField T="int" @bind-Value="newLevelHierarchy" Label="@L("HIERARCHY", "Hierarchy")"
+            <MudNumericField T="int" @bind-Value="newLevelHierarchy" Label="@L("HIERARCHY", "Hierarchy")" HelperText="@L("HIERARCHY_HINT", "0 = top row")"
                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1" Immediate="true" />
-            <input type="color" class="form-control form-control-sm mt-1 entity-color-input-wide" title="@L("NEW_LEVEL_COLOR", "New level color")" @bind="newLevelColor" />
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" FullWidth="true" Class="mt-1"
+            <label class="rp-color">@L("NEW_LEVEL_COLOR", "Colour")<input type="color" class="entity-color-input" @bind="newLevelColor" /></label>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" FullWidth="true" Class="mt-2" DropShadow="false"
                        Disabled="@(string.IsNullOrWhiteSpace(newLevelName))" OnClick=AddLevel>@L("ADD_LEVEL", "Add level")</MudButton>
         }
     </div>
