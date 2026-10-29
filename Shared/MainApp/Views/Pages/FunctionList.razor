@@ -1,0 +1,111 @@
+@using MudBlazor
+@inject StateContainer stateContainer
+@inject IJSRuntime JSRuntime
+@inject IStringLocalizer<Localization.SharedResource> Loc
+
+@* Left panel: every function of the model, searchable; a click selects it and scrolls the canvas to it. *@
+<div class="fl">
+    <div class="fl-head">
+        <span class="sb-title">@L("FUNCTIONS_SHORT", "Functions") <span class="fl-total">@stateContainer.functionList.Count</span></span>
+        <button id="newFnButton" type="button" class="sb-btn sb-btn-primary fl-new" title="@Loc["NEW_TOOLTIP"]"
+                @onclick=newFunction @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup="(e) => nextFn.InvokeAsync(e)">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />@L("NEW_FUNCTION", "New")
+        </button>
+    </div>
+    <label class="fl-search">
+        <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
+        <input id="functionSearch" type="search" placeholder="@L("SEARCH_FUNCTIONS", "Search functions")" @bind="filter" @bind:event="oninput" @onkeyup:stopPropagation />
+    </label>
+    @if (!stateContainer.fileLoaded)
+    {
+        <p class="sb-hint">@L("NO_MODEL_HINT", "Open a model (.xfmv) or create the first function with + New.")</p>
+    }
+    else
+    {
+        var usage = stateContainer.fmiUsage();
+        var items = Filtered().ToList();
+        <ul class="fl-list" role="listbox" aria-label="@L("FUNCTIONS_SHORT", "Functions")">
+            @foreach (var fn in items)
+            {
+                var selected = fn.IDNr == stateContainer.selectedFn || stateContainer.selectedMulti.Contains(fn.IDNr);
+                var agent = stateContainer.agentList.Find(a => a.IDNr == fn.AgentId);
+                <li role="option" aria-selected="@selected" class="fl-item @(selected ? "selected" : "") @(fn.wasActive ? "was-active" : "")"
+                    title="@fn.Description" @onclick="@((e) => Select(e, fn))">
+                    <span class="fl-swatch" style="--fn-colour:@Swatch(fn)"></span>
+                    <span class="fl-text">
+                        <span class="fl-name">@(string.IsNullOrEmpty(fn.IDName) ? $"Function {fn.IDNr}" : fn.IDName)</span>
+                        <span class="fl-meta">@TypeLabel(fn)@(agent is null ? "" : $" · {agent.Name}")</span>
+                    </span>
+                    <span class="fl-badges">
+                        @if (usage.HasScript(fn.IDNr)) { <span class="fl-badge fmi-chip-st">ST</span> }
+                        @if (usage.CallsMacros(fn.IDNr)) { <span class="fl-badge fmi-chip-macro">ƒ</span> }
+                        @if (usage.ReadsData(fn.IDNr)) { <span class="fl-badge fmi-chip-api">API</span> }
+                    </span>
+                </li>
+            }
+        </ul>
+        @if (items.Count == 0)
+        {
+            <p class="sb-hint">@L("NO_MATCH", "No function matches.")</p>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback refreshParent { get; set; }
+    [Parameter] public EventCallback newFunction { get; set; }
+    [Parameter] public EventCallback<KeyboardEventArgs> nextFn { get; set; }
+
+    private string filter = "";
+
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
+
+    private IEnumerable<Function> Filtered() => stateContainer.functionList
+        .Where(fn => string.IsNullOrWhiteSpace(filter) || (fn.IDName ?? "").Contains(filter.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(fn => int.TryParse(fn.IDNr, out var n) ? n : int.MaxValue);
+
+    // Entry / Exit / Background come from the FMI run; before a run every function is plain.
+    private static string TypeLabel(Function fn) => fn.fmiType switch
+    {
+        "Entry" => "Entry",
+        "Exit" => "Exit",
+        "Background" => "Background",
+        "Passthrough" or "Foreground" => "Foreground",
+        _ => fn.FunctionType == "2" ? "Background" : "Function"
+    };
+
+    private static string Swatch(Function fn) => string.IsNullOrEmpty(fn.fnColorValue) || fn.fnColorValue == "none" ? "transparent" : fn.fnColorValue;
+
+    private async Task Select(MouseEventArgs e, Function fn)
+    {
+        if ((e.CtrlKey || e.MetaKey) && (stateContainer.selectedFn != "-1" || stateContainer.selectedMulti.Count > 0))
+        {
+            // add to / remove from a multi-selection, as on the canvas
+            if (stateContainer.selectedFn != "-1")
+            {
+                var first = stateContainer.selectedFn;
+                stateContainer.selectedFn = "-1";
+                stateContainer.selectedMulti.Add(first);
+            }
+            if (!stateContainer.selectedMulti.Remove(fn.IDNr)) stateContainer.selectedMulti.Add(fn.IDNr);
+        }
+        else
+        {
+            if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction?.IDName == "")
+            {
+                stateContainer.defaultFnLabel();
+            }
+            stateContainer.selectedLabel = "";
+            stateContainer.selectedFn = fn.IDNr;
+            stateContainer.fnName = fn.IDName;
+            stateContainer.isDisabled = false;
+            stateContainer.phonePanelOpen = false;
+            await JSRuntime.InvokeVoidAsync("scrollCanvasTo", fn.x * stateContainer.scaleZoom, fn.y * stateContainer.scaleZoom);
+        }
+        await refreshParent.InvokeAsync();
+    }
+}

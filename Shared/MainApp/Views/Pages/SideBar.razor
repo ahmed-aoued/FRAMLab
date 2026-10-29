@@ -7,108 +7,139 @@
 @using System.Linq
 @using System.Globalization
 
-<div class="sidebar @(stateContainer.showKeys != "" ? "sidebar-keys-open" : "") @(stateContainer.phonePanelOpen ? "sidebar-phone-open" : "")">
-    <div class="sidebar-editor v-panel">
-        <div class="sb-head">
-            <span class="sb-title">@L("FUNCTION", "Function")</span>
-            <button id="newFnButton" type="button" class="sb-btn sb-btn-primary" title="@Loc["NEW_TOOLTIP"]" tabindex="3"
-                    @onclick=newFunction @onfocusin=@(() => stateContainer.isDisabled = false) @onkeyup=NextFn>
-                <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />@L("NEW_FUNCTION", "New")
+<aside class="inspector @(stateContainer.phonePanelOpen ? "inspector-phone-open" : "")" aria-label="@L("INSPECTOR", "Inspector")">
+    <div class="insp-tabs" role="tablist">
+        @foreach (var (tab, label, icon) in Tabs)
+        {
+            <button type="button" role="tab" aria-selected="@(stateContainer.inspectorTab == tab)" class="insp-tab @(stateContainer.inspectorTab == tab ? "active" : "")"
+                    @onclick="@(() => SetTab(tab))">
+                <MudIcon Icon="@icon" Size="Size.Small" />@label
             </button>
-        </div>
-        <MudTextField @key="@("fnname-" + stateContainer.selectedFn)" T="string" InputId="fnNameText"
-                      Value="@stateContainer.fnName" ValueChanged="OnFnNameChanged"
-                      Label="@Loc["NAME_FN"]" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      Disabled="@stateContainer.isDisabled" tabindex="4"
-                      Immediate="false" Class="sb-field" />
-        <MudTextField @key="@("fndesc-" + stateContainer.selectedFn)" T="string"
-                      Value="@(stateContainer.selectedFunction?.Description ?? "")" ValueChanged="OnFnDescChanged"
-                      Label="@Loc["FN_DESCRIPTION"]" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      Disabled="@stateContainer.isDisabled" tabindex="5"
-                      Lines="2" MaxLines="5" Sizing="InputSizing.Auto" Class="sb-field sb-field-desc" />
-
-        @if (!HasSelection)
-        {
-            <p class="sb-hint">@L("SELECT_FN_HINT", "Select a function on the canvas, or create a new one, to edit its aspects.")</p>
         }
-        else
+    </div>
+    <div class="insp-body">
+        @if (stateContainer.inspectorTab == "function")
         {
-            <div class="sb-head">
-                <span class="sb-title">@L("ASPECTS", "Aspects")</span>
-            </div>
-            @foreach (var type in AspectTypes)
+            @if (!HasSelection)
             {
-                @AspectGroup(type)
-            }
-
-            <div class="sb-head">
-                <span class="sb-title">@L("ORGANISATION", "Organisation")</span>
-            </div>
-            @if (stateContainer.agentList.Count == 0 && stateContainer.levelList.Count == 0)
-            {
-                <p class="sb-hint">
-                    @L("NO_AGENTS_LEVELS_HINT", "No agents or levels yet.")
-                    <button type="button" class="sb-link" @onclick=OpenAgentsLevelsPanel>@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")</button>
-                </p>
+                <div class="insp-empty">
+                    <svg class="insp-empty-mark" viewBox="0 0 100 100" aria-hidden="true"><path d="M 8 50 L 29 13.6 L 71 13.6 L 92 50 L 71 86.4 L 29 86.4 Z" /></svg>
+                    <p>@L("SELECT_FN_HINT", "Select a function on the canvas, or create a new one, to edit its aspects.")</p>
+                    @if (stateContainer.selectedMulti.Count > 1)
+                    {
+                        <p><strong>@stateContainer.selectedMulti.Count</strong> @L("FUNCTIONS_SELECTED", "functions selected.")</p>
+                        <button type="button" class="sb-btn sb-btn-tonal" @onclick="ModalColor"><MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" />@L("COLOUR_BUTTON", "Colour")</button>
+                    }
+                </div>
             }
             else
             {
-                <MudSelect T="string" Value="@(stateContainer.selectedFunction!.AgentId)" ValueChanged="OnAgentChanged"
-                           Label="@L("AGENT", "Agent")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
-                           Clearable="true" Class="sb-field" tabindex="33">
-                    @foreach (var agent in stateContainer.agentList)
-                    {
-                        <MudSelectItem T="string" Value="@agent.IDNr">@agent.Name</MudSelectItem>
-                    }
-                </MudSelect>
-                <MudSelect T="string" Value="@(stateContainer.selectedFunction!.LevelId)" ValueChanged="OnLevelChanged"
-                           Label="@L("LEVEL", "Level")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
-                           Clearable="true" Class="sb-field" tabindex="34">
-                    @foreach (var level in stateContainer.levelList.OrderBy(l => l.Hierarchy).ThenBy(l => l.Name))
-                    {
-                        <MudSelectItem T="string" Value="@level.IDNr">@level.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            }
+                <MudTextField @key="@("fnname-" + stateContainer.selectedFn)" T="string" InputId="fnNameText"
+                              Value="@stateContainer.fnName" ValueChanged="OnFnNameChanged"
+                              Label="@Loc["NAME_FN"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Disabled="@stateContainer.isDisabled" tabindex="4"
+                              Immediate="false" Class="sb-field" />
+                <MudTextField @key="@("fndesc-" + stateContainer.selectedFn)" T="string"
+                              Value="@(stateContainer.selectedFunction?.Description ?? "")" ValueChanged="OnFnDescChanged"
+                              Label="@Loc["FN_DESCRIPTION"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Disabled="@stateContainer.isDisabled" tabindex="5"
+                              Lines="2" MaxLines="6" Sizing="InputSizing.Auto" Class="sb-field sb-field-desc" />
 
-            <div class="sb-head">
-                <span class="sb-title">@L("SCRIPT_AND_LOOK", "Script & appearance")</span>
-            </div>
-            <div class="sb-row">
-                @* Stash the model on pointer-down, then open the IDE. The click handler is explicit
-                   so that browsers/embedded views that suppress window.open (target="_blank") still
-                   navigate to the IDE in the current tab instead of silently doing nothing. *@
-                <a class="sb-btn sb-btn-tonal sb-grow" title="@L("SCRIPT_TOOLTIP", "Open the ST script editor for this function")" tabindex="27"
-                   href="@ScriptEditorUrl"
-                   @onpointerdown="PrepareScriptIDE"
-                   @onclick="OpenScriptIDE"
-                   @onclick:preventDefault>
-                    <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" />
-                    @(HasScript ? L("EDIT_SCRIPT", "Edit script") : L("ADD_SCRIPT", "Add script"))
-                </a>
-                <button type="button" class="sb-btn sb-btn-tonal sb-grow" title="@Loc["FN_COLOUR"]" tabindex="25" @onclick="ModalColor" @onkeyup="ModalKey">
-                    <MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" />@L("COLOUR_BUTTON", "Colour")
-                </button>
-            </div>
+                <div class="sb-head">
+                    <span class="sb-title">@L("ASPECTS", "Aspects")</span>
+                </div>
+                @foreach (var type in AspectTypes)
+                {
+                    @AspectGroup(type)
+                }
+
+                <div class="sb-head">
+                    <span class="sb-title">@L("ORGANISATION", "Organisation")</span>
+                </div>
+                @if (stateContainer.agentList.Count == 0 && stateContainer.levelList.Count == 0)
+                {
+                    <p class="sb-hint">
+                        @L("NO_AGENTS_LEVELS_HINT", "No agents or levels yet.")
+                        <button type="button" class="sb-link" @onclick="@(() => SetTab("model"))">@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")</button>
+                    </p>
+                }
+                else
+                {
+                    <div class="sb-pair">
+                        <MudSelect T="string" Value="@(stateContainer.selectedFunction!.AgentId)" ValueChanged="OnAgentChanged"
+                                   Label="@L("AGENT", "Agent")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                                   Clearable="true" Class="sb-field" tabindex="33">
+                            @foreach (var agent in stateContainer.agentList)
+                            {
+                                <MudSelectItem T="string" Value="@agent.IDNr">@agent.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="string" Value="@(stateContainer.selectedFunction!.LevelId)" ValueChanged="OnLevelChanged"
+                                   Label="@L("LEVEL", "Level")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                                   Clearable="true" Class="sb-field" tabindex="34">
+                            @foreach (var level in stateContainer.levelList.OrderBy(l => l.Hierarchy).ThenBy(l => l.Name))
+                            {
+                                <MudSelectItem T="string" Value="@level.IDNr">@level.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                }
+
+                <div class="sb-head">
+                    <span class="sb-title">@L("SCRIPT_AND_LOOK", "Script & appearance")</span>
+                </div>
+                <div class="sb-row">
+                    @* Stash the model on pointer-down, then open the IDE. The click handler is explicit
+                       so that browsers/embedded views that suppress window.open (target="_blank") still
+                       navigate to the IDE in the current tab instead of silently doing nothing. *@
+                    <a class="sb-btn sb-btn-tonal sb-grow" title="@L("SCRIPT_TOOLTIP", "Open the ST script editor for this function")" tabindex="27"
+                       href="@ScriptEditorUrl"
+                       @onpointerdown="PrepareScriptIDE"
+                       @onclick="OpenScriptIDE"
+                       @onclick:preventDefault>
+                        <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" />
+                        @(HasScript ? L("EDIT_SCRIPT", "Edit script") : L("ADD_SCRIPT", "Add script"))
+                    </a>
+                    <button type="button" class="sb-btn sb-btn-tonal sb-grow" title="@Loc["FN_COLOUR"]" tabindex="25" @onclick="ModalColor" @onkeyup="ModalKey">
+                        <MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" />@L("COLOUR_BUTTON", "Colour")
+                    </button>
+                </div>
+            }
         }
-        <div class="sb-row sb-textsize">
-            <span class="sb-label">@L("TEXT_SIZE", "Text size")</span>
-            <span class="sb-stepper" title="@L("TEXT_SIZE_FN", "Function labels (whole model)")">
-                <span class="sb-stepper-label">@L("FUNCTIONS_SHORT", "Fn")</span>
-                <button type="button" class="sb-step" title=@Loc["FN_FONT_DECREASE"] tabindex="1" @onclick=zoomFs @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>−</button>
-                <button type="button" class="sb-step" title=@Loc["FN_FONT_INCREASE"] tabindex="2" @onclick=zoomFl @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>+</button>
-            </span>
-            <span class="sb-stepper" title="@L("TEXT_SIZE_ASPECT", "Aspect labels (whole model)")">
-                <span class="sb-stepper-label">@L("ASPECTS_SHORT", "Asp")</span>
-                <button type="button" class="sb-step" title=@Loc["ASPECT_FONT_DECREASE"] tabindex="23" @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>−</button>
-                <button type="button" class="sb-step" title=@Loc["ASPECT_FONT_INCREASE"] tabindex="24" @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>+</button>
-            </span>
-        </div>
+        else if (stateContainer.inspectorTab == "equations")
+        {
+            @if (HasSelection)
+            {
+                <div class="insp-context">
+                    <span class="sb-title">@L("EQUATIONS_OF", "Keys of")</span>
+                    <strong>@stateContainer.selectedFunction!.IDName</strong>
+                </div>
+            }
+            <FMIControl Mode="@stateContainer.activeMode" Part="keys" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
+        }
+        else
+        {
+            <div class="sb-head"><span class="sb-title">@L("SIMULATION", "Simulation")</span></div>
+            <FMIControl Mode="@stateContainer.activeMode" Part="model" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
+
+            <div class="sb-head"><span class="sb-title">@L("TEXT_SIZE", "Text size (whole model)")</span></div>
+            <div class="sb-row sb-textsize-row">
+                <span class="sb-stepper" title="@L("TEXT_SIZE_FN", "Function labels")">
+                    <span class="sb-stepper-label">@L("FUNCTIONS_SHORT", "Functions")</span>
+                    <button type="button" class="sb-step" title=@Loc["FN_FONT_DECREASE"] @onclick=zoomFs @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>−</button>
+                    <button type="button" class="sb-step" title=@Loc["FN_FONT_INCREASE"] @onclick=zoomFl @onfocusin=zoomFin @onfocusout=zoomFout @onkeyup=NextFn>+</button>
+                </span>
+                <span class="sb-stepper" title="@L("TEXT_SIZE_ASPECT", "Aspect labels")">
+                    <span class="sb-stepper-label">@L("ASPECTS_SHORT", "Aspects")</span>
+                    <button type="button" class="sb-step" title=@Loc["ASPECT_FONT_DECREASE"] @onclick=zoomAs @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>−</button>
+                    <button type="button" class="sb-step" title=@Loc["ASPECT_FONT_INCREASE"] @onclick=zoomAl @onfocusin=zoomAin @onfocusout=zoomAout @onkeyup=NextFn>+</button>
+                </span>
+            </div>
+
+            <RightPanel Embedded="true" refreshParent="refreshParent" />
+        }
     </div>
-    <div class="sidebar-run">
-        <FMIControl Mode="@stateContainer.activeMode" refreshParent="@(EventCallback.Factory.Create(this, updateAll))" />
-    </div>
-</div>
+</aside>
 
 @code {
     [Parameter]
@@ -123,6 +154,19 @@
     private string oldZoomText = "";
 
     private string ScriptEditorUrl => $"scripteditor/{stateContainer.selectedFn}";
+
+    private (string Tab, string Label, string Icon)[] Tabs =>
+    [
+        ("function", L("FUNCTION", "Function"), Icons.Material.Outlined.Hexagon),
+        ("equations", L("EQUATIONS", "Equations"), Icons.Material.Outlined.Functions),
+        ("model", L("MODEL", "Model"), Icons.Material.Outlined.Tune),
+    ];
+
+    private void SetTab(string tab)
+    {
+        stateContainer.inspectorTab = tab;
+        refreshParent.InvokeAsync();
+    }
 
     private static readonly string[] AspectTypes = { "Output", "Input", "Precondition", "Resource", "Control", "Time" };
     private bool HasSelection => stateContainer.selectedFn != "-1" && stateContainer.selectedFunction is not null;

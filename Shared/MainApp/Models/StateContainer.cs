@@ -236,6 +236,12 @@ namespace FRAMLab.Shared
         public bool isDirty { get; set; } = false;
         /// <summary>Phones only: whether the editing panel is slid in over the canvas.</summary>
         public bool phonePanelOpen { get; set; } = false;
+        /// <summary>Bottom panel under the canvas: "" (closed), "log" or "table".</summary>
+        public string bottomPanel { get; set; } = "";
+        /// <summary>Inspector tab on the right: "function", "equations" or "model".</summary>
+        public string inspectorTab { get; set; } = "function";
+        /// <summary>Whether the function list on the left is shown.</summary>
+        public bool leftPanelOpen { get; set; } = true;
         public string inputDropStatus { get; set; } = "file-input-zone-drop";
         public string debugOutput { get; set; } = "";
         public bool isBackup { get; set; } = false;

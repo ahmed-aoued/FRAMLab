@@ -483,4 +483,52 @@
   <data name="DESKTOP_ONLY_TITLE" xml:space="preserve">
     <value>Best on a larger screen</value>
   </data>
+  <data name="FUNCTION_LIST" xml:space="preserve">
+    <value>Function list</value>
+  </data>
+  <data name="INSPECTOR" xml:space="preserve">
+    <value>Inspector</value>
+  </data>
+  <data name="EQUATIONS" xml:space="preserve">
+    <value>Equations</value>
+  </data>
+  <data name="MODEL" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="EQUATIONS_OF" xml:space="preserve">
+    <value>Keys of</value>
+  </data>
+  <data name="FUNCTIONS_SELECTED" xml:space="preserve">
+    <value>functions selected.</value>
+  </data>
+  <data name="SEARCH_FUNCTIONS" xml:space="preserve">
+    <value>Search functions</value>
+  </data>
+  <data name="NO_MODEL_HINT" xml:space="preserve">
+    <value>Open a model (.xfmv) or create the first function with + New.</value>
+  </data>
+  <data name="NO_MATCH" xml:space="preserve">
+    <value>No function matches.</value>
+  </data>
+  <data name="BOTTOM_PANEL" xml:space="preserve">
+    <value>Run log and table</value>
+  </data>
+  <data name="RESTORE_PANEL" xml:space="preserve">
+    <value>Restore panel size</value>
+  </data>
+  <data name="MAXIMISE_PANEL" xml:space="preserve">
+    <value>Maximise panel</value>
+  </data>
+  <data name="HIDE_PANEL" xml:space="preserve">
+    <value>Hide panel</value>
+  </data>
+  <data name="SHOW_PANEL" xml:space="preserve">
+    <value>Show panel</value>
+  </data>
+  <data name="DISPLAY_SETUP" xml:space="preserve">
+    <value>Display</value>
+  </data>
+  <data name="LINK_CSV" xml:space="preserve">
+    <value>Link CSV</value>
+  </data>
 </root>

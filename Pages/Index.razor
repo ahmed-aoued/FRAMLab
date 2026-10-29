@@ -42,29 +42,17 @@
     <FMISetup OnClose="ModalClose"></FMISetup>
 }
 <MenuBar @ref="menuBar" refreshParent="refreshParent" onInputFileChange="OnInputFileChange" fileIsLoaded="FileIsLoaded" />
-<SideBar refreshParent="refreshParent" newFunction="NewFunction" nextFn="NextFn" />
-@if (stateContainer.rightPanel != "")
+<div class="shell @(stateContainer.leftPanelOpen ? "" : "shell-left-closed") @(stateContainer.bottomPanel != "" ? "shell-bottom-open" : "")">
+@if (stateContainer.leftPanelOpen)
 {
-    <RightPanel refreshParent="refreshParent" />
+    <aside class="shell-left" aria-label="Functions">
+        <FunctionList refreshParent="refreshParent" newFunction="NewFunction" nextFn="NextFn" />
+    </aside>
 }
-@if (!phoneNoticeDismissed)
-{
-    <div class="phone-notice" role="status">
-        <MudBlazor.MudIcon Icon="@MudBlazor.Icons.Material.Outlined.DesktopWindows" Size="MudBlazor.Size.Small" />
-        <span>@Loc["PHONE_NOTICE"]</span>
-        <button type="button" class="sb-btn sb-btn-tonal" @onclick="DismissPhoneNotice">@Loc["DISMISS"]</button>
-    </div>
-}
+<div class="shell-center">
 <div id="mainWindow" class="main" @onkeyup=NextFn @onkeydown=OnKeyDown tabindex="0">
-    @if (stateContainer.spreadsheetVisible > 0)
-    {
-        <div class="main-visualiser @(stateContainer.spreadsheetVisible==1?"main-half-s":"")">
-            <Spreadsheet @ref="spreadsheet" refreshParent="refreshParent"></Spreadsheet>
-        </div>
-    }
-    @if (stateContainer.spreadsheetVisible != 2)
-    {
-        <div class="main-visualiser @(stateContainer.spreadsheetVisible==1?"main-half-m":"")" touch-action=@stateContainer.touchAction>
+    @{
+        <div class="main-visualiser" touch-action=@stateContainer.touchAction>
             @if (stateContainer.inputDropStatus == "file-input-zone-drop")
             {
                 <div class="file-input-zone-drop"><InputFile OnChange="OnInputFileChange" single accept=".xfmv" title=@Loc["OPEN_TOOLTIP"] /></div>
@@ -169,17 +157,27 @@
             <p>
                 @stateContainer.debugOutput
             </p>
-            <!-- for testing purposes <button class="btn btn-menu oi oi-image" @onclick=GetExample></button> -->
         </div>
     }
 </div>
+<BottomPanel refreshParent="refreshParent" />
+</div>
+<SideBar refreshParent="refreshParent" newFunction="NewFunction" nextFn="NextFn" />
+</div>
+@if (!phoneNoticeDismissed)
+{
+    <div class="phone-notice" role="status">
+        <MudBlazor.MudIcon Icon="@MudBlazor.Icons.Material.Outlined.DesktopWindows" Size="MudBlazor.Size.Small" />
+        <span>@Loc["PHONE_NOTICE"]</span>
+        <button type="button" class="sb-btn sb-btn-tonal" @onclick="DismissPhoneNotice">@Loc["DISMISS"]</button>
+    </div>
+}
 
 @code {
     public int maxFn = -1;
     public double newFnX = -40;
     public double newFnY = 0;
     public bool isNewModel = true;
-    protected Spreadsheet? spreadsheet;
     protected MenuBar? menuBar;
     private static Func<string, string, Task>? UpdateFileContent;
 
@@ -271,6 +269,13 @@
         if (firstRender)
         {
             UpdateFileContent = OpenFileContent;
+            // the function list starts closed where it would squeeze the canvas
+            try
+            {
+                var window = await JSRuntime.InvokeAsync<BrowserDimension>("getDimensions");
+                if (window.width < 1200) stateContainer.leftPanelOpen = false;
+            }
+            catch { }
             try { phoneNoticeDismissed = await localStorage.GetItemAsync<bool>("framlab.phoneNoticeDismissed"); } catch { phoneNoticeDismissed = false; }
             if (!phoneNoticeDismissed) StateHasChanged();
             // Listen for the Script IDE tab saving the model back.
@@ -285,6 +290,11 @@
         }
         else
         {
+            if (focusFnNameAfterRender)
+            {
+                focusFnNameAfterRender = false;
+                await JSRuntime.InvokeVoidAsync("focusInput", "fnNameText");
+            }
             if (stateContainer.fitPending && stateContainer.fileLoaded && menuBar is not null)
             {
                 stateContainer.fitPending = false;
@@ -343,6 +353,7 @@
     }
     private void NewFunction()
     {
+        stateContainer.inspectorTab = "function"; // the name field of the new function lives there
         if (stateContainer.selectedFn != "-1" && stateContainer.selectedFunction?.IDName == "")
         {
             stateContainer.defaultFnLabel();
@@ -474,9 +485,9 @@
         stateContainer.functionList.Add(new Function(itemF));
         stateContainer.selectedFn = maxFn.ToString();
         stateContainer.fnName = "";
-        FocusElement("fnNameText");
-        ClearElement("fnNameText");
+        focusFnNameAfterRender = true; // the inspector renders the name field of the new function first
     }
+    private bool focusFnNameAfterRender = false;
     private async Task OnInputFileChange(InputFileChangeEventArgs e)
     {
         stateContainer.debugOutput = "File loading ...";

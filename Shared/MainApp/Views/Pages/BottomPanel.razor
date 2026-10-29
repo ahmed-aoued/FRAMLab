@@ -1,0 +1,95 @@
+@using MudBlazor
+@inject StateContainer stateContainer
+@inject IJSRuntime JSRuntime
+@inject IStringLocalizer<Localization.SharedResource> Loc
+
+@* Under the canvas: what you watch while the model runs (log) or compare across functions (table).
+   Closed, only the tab strip shows. *@
+<section class="bottom-panel @(Open ? "open" : "") @(maximised && Open ? "max" : "")" aria-label="@L("BOTTOM_PANEL", "Run log and table")">
+    <div class="bp-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="@(stateContainer.bottomPanel == "log")" class="bp-tab @(stateContainer.bottomPanel == "log" ? "active" : "")" @onclick="@(() => Show("log"))">
+            <MudIcon Icon="@Icons.Material.Outlined.Article" Size="Size.Small" />@Loc["FMI_SHOW_LOG"]
+            @if (Problems > 0)
+            {
+                <span class="bp-count bp-count-warn" title="Warnings and errors">@Problems</span>
+            }
+            else if (stateContainer.fmiLog.Count > 0)
+            {
+                <span class="bp-count">@stateContainer.fmiLog.Count</span>
+            }
+        </button>
+        <button type="button" role="tab" aria-selected="@(stateContainer.bottomPanel == "table")" class="bp-tab @(stateContainer.bottomPanel == "table" ? "active" : "")" @onclick="@(() => Show("table"))">
+            <MudIcon Icon="@Icons.Material.Outlined.TableChart" Size="Size.Small" />@Loc["TABLE_VIEW"]
+        </button>
+        <span class="bp-spacer"></span>
+        @if (Open && stateContainer.bottomPanel == "log")
+        {
+            <button type="button" class="fmi-icon-btn" title="@Loc["SAVE_TOOLTIP"]: log as text" @onclick="SaveLog"><MudIcon Icon="@Icons.Material.Outlined.FileDownload" Size="Size.Small" /></button>
+        }
+        @if (Open)
+        {
+            <button type="button" class="fmi-icon-btn" title="@(maximised ? L("RESTORE_PANEL", "Restore panel size") : L("MAXIMISE_PANEL", "Maximise panel"))" @onclick="@(() => maximised = !maximised)">
+                <MudIcon Icon="@(maximised ? Icons.Material.Filled.CloseFullscreen : Icons.Material.Filled.OpenInFull)" Size="Size.Small" />
+            </button>
+        }
+        <button type="button" class="fmi-icon-btn" title="@(Open ? L("HIDE_PANEL", "Hide panel") : L("SHOW_PANEL", "Show panel"))" @onclick="ToggleOpen">
+            <MudIcon Icon="@(Open ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)" Size="Size.Small" />
+        </button>
+    </div>
+    @if (Open)
+    {
+        <div class="bp-body">
+            @if (stateContainer.bottomPanel == "log")
+            {
+                <FmiLogView OnSelectFunction="SelectFunction" />
+            }
+            else if (stateContainer.fileLoaded)
+            {
+                <Spreadsheet refreshParent="refreshParent" />
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public EventCallback refreshParent { get; set; }
+
+    private bool maximised = false;
+    private string lastTab = "log";
+    private bool Open => stateContainer.bottomPanel != "";
+    private int Problems => stateContainer.fmiLog.Count(e => e.Level != FmiLogLevel.Info);
+
+    private string L(string key, string fallback)
+    {
+        var value = Loc[key];
+        return value.ResourceNotFound ? fallback : value.Value;
+    }
+
+    private async Task Show(string tab)
+    {
+        // clicking the active tab closes the panel, like an editor's bottom panel
+        stateContainer.bottomPanel = stateContainer.bottomPanel == tab ? "" : tab;
+        if (tab != "") lastTab = tab;
+        await refreshParent.InvokeAsync();
+    }
+
+    private async Task ToggleOpen()
+    {
+        stateContainer.bottomPanel = Open ? "" : lastTab;
+        await refreshParent.InvokeAsync();
+    }
+
+    private async Task SelectFunction(string functionId)
+    {
+        stateContainer.selectedLabel = "";
+        stateContainer.selectedFn = functionId;
+        stateContainer.fnName = stateContainer.selectedFunction?.IDName ?? "";
+        stateContainer.isDisabled = false;
+        await refreshParent.InvokeAsync();
+    }
+
+    private async Task SaveLog()
+    {
+        await JSRuntime.InvokeAsync<object>("FileSaveAs", stateContainer.fileName.Replace(".xfmv", "-fmilog.txt"), stateContainer.fmiMessage);
+    }
+}

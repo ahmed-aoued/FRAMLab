@@ -11,9 +11,11 @@
 
 <MudAppBar Fixed="true" Dense="true" Elevation="0" Class="framlab-appbar">
     <div class="ab-bar">
-        @* Phones: the editing panel slides in over the canvas *@
-        <MudIconButton Icon="@(stateContainer.phonePanelOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" Size="Size.Medium"
-                       Class="ab-show-sm" OnClick="TogglePhonePanel" aria-label="@L("FUNCTION", "Function")" />
+        <MudTooltip Text="@L("FUNCTION_LIST", "Function list")">
+            <MudToggleIconButton Toggled="@stateContainer.leftPanelOpen" ToggledChanged="OnLeftPanelToggled"
+                                 Icon="@Icons.Material.Outlined.ViewSidebar" ToggledIcon="@Icons.Material.Filled.ViewSidebar"
+                                 ToggledColor="Color.Primary" Size="Size.Medium" Class="ab-hide-sm ab-flip" aria-label="@L("FUNCTION_LIST", "Function list")" />
+        </MudTooltip>
         @* Brand and the open model's name; the dot marks unsaved changes *@
         <div class="ab-brand" title="@FileTitle">
             <svg class="ab-logo" viewBox="0 0 100 100" aria-hidden="true">
@@ -61,7 +63,7 @@
             </MudTooltip>
         </div>
 
-        <div class="ab-group">
+        <div class="ab-group ab-hide-sm">
             <span class="ab-hide-md">
                 <MudTooltip Text="@Loc["ZOOM_MINUS_TOOLTIP"]">
                     <MudIconButton Icon="@Icons.Material.Filled.ZoomOut" Size="Size.Medium" OnClick="zoomMinus" aria-label="@Loc["ZOOM_MINUS_TOOLTIP"]" />
@@ -77,10 +79,16 @@
             </span>
         </div>
 
+        @* Run the model: always visible, like a simulator's transport bar *@
+        <div class="ab-group ab-run">
+            <FMIControl Part="run" Mode="@stateContainer.activeMode" refreshParent="refreshParent" />
+        </div>
+
         <MudSpacer />
 
         @* View: what the canvas shows *@
         <div class="ab-group ab-hide-sm">
+            <span class="ab-hide-lg">
             <MudTooltip Text="@Loc["SHOW_LABEL"]">
                 <MudToggleIconButton Toggled="@_labelsOn" ToggledChanged="OnLabelsToggled"
                                      Icon="@Icons.Material.Outlined.Label" ToggledIcon="@Icons.Material.Filled.Label"
@@ -89,6 +97,7 @@
             <MudTooltip Text="@Loc["RENDER"]">
                 <MudIconButton Icon="@Icons.Material.Outlined.Hexagon" Size="Size.Medium" OnClick="ChangeFnStyle" aria-label="@Loc["RENDER"]" />
             </MudTooltip>
+            </span>
             <MudTooltip Text="@Loc["TABLE_VIEW"]">
                 <MudToggleIconButton Toggled="@_spreadsheetOn" ToggledChanged="OnSpreadsheetToggled"
                                      Icon="@Icons.Material.Outlined.TableChart" ToggledIcon="@Icons.Material.Filled.TableChart"
@@ -106,13 +115,18 @@
             </MudTooltip>
         </div>
 
+        @* Phones: the inspector slides in over the canvas *@
+        <MudIconButton Icon="@(stateContainer.phonePanelOpen ? Icons.Material.Filled.Close : Icons.Material.Outlined.EditNote)" Size="Size.Medium"
+                       Class="ab-show-sm" OnClick="TogglePhonePanel" aria-label="@L("INSPECTOR", "Inspector")" />
         @* Everything else; on narrow screens the hidden toolbar buttons appear here too *@
         <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Medium" Dense="true" AriaLabel="@L("MORE_ACTIONS", "More actions")" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
             <MudMenuItem OnClick="actionUndo" Class="ab-menu-sm" Icon="@Icons.Material.Filled.Undo">@Loc["UNDO_TOOLTIP"]</MudMenuItem>
             <MudMenuItem OnClick="actionRedo" Class="ab-menu-sm" Icon="@Icons.Material.Filled.Redo">@Loc["REDO_TOOLTIP"]</MudMenuItem>
+            <MudMenuItem OnClick="zoomFill" Class="ab-menu-sm" Icon="@Icons.Material.Filled.FitScreen">@Loc["ZOOM_FULLSCREEN"]</MudMenuItem>
             <MudMenuItem OnClick="zoomMinus" Class="ab-menu-md" Icon="@Icons.Material.Filled.ZoomOut">@Loc["ZOOM_MINUS_TOOLTIP"]</MudMenuItem>
             <MudMenuItem OnClick="zoomPlus" Class="ab-menu-md" Icon="@Icons.Material.Filled.ZoomIn">@Loc["ZOOM_PLUS_TOOLTIP"]</MudMenuItem>
-            <MudMenuItem OnClick="ShowLabels" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.Label">@Loc["SHOW_LABEL"]</MudMenuItem>
+            <MudMenuItem OnClick="ShowLabels" Class="ab-menu-lg" Icon="@Icons.Material.Outlined.Label">@Loc["SHOW_LABEL"]</MudMenuItem>
+            <MudMenuItem OnClick="ChangeFnStyle" Class="ab-menu-lg" Icon="@Icons.Material.Outlined.Hexagon">@Loc["RENDER"]</MudMenuItem>
             <MudMenuItem OnClick="showSpreadsheet" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.TableChart">@Loc["TABLE_VIEW"]</MudMenuItem>
             <MudMenuItem OnClick="ToggleAgentsLevelsView" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.GridView">@L("AGENTS_LEVELS_VIEW", "Agents & Levels view")</MudMenuItem>
             <MudMenuItem OnClick="ToggleAgentsLevelsPanel" Class="ab-menu-sm" Icon="@Icons.Material.Outlined.Groups">@L("MANAGE_AGENTS_LEVELS", "Manage agents and levels")</MudMenuItem>
@@ -158,9 +172,9 @@
 
     // Toggle state derived from StateContainer (kept in sync on each render).
     private bool _labelsOn => stateContainer.aspectLabelsDisplay != "none";
-    private bool _spreadsheetOn => stateContainer.spreadsheetVisible > 0;
+    private bool _spreadsheetOn => stateContainer.bottomPanel == "table";
     private bool _agentsLevelsViewOn => stateContainer.AgentsLevelsViewActive;
-    private bool _rightPanelOn => stateContainer.rightPanel == "agents-levels";
+    private bool _rightPanelOn => stateContainer.inspectorTab == "model";
 
     private void OnLabelsToggled(bool _) => ShowLabels();
     private void OnSpreadsheetToggled(bool _) => showSpreadsheet();
@@ -169,11 +183,14 @@
 
     public void showSpreadsheet()
     {
-        stateContainer.spreadsheetVisible += 1;
-        if (stateContainer.spreadsheetVisible > 2)
-        {
-            stateContainer.spreadsheetVisible = 0;
-        }
+        // the table lives in the bottom panel under the canvas
+        stateContainer.bottomPanel = stateContainer.bottomPanel == "table" ? "" : "table";
+        refreshParent.InvokeAsync();
+    }
+    private void OnLeftPanelToggled(bool open)
+    {
+        stateContainer.leftPanelOpen = open;
+        stateContainer.fitPending = true;
         refreshParent.InvokeAsync();
     }
     private void ToggleAgentsLevelsView()
@@ -189,7 +206,9 @@
     }
     private void ToggleAgentsLevelsPanel()
     {
-        stateContainer.rightPanel = stateContainer.rightPanel == "agents-levels" ? "" : "agents-levels";
+        // agents and levels are managed in the inspector's Model tab
+        stateContainer.inspectorTab = stateContainer.inspectorTab == "model" ? "function" : "model";
+        stateContainer.phonePanelOpen = stateContainer.inspectorTab == "model" || stateContainer.phonePanelOpen;
         refreshParent.InvokeAsync();
     }
     public async void OnFileSave()
@@ -805,8 +824,14 @@
         // leave a small margin so the outermost aspects are not glued to the edge
         var availableWidth = Math.Max(100, viewport.width - 16);
         var availableHeight = Math.Max(100, viewport.height - 16);
-        if (onlyIfOverflowing && stateContainer.canvasWidth <= availableWidth && stateContainer.canvasHeight <= availableHeight)
+        // the model size at the current zoom (the canvas size can be stale after a layout switch)
+        var currentWidth = stateContainer.viewWidth * stateContainer.scaleZoom;
+        var currentHeight = stateContainer.viewHeight * stateContainer.scaleZoom;
+        if (onlyIfOverflowing && currentWidth <= availableWidth && currentHeight <= availableHeight)
         {
+            stateContainer.canvasWidth = currentWidth;
+            stateContainer.canvasHeight = currentHeight;
+            await refreshParent.InvokeAsync();
             return;
         }
         stateContainer.scaleZoom = Math.Min(4, Math.Min(availableWidth / stateContainer.viewWidth, availableHeight / stateContainer.viewHeight));

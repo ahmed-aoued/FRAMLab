@@ -33,6 +33,13 @@
                 height: window.innerHeight
             };
         };
+        // Scroll the canvas so a point (canvas pixels) is centred, e.g. a function picked from the list
+        window.scrollCanvasTo = function (x, y) {
+            const host = document.getElementById('canvas_1')?.parentElement;
+            if (!host) return;
+            const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            host.scrollTo({ left: Math.max(0, x - host.clientWidth / 2), top: Math.max(0, y - host.clientHeight / 2), behavior: smooth ? 'smooth' : 'auto' });
+        };
         // Visible size of the area that holds the model canvas (excludes side panels and toolbar)
         window.getCanvasViewport = function () {
             const host = document.getElementById('canvas_1')?.parentElement;
@@ -43,17 +50,19 @@
     <script src="OpenFile.js"></script>
     <script type="text/javascript">
         function focusInput(id) {
-            document.getElementById(id).focus();
+            document.getElementById(id)?.focus(); // the element may not be rendered yet
         }
     </script>
     <script type="text/javascript">
         function clearInput(id) {
-            document.getElementById(id).value = '';
+            const el = document.getElementById(id);
+            if (el) el.value = '';
         }
     </script>
     <script type="text/javascript">
         function setInput(id, text) {
-            document.getElementById(id).value = text;
+            const el = document.getElementById(id);
+            if (el) el.value = text;
         }
     </script>
     <script type="text/javascript">

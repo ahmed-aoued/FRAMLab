@@ -483,4 +483,52 @@
   <data name="DESKTOP_ONLY_TITLE" xml:space="preserve">
     <value>Am besten auf einem größeren Bildschirm</value>
   </data>
+  <data name="FUNCTION_LIST" xml:space="preserve">
+    <value>Funktionsliste</value>
+  </data>
+  <data name="INSPECTOR" xml:space="preserve">
+    <value>Eigenschaften</value>
+  </data>
+  <data name="EQUATIONS" xml:space="preserve">
+    <value>Gleichungen</value>
+  </data>
+  <data name="MODEL" xml:space="preserve">
+    <value>Modell</value>
+  </data>
+  <data name="EQUATIONS_OF" xml:space="preserve">
+    <value>Schlüssel von</value>
+  </data>
+  <data name="FUNCTIONS_SELECTED" xml:space="preserve">
+    <value>Funktionen ausgewählt.</value>
+  </data>
+  <data name="SEARCH_FUNCTIONS" xml:space="preserve">
+    <value>Funktionen suchen</value>
+  </data>
+  <data name="NO_MODEL_HINT" xml:space="preserve">
+    <value>Öffnen Sie ein Modell (.xfmv) oder legen Sie mit + Neu die erste Funktion an.</value>
+  </data>
+  <data name="NO_MATCH" xml:space="preserve">
+    <value>Keine passende Funktion.</value>
+  </data>
+  <data name="BOTTOM_PANEL" xml:space="preserve">
+    <value>Ablaufprotokoll und Tabelle</value>
+  </data>
+  <data name="RESTORE_PANEL" xml:space="preserve">
+    <value>Ursprüngliche Größe</value>
+  </data>
+  <data name="MAXIMISE_PANEL" xml:space="preserve">
+    <value>Bereich maximieren</value>
+  </data>
+  <data name="HIDE_PANEL" xml:space="preserve">
+    <value>Bereich ausblenden</value>
+  </data>
+  <data name="SHOW_PANEL" xml:space="preserve">
+    <value>Bereich einblenden</value>
+  </data>
+  <data name="DISPLAY_SETUP" xml:space="preserve">
+    <value>Anzeige</value>
+  </data>
+  <data name="LINK_CSV" xml:space="preserve">
+    <value>CSV verknüpfen</value>
+  </data>
 </root>

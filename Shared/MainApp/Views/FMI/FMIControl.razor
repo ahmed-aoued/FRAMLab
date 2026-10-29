@@ -7,7 +7,31 @@
 @inject ILogger<FMIControl> Logger
 
 @{ var usage = stateContainer.fmiUsage(); }
+@if (Part == "run")
+{
+    @* Compact run controls for the app bar *@
+    <div class="fmi-run-bar">
+        <button type="button" class="fmi-icon-btn fmi-reset" title=@Loc["FMI_RESET"] @onclick=bFMI_reset><MudIcon Icon="@Icons.Material.Filled.RestartAlt" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_STEP"] @onclick=bFMI_step><MudIcon Icon="@Icons.Material.Filled.SkipNext" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn fmi-icon-btn-primary" title=@(isPlaying ? L("FMI_STOP", "Stop") : Loc["FMI_PLAY"]) @onclick=bFMI_start>
+            <MudIcon Icon="@(isPlaying ? Icons.Material.Filled.Stop : Icons.Material.Filled.PlayArrow)" Size="Size.Small" />
+        </button>
+        <label class="fmi-speed fmi-speed-compact" title=@Loc["FMI_DELAY"]>
+            <MudIcon Icon="@Icons.Material.Outlined.Timer" Size="Size.Small" />
+            <input id="fmiCycleDelay" name="fmiCycleDelay" type="range" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" />
+            <span class="fmi-speed-value">@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s", CultureInfo.InvariantCulture))</span>
+        </label>
+        <span class="fmi-cycle-badge @(stateContainer.cycleFMI > -1 ? "" : "idle")" title="@L("CURRENT_CYCLE", "Current cycle")">@L("CYCLE", "Cycle") @(stateContainer.cycleFMI > -1 ? stateContainer.cycleFMI.ToString() : "–")</span>
+        <span class="fmi-tool-sep"></span>
+        <button type="button" class="fmi-icon-btn fmi-hl" title=@Loc["FMI_SHOW_ACTIVATED"] @onclick=bFMI_wasActive><MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn fmi-hl" title=@Loc["FMI_NOT_ACTIVATED"] @onclick=bFMI_notActive><MudIcon Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" /></button>
+    </div>
+}
+else
+{
 <div class="fmi-panel">
+    @if (Part == "all")
+    {
     <div class="fmi-head">
         <span class="sb-title">@L("SIMULATION", "Simulation")</span>
         @if (stateContainer.cycleFMI > -1)
@@ -27,6 +51,9 @@
             <span class="fmi-speed-value">@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s", CultureInfo.InvariantCulture))</span>
         </label>
     </div>
+    }
+    @if (Part == "all" || Part == "model")
+    {
     @* what the model uses besides plain equations; click to open FMI Setup *@
     <div class="fmi-chip-row">
         <button type="button" class="fmi-chip @(usage.UsesScripts ? "fmi-chip-st" : "")" title="Functions with an ST script" @onclick=bFMI_setup>ST @usage.ScriptFunctions.Count</button>
@@ -37,6 +64,30 @@
             <input type="checkbox" checked="@stateContainer.fmiPrevVariables" @onchange="@((e) => stateContainer.fmiPrevVariables = (bool)(e.Value ?? false))" /> Prev_*
         </label>
     </div>
+    }
+    @if (Part == "model")
+    {
+    <div class="fmi-run-row">
+        <label class="fmi-speed" title=@Loc["FMI_DELAY"]>
+            <MudIcon Icon="@Icons.Material.Outlined.Timer" Size="Size.Small" />
+            <input id="fmiCycleDelayModel" name="fmiCycleDelayModel" type="range" @bind="stateContainer.cycleDelay" @bind:event="oninput" min="0" max="1500" step="250" />
+            <span class="fmi-speed-value">@(((double)stateContainer.cycleDelay / 1000).ToString("0.0#s", CultureInfo.InvariantCulture))</span>
+        </label>
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_SHOW_ACTIVATED"] @onclick=bFMI_wasActive><MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Small" /></button>
+        <button type="button" class="fmi-icon-btn" title=@Loc["FMI_NOT_ACTIVATED"] @onclick=bFMI_notActive><MudIcon Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" /></button>
+    </div>
+    <div class="fmi-model-actions">
+        <button type="button" class="sb-btn sb-btn-tonal" title="FMI Setup: variables, macros and data sources" @onclick=bFMI_setup><MudIcon Icon="@Icons.Material.Outlined.Build" Size="Size.Small" />FMI Setup</button>
+        <button type="button" class="sb-btn sb-btn-tonal" title="Tracer colours and values shown on the canvas" @onclick=bFMI_results><MudIcon Icon="@Icons.Material.Outlined.Speed" Size="Size.Small" />@L("DISPLAY_SETUP", "Display")</button>
+        <button type="button" class="sb-btn sb-btn-tonal" title=@Loc["FMI_SHOW_LOG"] @onclick=bFMI_showlog><MudIcon Icon="@Icons.Material.Outlined.Article" Size="Size.Small" />@Loc["FMI_SHOW_LOG"]</button>
+        <span class="sb-btn sb-btn-tonal fmi-file-btn" title="Link a CSV file for lookup() and xref()">
+            <InputFile id="fmiDataImportBtn" OnChange="bFMI_dataImport" single accept=".csv" />
+            <MudIcon Icon="@Icons.Material.Outlined.TableView" Size="Size.Small" />@L("LINK_CSV", "Link CSV")
+        </span>
+    </div>
+    }
+    @if (Part == "all")
+    {
     <div class="fmi-tool-row">
         <button type="button" class="fmi-icon-btn" title=@Loc["FMI_SHOW_ACTIVATED"] tabindex="26" @onclick=bFMI_wasActive><MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Small" /></button>
         <button type="button" class="fmi-icon-btn" title=@Loc["FMI_NOT_ACTIVATED"] tabindex="26" @onclick=bFMI_notActive><MudIcon Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" /></button>
@@ -54,7 +105,8 @@
         <span>@L("KEYS_EQUATIONS", "Keys & equations")</span>
         <MudIcon Icon="@(stateContainer.showKeys != "" ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)" Size="Size.Small" Class="ml-auto" />
     </button>
-@if (stateContainer.showKeys != "")
+    }
+@if (Part == "keys" || (Part == "all" && stateContainer.showKeys != ""))
 {
     <div class="fmi-keys-tools">
         <label class="fmi-stop-after" title=@cycleTooltip()>
@@ -130,12 +182,17 @@
     }
 }
 </div>
+}
 
 @code {
     [Parameter]
     public EventCallback refreshParent { get; set; }
     [Parameter]
     public string Mode { get; set; } = "Basic";
+    /// <summary>Which part to render: "all" (the whole panel), "run" (compact run controls),
+    /// "model" (feature chips and model-wide tools) or "keys" (keys and equations).</summary>
+    [Parameter]
+    public string Part { get; set; } = "all";
 
     /// <summary>The run loop lives in FmiRunEngine (testable without the UI); this component drives it.</summary>
     // Localization helper: falls back to a default English string if the resx key is missing.
@@ -691,7 +748,8 @@
     }
     private void bFMI_showlog()
     {
-        stateContainer.showFMIPopup = !stateContainer.showFMIPopup;
+        if (Part == "all") stateContainer.showFMIPopup = !stateContainer.showFMIPopup;
+        else stateContainer.bottomPanel = stateContainer.bottomPanel == "log" ? "" : "log";
         refreshParent.InvokeAsync();
     }
     private void bFMI_setup()

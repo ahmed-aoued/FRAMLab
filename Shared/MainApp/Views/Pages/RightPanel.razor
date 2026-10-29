@@ -2,15 +2,18 @@
 @inject StateContainer stateContainer
 @inject IStringLocalizer<Localization.SharedResource> Loc
 
-<div class="right-sidebar">
-    <div class="v-panel rp-body">
-        <div class="rp-head">
-            <span class="rp-title">@PanelTitle()</span>
-            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default"
-                           title="@L("CLOSE", "Close")" OnClick=Close aria-label="@L("CLOSE", "Close")" />
-        </div>
+<div class="@(Embedded ? "rp-embedded" : "right-sidebar")">
+    <div class="@(Embedded ? "" : "v-panel rp-body")">
+        @if (!Embedded)
+        {
+            <div class="rp-head">
+                <span class="rp-title">@PanelTitle()</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Default"
+                               title="@L("CLOSE", "Close")" OnClick=Close aria-label="@L("CLOSE", "Close")" />
+            </div>
+        }
 
-        @if (stateContainer.rightPanel == "agents-levels")
+        @if (Embedded || stateContainer.rightPanel == "agents-levels")
         {
             <div class="sb-title rp-section">@L("AGENTS", "Agents")</div>
             @if (stateContainer.agentList.Count == 0)
@@ -80,6 +83,9 @@
 @code {
     [Parameter]
     public EventCallback refreshParent { get; set; }
+    /// <summary>Rendered inside the inspector's Model tab instead of as its own panel.</summary>
+    [Parameter]
+    public bool Embedded { get; set; }
 
     private string L(string key, string fallback)
     {
