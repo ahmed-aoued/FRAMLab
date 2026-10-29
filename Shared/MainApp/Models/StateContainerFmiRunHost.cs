@@ -36,6 +36,7 @@ namespace FRAMLab.Shared
 
         public void StartLog()
         {
+            state.SyncScriptAspects(); // a new run: pick up aspects added or renamed since the model was loaded
             state.clearFmiLog();
             state.appendFmiLog($"FRAM Model Interpreter - FMI Basic  -----  (c) Erik Hollnagel, 2020\nFMI session log: {DateTime.Now}\n\n");
             state.flushFmiDiagnostics(includeLoad: true); // definition + cycle-0 diagnostics

@@ -1,0 +1,554 @@
+<?xml version='1.0' encoding='utf-8'?>
+<FM Version="0,3,0,0">
+  <Functions tracer_1="Ice_risk" colour_10="0" colour_11="0.25" colour_12="0.5" colour_13="0.75" colour_14="1" c_10_value="#40CFFF" c_12_value="#FFFF00" c_14_value="#F00000" tracer_2="Surface_temp" colour_20="-6" colour_21="-3" colour_22="0" colour_23="3" colour_24="6" c_20_value="#F00000" c_22_value="#FFFF00" c_24_value="#40CFFF" tracer_3="Salt_stock" colour_30="0" colour_31="40" colour_32="80" colour_33="100" colour_34="120" c_30_value="#F00000" c_32_value="#FFFF00" c_34_value="#28F000" typeFMIdisplay="|Blend|Blend|Ratio|Blend|Blend|Blend" hideFMIhighlight="false" hideFMIdisplaytext="false" tracer_4="" tracer_5="" tracer_6="">
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="2" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="40" y="210" agentId="0" levelId="2" style="custom" color="13166078">
+      <IDNr>0</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Monitor the weather</IDName>
+      <metadata>
+        <Air_temp active="true" equation="api(&quot;weather&quot;, &quot;current.temperature_2m&quot;)">0</Air_temp>
+        <Humidity active="true" equation="api(&quot;weather&quot;, &quot;current.relative_humidity_2m&quot;)">0</Humidity>
+        <Dew_point active="true" equation="api(&quot;weather&quot;, &quot;current.dew_point_2m&quot;)">0</Dew_point>
+        <Precipitation active="true" equation="api(&quot;weather&quot;, &quot;current.precipitation&quot;)">0</Precipitation>
+        <Night_min active="true" equation="api(&quot;weather&quot;, &quot;daily.temperature_2m_min[0]&quot;)">0</Night_min>
+        <Hyperlink active="" equation="">https://open-meteo.com/</Hyperlink>
+      </metadata>
+      <Description>Entry function. Reads the live weather at the A8 Albaufstieg from Open-Meteo (api() in equations, read on activation). Fires at the start and then every 2nd cycle.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="220" y="40" agentId="1" levelId="2">
+      <IDNr>1</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Measure road surface temperature</IDName>
+      <metadata>
+        <Surface_min active="" equation="">0</Surface_min>
+        <Sensor_count active="" equation="">4</Sensor_count>
+      </metadata>
+      <Description>Background function. Four road sensors along the climb, each colder than the air by a fixed amount (bridge, shaded cutting, ...). The ST script keeps a rolling 4 x 3 table of readings (Static 2-D array) and shares the coldest value ever seen through a script Global. It reads the weather LIVE (latest value at the moment of the read).</Description>
+      <script enabled="true" language="ST" version="1">(* Road sensors: each segment is colder than the air by its offset.
+   Readings[segment, slot] is a rolling window over the last three cycles. *)
+Air := API('weather', 'current.temperature_2m');
+Offsets := [0.5, 1.5, 2.5, 1.0];
+FOR Seg := 0 TO 3 DO
+    Readings[Seg, Slot] := Air - Offsets[Seg];
+END_FOR;
+
+(* coldest segment in the newest column *)
+Surface_min := Readings[0, Slot];
+FOR Seg := 1 TO 3 DO
+    IF Readings[Seg, Slot] &lt; Surface_min THEN
+        Surface_min := Readings[Seg, Slot];
+    END_IF;
+END_FOR;
+Surface_min := ROUND(Surface_min * 10.0) / 10.0;   (* sensors report to 0.1 C *)
+Coldest_surface := MIN(Coldest_surface, Surface_min);
+
+Slot := (Slot + 1) MOD 3;
+Print('sensors: coldest segment ', Surface_min, ' C, coldest so far ', Coldest_surface, ' C');
+</script>
+      <variables>
+        <var name="Readings" scope="Static" type="REAL" array="true" dims="2" />
+        <var name="Slot" scope="Static" type="INT" init="0" />
+        <var name="Offsets" scope="Temp" type="REAL" array="true" />
+        <var name="Air" scope="Temp" type="REAL" init="0" />
+        <var name="Seg" scope="Temp" type="INT" init="0" />
+        <var name="Surface_min" scope="Temp" type="REAL" init="0" output="true" />
+      </variables>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="240" y="210" agentId="3" levelId="1" style="custom" color="16766976">
+      <IDNr>2</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Assess ice risk</IDName>
+      <metadata>
+        <Surface_temp active="true" equation="R1_Surface_min - Global_Demo_offset">0</Surface_temp>
+        <Dew_spread active="true" equation="Surface_temp - I0_Dew_point + Global_Demo_offset">0</Dew_spread>
+        <Ice_risk active="true" equation="iceRisk(Surface_temp, Dew_spread, I0_Precipitation, C3_Freeze_threshold)">0</Ice_risk>
+        <Ice_risk_assessment active="true" equation="Ice_risk">0</Ice_risk_assessment>
+      </metadata>
+      <Description>Combines weather, road sensors and the authority's criteria into an ice risk between 0 and 1, using the macros iceRisk() and clamp01(). Global_Demo_offset (set by the authority) lowers the surface temperature so the whole chain can be shown on a mild day.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="240" y="390" agentId="2" levelId="0">
+      <IDNr>3</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Set ice risk criteria</IDName>
+      <metadata>
+        <Freeze_threshold active="" equation="">1</Freeze_threshold>
+        <Global_Demo_offset active="" equation="">6</Global_Demo_offset>
+        <Global_Salt_per_km active="" equation="">0.02</Global_Salt_per_km>
+      </metadata>
+      <Description>Background function (policy). The highway authority's thresholds. Global_* keys are visible to every function. Set Global_Demo_offset to 0 to use the real weather only; the default of 6 C makes the full gritting chain run even on a mild day.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="440" y="40" agentId="4" levelId="2">
+      <IDNr>4</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Keep crew on standby</IDName>
+      <metadata>
+        <Drivers active="" equation="">4</Drivers>
+        <Fatigue active="true" equation="min(1, Cycle * 0.1)">0</Fatigue>
+      </metadata>
+      <Description>Background function. Drivers on call during the night; fatigue grows with every cycle.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="460" y="210" agentId="3" levelId="1" style="custom" color="16761035">
+      <IDNr>5</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Decide on gritting</IDName>
+      <metadata>
+        <Risk_level active="" equation="">0</Risk_level>
+        <Decision active="" equation="">none</Decision>
+        <Routes_to_grit active="" equation="">0</Routes_to_grit>
+        <Activate active="" equation="">Ice warning</Activate>
+        <Variable active="" equation="">0</Variable>
+      </metadata>
+      <Description>The duty manager's decision. The ST script turns the ice risk into a level with CASE, writes the Activate key (which outputs fire: gritting order and/or ice warning) and the Variable key (level 3 marks the function as variable in FRAM terms).</Description>
+      <script enabled="true" language="ST" version="1">(* Levels: 0 no action, 1 monitor, 2 grit main routes, 3 grit all routes. *)
+Risk := Ice_risk_assessment;
+Risk_level := TRUNC(Risk * 4.0);
+IF Risk_level &gt; 3 THEN
+    Risk_level := 3;
+END_IF;
+(* the sensors already saw frost tonight: be one level more careful *)
+IF Coldest_surface &lt; 0.0 AND Risk_level &lt; 3 THEN
+    Risk_level := Risk_level + 1;
+END_IF;
+
+CASE Risk_level OF
+    0:    Decision := 'no action';         Routes_to_grit := 0;
+    1:    Decision := 'monitor';           Routes_to_grit := 0;
+    2:    Decision := 'grit main routes';  Routes_to_grit := 2;
+    3:    Decision := 'grit all routes';   Routes_to_grit := 4;
+END_CASE;
+
+(* which outputs fire *)
+IF Routes_to_grit &gt; 0 THEN
+    Activate := 'Gritting order, Ice warning';
+ELSE
+    Activate := 'Ice warning';
+END_IF;
+IF Risk_level &gt;= 3 THEN
+    Variable := 1;
+ELSE
+    Variable := 0;
+END_IF;
+Print('decision: ', Decision, ' (risk ', Risk, ', level ', Risk_level, ')');
+</script>
+      <variables>
+        <var name="Risk" scope="Temp" type="REAL" init="0" />
+        <var name="Risk_level" scope="Temp" type="INT" init="0" output="true" />
+        <var name="Decision" scope="Temp" type="STRING" init="none" output="true" />
+        <var name="Routes_to_grit" scope="Temp" type="INT" init="0" output="true" />
+        <var name="Activate" scope="Temp" type="STRING" init="Ice warning" output="true" />
+        <var name="Variable" scope="Temp" type="INT" init="0" output="true" />
+      </variables>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="680" y="210" agentId="4" levelId="2">
+      <IDNr>6</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Load salt onto trucks</IDName>
+      <metadata>
+        <Trucks active="true" equation="min(I5_Routes_to_grit, R4_Drivers)">0</Trucks>
+        <Salt_loaded active="true" equation="saltTonnes(Trucks * 25)">0</Salt_loaded>
+        <Loaded_trucks active="true" equation="Trucks">0</Loaded_trucks>
+        <Hold active="" equation="">Salt stock</Hold>
+      </metadata>
+      <Description>One truck per route, limited by the drivers on duty. saltTonnes() is a macro visible only to this function. Hold keeps the depot's salt stock coupling.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="460" y="390" agentId="2" levelId="1">
+      <IDNr>7</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Run the shift clock</IDName>
+      <metadata>
+        <Shift_count active="true" equation="Shift_count + 1">0</Shift_count>
+        <Minutes_to_rush_hour active="true" equation="max(0, 360 - Cycle * 30)">360</Minutes_to_rush_hour>
+        <Rush_hour_temp active="true" equation="api(&quot;forecast&quot;, &quot;6.temperature_2m&quot;)">0</Rush_hour_temp>
+        <Rain_chance active="true" equation="api(&quot;forecast&quot;, &quot;6.precipitation_probability&quot;)">0</Rain_chance>
+      </metadata>
+      <Description>Background function. Counts night shifts (a typed, persistent model variable), the minutes to the morning rush hour, and reads the hourly forecast for 06:00 from a CSV data source.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="680" y="40" agentId="4" levelId="2">
+      <IDNr>8</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Manage the salt depot</IDName>
+      <metadata>
+        <Salt_stock active="true" equation="max(0, Salt_stock - 3)">120</Salt_stock>
+        <Reorder active="true" equation="Salt_stock &lt; 100 ? 1 : 0">0</Reorder>
+      </metadata>
+      <Description>Background function. Salt_stock is a typed variable that persists between cycles: other districts draw 3 t from the depot every time it is evaluated.</Description>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="9" groupActive="" groupX="" groupY="" x="900" y="210" agentId="4" levelId="2" style="custom" color="9498256">
+      <IDNr>9</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Grit priority routes</IDName>
+      <metadata>
+        <Roads_treated active="" equation="">0</Roads_treated>
+        <Passes active="" equation="">0</Passes>
+      </metadata>
+      <Description>Group parent (with Load salt onto trucks). The ST script spreads salt over each route and segment (Temp 2-D array) and checks the wind ON EXIT: the data is captured after this function activates and used the next time it runs.</Description>
+      <script enabled="true" language="ST" version="1">(* Each truck takes one priority route of five segments.
+   Treated[route, segment] = tonnes of salt spread on that segment. *)
+Trucks := TRUNC(Loaded_trucks);
+Km := 0.0;
+FOR Route := 0 TO Trucks - 1 DO
+    FOR Segment := 0 TO 4 DO
+        Treated[Route, Segment] := Route_plan / 5.0 * 0.02;
+        Km := Km + Route_plan / 5.0;
+    END_FOR;
+END_FOR;
+
+(* extra passes on the steep climb, unless strong wind blows the salt away *)
+Wind := API('weather', 'current.wind_speed_10m');
+Passes := 1;
+WHILE Passes &lt; 3 DO
+    IF Wind &gt; 40.0 THEN
+        EXIT;
+    END_IF;
+    Passes := Passes + 1;
+END_WHILE;
+
+Roads_treated := ROUND(Km * 10.0) / 10.0;   (* report to 0.1 km *)
+Print('gritted ', Roads_treated, ' km with ', Trucks, ' trucks, ', Passes, ' passes on the climb, wind ', Wind, ' km/h');
+Print('salt per route and segment: ', Treated);
+</script>
+      <variables>
+        <var name="Trucks" scope="Temp" type="INT" init="0" />
+        <var name="Km" scope="Temp" type="REAL" init="0" />
+        <var name="Route" scope="Temp" type="INT" init="0" />
+        <var name="Segment" scope="Temp" type="INT" init="0" />
+        <var name="Treated" scope="Temp" type="REAL" array="true" dims="2" />
+        <var name="Wind" scope="Temp" type="REAL" init="0" />
+        <var name="Passes" scope="Temp" type="INT" init="1" output="true" />
+      </variables>
+    </Function>
+    <Function fnStyle="0" isInput="false" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="900" y="40" agentId="2" levelId="0">
+      <IDNr>10</IDNr>
+      <FunctionType>2</FunctionType>
+      <IDName>Plan priority routes</IDName>
+      <metadata>
+        <Route_plan active="" equation="">12</Route_plan>
+        <Routes active="" equation="">4</Routes>
+      </metadata>
+      <Description>Background function. Each priority route is 12 km. (A route table could also be read with lookup()/xref() from a CSV imported in the FMI panel.)</Description>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="1120" y="210" agentId="3" levelId="1">
+      <IDNr>11</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Report road condition</IDName>
+      <metadata>
+        <Km_total active="true" equation="Isum_Roads_treated">0</Km_total>
+        <Report active="true" equation="Km_total &gt; 0 ? &quot;roads treated&quot; : &quot;no treatment&quot;" />
+      </metadata>
+      <Description>Exit function. Uses the aggregate Isum_Roads_treated and a REPEAT loop to estimate how long the treatment lasts.</Description>
+      <script enabled="true" language="ST" version="1">(* the salt loses half its effect every three hours *)
+Hours := 0;
+Effect := 1.0;
+REPEAT
+    Effect := Effect / 2.0;
+    Hours := Hours + 3;
+UNTIL Effect &lt; 0.2
+END_REPEAT;
+Print('report: ', Roads_treated, ' km treated, effective for about ', Hours, ' h');
+</script>
+      <variables>
+        <var name="Hours" scope="Temp" type="INT" init="0" />
+        <var name="Effect" scope="Temp" type="REAL" init="1" />
+      </variables>
+    </Function>
+    <Function fnStyle="0" isInput="true" orphans="0" profileFn="" profileI="" profileP="" profileR="" profileC="" profileT="" groupType="" groupIDNr="" groupActive="" groupX="" groupY="" x="680" y="390" agentId="5" levelId="0">
+      <IDNr>12</IDNr>
+      <FunctionType>0</FunctionType>
+      <IDName>Warn road users</IDName>
+      <metadata>
+        <Message active="true" equation="I5_Risk_level &gt;= 3 ? &quot;Black ice on the A8 climb&quot; : (I5_Risk_level &gt;= 2 ? &quot;Risk of black ice&quot; : &quot;Roads may be slippery&quot;)" />
+        <Hyperlink active="" equation="">https://www.autobahn.de/</Hyperlink>
+      </metadata>
+      <Description>Exit function. The traffic information service publishes a warning; its text depends on the duty manager's risk level (nested ?:).</Description>
+    </Function>
+  </Functions>
+  <Inputs>
+    <Input orphan="false">
+      <IDNr>0</IDNr>
+      <IDName>Weather observation</IDName>
+      <FunctionIDNr>2</FunctionIDNr>
+      <Description />
+    </Input>
+    <Input orphan="false">
+      <IDNr>1</IDNr>
+      <IDName>Ice risk assessment</IDName>
+      <FunctionIDNr>5</FunctionIDNr>
+      <Description />
+    </Input>
+    <Input orphan="false">
+      <IDNr>2</IDNr>
+      <IDName>Gritting order</IDName>
+      <FunctionIDNr>6</FunctionIDNr>
+      <Description />
+    </Input>
+    <Input orphan="false">
+      <IDNr>3</IDNr>
+      <IDName>Loaded trucks</IDName>
+      <FunctionIDNr>9</FunctionIDNr>
+      <Description />
+    </Input>
+    <Input orphan="false">
+      <IDNr>4</IDNr>
+      <IDName>Roads treated</IDName>
+      <FunctionIDNr>11</FunctionIDNr>
+      <Description />
+    </Input>
+    <Input orphan="false">
+      <IDNr>5</IDNr>
+      <IDName>Ice warning</IDName>
+      <FunctionIDNr>12</FunctionIDNr>
+      <Description />
+    </Input>
+  </Inputs>
+  <Outputs>
+    <Output orphan="false">
+      <IDNr>0</IDNr>
+      <IDName>Weather observation</IDName>
+      <FunctionIDNr>0</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>1</IDNr>
+      <IDName>Road surface data</IDName>
+      <FunctionIDNr>1</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>2</IDNr>
+      <IDName>Ice risk assessment</IDName>
+      <FunctionIDNr>2</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>3</IDNr>
+      <IDName>Ice risk criteria</IDName>
+      <FunctionIDNr>3</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>4</IDNr>
+      <IDName>Gritting policy</IDName>
+      <FunctionIDNr>3</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>5</IDNr>
+      <IDName>Crew on standby</IDName>
+      <FunctionIDNr>4</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>6</IDNr>
+      <IDName>Drivers on duty</IDName>
+      <FunctionIDNr>4</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>7</IDNr>
+      <IDName>Gritting order</IDName>
+      <FunctionIDNr>5</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>8</IDNr>
+      <IDName>Ice warning</IDName>
+      <FunctionIDNr>5</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>9</IDNr>
+      <IDName>Loaded trucks</IDName>
+      <FunctionIDNr>6</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>10</IDNr>
+      <IDName>Decision deadline</IDName>
+      <FunctionIDNr>7</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>11</IDNr>
+      <IDName>Morning rush hour</IDName>
+      <FunctionIDNr>7</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>12</IDNr>
+      <IDName>Salt stock</IDName>
+      <FunctionIDNr>8</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>13</IDNr>
+      <IDName>Roads treated</IDName>
+      <FunctionIDNr>9</FunctionIDNr>
+      <Description />
+    </Output>
+    <Output orphan="false">
+      <IDNr>14</IDNr>
+      <IDName>Route plan</IDName>
+      <FunctionIDNr>10</FunctionIDNr>
+      <Description />
+    </Output>
+  </Outputs>
+  <Preconditions>
+    <Precondition orphan="false">
+      <IDNr>0</IDNr>
+      <IDName>Crew on standby</IDName>
+      <FunctionIDNr>5</FunctionIDNr>
+      <Description />
+    </Precondition>
+  </Preconditions>
+  <Resources>
+    <Resource orphan="false">
+      <IDNr>0</IDNr>
+      <IDName>Road surface data</IDName>
+      <FunctionIDNr>2</FunctionIDNr>
+      <Description />
+    </Resource>
+    <Resource orphan="false">
+      <IDNr>1</IDNr>
+      <IDName>Salt stock</IDName>
+      <FunctionIDNr>6</FunctionIDNr>
+      <Description />
+    </Resource>
+    <Resource orphan="false">
+      <IDNr>2</IDNr>
+      <IDName>Drivers on duty</IDName>
+      <FunctionIDNr>6</FunctionIDNr>
+      <Description />
+    </Resource>
+    <Resource orphan="false">
+      <IDNr>3</IDNr>
+      <IDName>Route plan</IDName>
+      <FunctionIDNr>9</FunctionIDNr>
+      <Description />
+    </Resource>
+  </Resources>
+  <Controls>
+    <Control orphan="false">
+      <IDNr>0</IDNr>
+      <IDName>Ice risk criteria</IDName>
+      <FunctionIDNr>2</FunctionIDNr>
+      <Description />
+    </Control>
+    <Control orphan="false">
+      <IDNr>1</IDNr>
+      <IDName>Gritting policy</IDName>
+      <FunctionIDNr>5</FunctionIDNr>
+      <Description />
+    </Control>
+  </Controls>
+  <Times>
+    <Time orphan="false">
+      <IDNr>0</IDNr>
+      <IDName>Decision deadline</IDName>
+      <FunctionIDNr>5</FunctionIDNr>
+      <Description />
+    </Time>
+    <Time orphan="false">
+      <IDNr>1</IDNr>
+      <IDName>Morning rush hour</IDName>
+      <FunctionIDNr>9</FunctionIDNr>
+      <Description />
+    </Time>
+  </Times>
+  <Aspects scaleFunction="1" scaleAspect="1" scaleZoom="1" Enhanced="false" WebEnhanced="" />
+  <Groups>
+    <Group active="">
+      <FunctionIDNr>9</FunctionIDNr>
+      <CHILD>6</CHILD>
+    </Group>
+  </Groups>
+  <Agents>
+    <Agent>
+      <IDNr>0</IDNr>
+      <Name>Weather service</Name>
+      <AgentType>Technological</AgentType>
+      <Color>#3A7BD5</Color>
+    </Agent>
+    <Agent>
+      <IDNr>1</IDNr>
+      <Name>Road sensor network</Name>
+      <AgentType>Technological</AgentType>
+      <Color>#00A6A6</Color>
+    </Agent>
+    <Agent>
+      <IDNr>2</IDNr>
+      <Name>Highway authority</Name>
+      <AgentType>Organisational</AgentType>
+      <Color>#7B5EA7</Color>
+    </Agent>
+    <Agent>
+      <IDNr>3</IDNr>
+      <Name>Duty manager</Name>
+      <AgentType>Human</AgentType>
+      <Color>#E07A1F</Color>
+    </Agent>
+    <Agent>
+      <IDNr>4</IDNr>
+      <Name>Gritting crew</Name>
+      <AgentType>Human</AgentType>
+      <Color>#2E8B57</Color>
+    </Agent>
+    <Agent>
+      <IDNr>5</IDNr>
+      <Name>Traffic information service</Name>
+      <AgentType>Organisational</AgentType>
+      <Color>#C0392B</Color>
+    </Agent>
+  </Agents>
+  <Levels>
+    <Level color="#E8DAEF">
+      <IDNr>0</IDNr>
+      <Name>Strategic</Name>
+      <Hierarchy>2</Hierarchy>
+    </Level>
+    <Level color="#FCF3CF">
+      <IDNr>1</IDNr>
+      <Name>Tactical</Name>
+      <Hierarchy>1</Hierarchy>
+    </Level>
+    <Level color="#D5F5E3">
+      <IDNr>2</IDNr>
+      <Name>Operational</Name>
+      <Hierarchy>0</Hierarchy>
+    </Level>
+  </Levels>
+  <ScriptGlobals>
+    <var name="Coldest_surface" scope="Global" type="REAL" init="99" />
+  </ScriptGlobals>
+  <FMI version="1">
+    <Variables>
+      <Variable name="Ice_risk" type="number" scope="function" function="2" initial="0" description="0 = no risk ... 1 = black ice almost certain" />
+      <Variable name="Salt_stock" type="number" scope="function" function="8" initial="120" persist="true" description="Tonnes of salt in the depot, carried between cycles" />
+      <Variable name="Shift_count" type="number" scope="model" initial="0" persist="true" description="Night shifts counted by the shift clock" />
+    </Variables>
+    <Macros>
+      <Macro name="clamp01" return="number" description="Limit a value to 0..1">
+        <Param name="x" type="number" />
+        <Body>x &lt; 0 ? 0 : (x &gt; 1 ? 1 : x)</Body>
+      </Macro>
+      <Macro name="iceRisk" return="number" description="Ice risk 0..1 from surface temperature, dew-point spread, precipitation and the freezing threshold">
+        <Param name="surface" type="number" />
+        <Param name="spread" type="number" />
+        <Param name="precip" type="number" />
+        <Param name="freeze" type="number" />
+        <Body>clamp01(0.6 * clamp01((freeze - surface) / 4) + 0.3 * clamp01((1 - spread) / 3) + 0.1 * clamp01(precip))</Body>
+      </Macro>
+      <Macro name="saltTonnes" function="6" return="number" description="Salt needed for a distance in km (only visible to Load salt onto trucks)">
+        <Param name="km" type="number" />
+        <Body>round(km * Global_Salt_per_km, 2)</Body>
+      </Macro>
+    </Macros>
+    <DataSources>
+      <Source name="weather" kind="http" address="https://api.open-meteo.com/v1/forecast?latitude=48.55&amp;longitude=9.67&amp;current=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,wind_speed_10m&amp;daily=temperature_2m_min&amp;forecast_days=1&amp;timezone=Europe%2FBerlin" description="Open-Meteo current weather and tonight's minimum at the A8 Albaufstieg (no key needed)" />
+      <Source name="forecast" kind="http" address="https://api.open-meteo.com/v1/forecast?latitude=48.55&amp;longitude=9.67&amp;hourly=temperature_2m,precipitation_probability&amp;forecast_days=1&amp;format=csv&amp;timezone=Europe%2FBerlin" format="csv" description="Open-Meteo hourly forecast for today as CSV (row = hour)" />
+    </DataSources>
+    <DataUses>
+      <Use source="weather" function="1" timing="live" />
+      <Use source="weather" function="9" timing="onExit" />
+    </DataUses>
+  </FMI>
+</FM>

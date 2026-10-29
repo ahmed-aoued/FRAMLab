@@ -122,6 +122,31 @@ namespace FRAMLab.Shared.MainApp.Services
             MetadataDS.Tables["Metadata"]!.Rows.Add(row);
         }
 
+        /// <summary>
+        /// Write a Global_* value into a function's variable in that variable's own type. Global_*
+        /// keys are also model-scope FMI variables, so the interpreter may already have created them
+        /// as numbers or booleans; after an FMI reset their shared value is "" until the owning
+        /// function runs again, and a typed variable then keeps its current value.
+        /// </summary>
+        private static void SetGlobal(Function function, Function.VariableInfo variable, string value)
+        {
+            switch (variable.Type)
+            {
+                case variableType.String:
+                    function.setVariable(variable, value);
+                    break;
+                case variableType.Double:
+                    if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)) function.setVariable(variable, d);
+                    break;
+                case variableType.Int:
+                    if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i)) function.setVariable(variable, i);
+                    break;
+                case variableType.Bool:
+                    if (value is "1" or "0" or "true" or "false") function.setVariable(variable, value is "1" or "true");
+                    break;
+            }
+        }
+
         public void CalcVariables(Function function, List<Coupling> couplingList, List<Function> functionList, int cycleFMI)
         {
             //function.newVariable("Cycle", new string[] { cycleFMI.ToString(), "The FMI Cycle count" });
@@ -135,7 +160,7 @@ namespace FRAMLab.Shared.MainApp.Services
                 {
                     //function.newVariable(mdKey, new string[] { mdValue, mdValue });
                     var vGlobal = function.getVariable(mdKey) ?? function.newVariable(mdKey, variableType.String);
-                    function.setVariable(vGlobal, mdValue);
+                    SetGlobal(function, vGlobal, mdValue);
                 }
 
                 double Isum = 0;
@@ -175,7 +200,7 @@ namespace FRAMLab.Shared.MainApp.Services
 
                     if (fnMD is not null || hasMetadataKey)
                     {
-                        var fnMDString = fnMD?.Value?.ToString() ?? "0";
+                        var fnMDString = fnMD is null ? "0" : Function.VariableText(fnMD);
                         if (!double.TryParse(string.IsNullOrEmpty(fnMDString) ? "0" : fnMDString, CultureInfo.InvariantCulture, out double fnMDValue))
                         {
                             if (fnMDString.ToLower() == "true")

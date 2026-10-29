@@ -298,23 +298,47 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             // The pipeline names propagated values "{letter}{outputFn}_{key}" where the
             // key is a metadata/key identifier, so match on the *sanitized* identifier
             // ("Hazard signal" -> "Hazard_signal"), never on the raw label with spaces.
+            // Only the coupling variable itself ({letter}{outputFn}_{key}) counts: aggregates such as
+            // In_Key or Isum_Key also end in "_Key" and must never be read in its place.
             var identifier = aspect.Identifier;
-            foreach (var kv in ctx.Function.getVariables())
+            var variables = ctx.Function.getVariables();
+            var letter = CategoryLetter(aspect.Category);
+            var match = variables.FirstOrDefault(kv => kv.Key.Equals(identifier, StringComparison.OrdinalIgnoreCase)
+                                                    || kv.Key.Equals($"Script_{aspect.Label}", StringComparison.OrdinalIgnoreCase));
+            if (match.Key is null && letter is not null)
             {
-                if (kv.Key.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-                    || kv.Key.Equals($"Script_{aspect.Label}", StringComparison.OrdinalIgnoreCase)
-                    || kv.Key.EndsWith("_" + identifier, StringComparison.OrdinalIgnoreCase))
-                {
-                    var raw = kv.Value is { Length: > 0 } ? kv.Value[0] : "";
-                    value = ParseValue(raw, aspect.Type);
-                    aspectCache[name] = value;
-                    return true;
-                }
+                match = variables.FirstOrDefault(kv => IsCouplingVariable(kv.Key, letter, identifier));
+            }
+            if (match.Key is not null)
+            {
+                var raw = match.Value is { Length: > 0 } ? match.Value[0] : "";
+                value = ParseValue(raw, aspect.Type);
+                aspectCache[name] = value;
+                return true;
             }
             // no runtime value yet -> typed zero
             value = ZeroOf(aspect.Type);
             aspectCache[name] = value;
             return true;
+        }
+
+        private static string? CategoryLetter(Models.AspectCategory category) => category switch
+        {
+            Models.AspectCategory.Input => "I",
+            Models.AspectCategory.Precondition => "P",
+            Models.AspectCategory.Resource => "R",
+            Models.AspectCategory.Control => "C",
+            Models.AspectCategory.Time => "T",
+            _ => null,
+        };
+
+        /// <summary>True for "I3_Key" (letter, function number, underscore, key) - not for In_Key / Isum_Key.</summary>
+        private static bool IsCouplingVariable(string name, string letter, string key)
+        {
+            if (!name.StartsWith(letter, StringComparison.OrdinalIgnoreCase)
+                || !name.EndsWith("_" + key, StringComparison.OrdinalIgnoreCase)) return false;
+            var digits = name.Substring(letter.Length, name.Length - letter.Length - key.Length - 1);
+            return digits.Length > 0 && digits.All(char.IsDigit);
         }
 
         private Models.AspectVariable? FindAspect(string name)
@@ -769,9 +793,7 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             var vars = ctx.Function.getVariables();
             foreach (var kv in vars)
             {
-                if (kv.Key.StartsWith(aspectLetter, StringComparison.OrdinalIgnoreCase)
-                    && (kv.Key.EndsWith("_" + key, StringComparison.OrdinalIgnoreCase)
-                        || kv.Key.EndsWith("_" + identifier, StringComparison.OrdinalIgnoreCase)))
+                if (IsCouplingVariable(kv.Key, aspectLetter, key) || IsCouplingVariable(kv.Key, aspectLetter, identifier))
                 {
                     var raw = kv.Value is { Length: > 0 } ? kv.Value[0] : "";
                     if (double.TryParse(raw, System.Globalization.NumberStyles.Float,

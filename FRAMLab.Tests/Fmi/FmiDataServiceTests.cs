@@ -95,6 +95,22 @@ public class FmiDataServiceTests
     }
 
     [Fact]
+    public void Csv_WithPreamble_UsesTheTable_AndDropsUnits()
+    {
+        // the shape of Open-Meteo's format=csv: a location block, an empty line, then the table
+        const string csv = "latitude,longitude,elevation\n48.54,9.67,802.0\n\n" +
+                           "time,temperature_2m (°C),precipitation_probability (%)\n" +
+                           "2026-10-29T00:00,4.5,0\n2026-10-29T01:00,4.4,10\n2026-10-29T02:00,3.8,20\n";
+
+        var rows = FmiDataService.Parse(csv, FmiDataFormat.Csv)!;
+
+        Assert.True(FmiDataService.TryReadPath(rows, "2.temperature_2m", out var temp, out var error), error);
+        Assert.Equal("3.8", temp);
+        Assert.True(FmiDataService.TryReadPath(rows, "1.precipitation_probability", out var rain, out _));
+        Assert.Equal("10", rain);
+    }
+
+    [Fact]
     public async Task SendsTheBrowserStoredKey_InTheNamedHeader()
     {
         var (data, server) = NewService(secret: "Bearer s3cret", authHeader: "Authorization");

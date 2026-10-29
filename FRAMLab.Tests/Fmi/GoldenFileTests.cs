@@ -20,10 +20,12 @@ public class GoldenFileTests
         Assert.Equal(5, functions.Count);
         Assert.Empty(interpreter.Definition.LoadDiagnostics);
 
-        //Exact legacy expectations per cycle (fn:key=value), captured from the unmodified engine.
+        //Exact expectations per cycle (fn:key=value). Risk_Score = Probability * Impact = 0.8 * 5 = 4;
+        //it was recorded as 40 on a German machine, where "0,8" (culture formatting of a typed number)
+        //was misread - variables now always reach equations in invariant culture.
         var expected = new[]
         {
-            "0:Probability=0.9", "1:Risk_Score=40", "1:Impact=5", "1:Probability=0.8",
+            "0:Probability=0.9", "1:Risk_Score=4", "1:Impact=5", "1:Probability=0.8",
             "2:Decision=0", "3:Effectiveness=NaN", "4:Logged=NaN"
         };
 

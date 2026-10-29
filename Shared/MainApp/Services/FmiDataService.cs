@@ -307,7 +307,10 @@ namespace FRAMLab.Shared.MainApp.Services
         // ---------------- parsing ----------------
 
         /// <summary>JSON as-is; CSV becomes an array of row objects keyed by the header row
-        /// (numbers converted), so "2.Temperature" reads row 2, column Temperature.</summary>
+        /// (numbers converted), so "2.Temperature" reads row 2, column Temperature. When the file has
+        /// several blocks separated by empty lines (e.g. a metadata preamble before the table), the
+        /// largest block is the table. A unit in parentheses is dropped from column names, so
+        /// "temperature_2m (°C)" is read as "temperature_2m".</summary>
         public static JsonNode? Parse(string text, FmiDataFormat format)
         {
             if (format == FmiDataFormat.Json)
@@ -315,10 +318,22 @@ namespace FRAMLab.Shared.MainApp.Services
                 try { return JsonNode.Parse(text); }
                 catch (System.Text.Json.JsonException) { return JsonValue.Create(text.Trim()); } // plain-text payload
             }
-            var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).Where(l => l.Trim() != "").ToList();
+            var blocks = new List<List<string>> { new() };
+            foreach (var line in text.Split('\n').Select(l => l.TrimEnd('\r')))
+            {
+                if (line.Trim() == "")
+                {
+                    if (blocks[^1].Count > 0) blocks.Add(new List<string>());
+                    continue;
+                }
+                blocks[^1].Add(line);
+            }
+            var lines = blocks.OrderByDescending(b => b.Count).First();
             var rows = new JsonArray();
             if (lines.Count == 0) return rows;
-            var header = SplitCsvLine(lines[0]);
+            var header = SplitCsvLine(lines[0])
+                .Select(h => Regex.Replace(h, @"\s*\([^)]*\)\s*$", ""))
+                .ToList();
             foreach (var line in lines.Skip(1))
             {
                 var cells = SplitCsvLine(line);

@@ -237,12 +237,17 @@ namespace FRAMLab.Shared
         /// Values are stringified exactly like the legacy dictionary the scripting code was
         /// written against; the typed variables remain authoritative for the engine.
         /// </summary>
+        /// <summary>A variable's value as text in invariant culture ("-7.3", never "-7,3"): equations,
+        /// macros and scripts parse numbers with a decimal point whatever the browser language is.</summary>
+        public static string VariableText(VariableInfo? variable) =>
+            Convert.ToString(variable?.Value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+
         public Dictionary<string, string[]> getVariables()
         {
             var result = new Dictionary<string, string[]>();
             foreach (var variable in variableList)
             {
-                result[variable.Name] = new[] { variable.Value?.ToString() ?? "", variable.Type.ToString() };
+                result[variable.Name] = new[] { VariableText(variable), variable.Type.ToString() };
             }
             return result;
         }
@@ -514,7 +519,7 @@ namespace FRAMLab.Shared
         public string array(string[] content)
         {
             var varInfo = getVariable(content[0]);
-            var returnString = varInfo?.Value?.ToString() ?? "";
+            var returnString = VariableText(varInfo);
             List<string> valueArray = new List<string>();
             if (returnString.Length > 0) { valueArray = returnString.Split(",").ToList(); }
             for (int i = 0; i < valueArray.Count; i++)

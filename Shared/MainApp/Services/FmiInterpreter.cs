@@ -123,9 +123,16 @@ namespace FRAMLab.Shared.MainApp.Services
                             InjectVariable(fn, def.Name, def.InitialValue, def.Description);
                             break;
                         case FmiVariableScope.Function when AppliesTo(def, fn.IDNr):
-                            if (state.PersistentVariables.TryGetValue(def.Name, out var persisted))
+                            if (def.Persist && state.PersistentVariables.TryGetValue(def.Name, out var persisted))
                             {
                                 InjectVariable(fn, def.Name, persisted, def.Description);
+                            }
+                            else if (fn.metadata?.FirstOrDefault(m => m[0] == def.Name) is string[] row)
+                            {
+                                // Not persisted: make the key's current value visible (equations may use
+                                // keys listed after them). Never reset it to the initial value - other
+                                // functions read it between cycles (aggregates such as Isum_Key).
+                                InjectVariable(fn, def.Name, FmiValue.FromLegacyString(row[1]), def.Description);
                             }
                             break;
                         case FmiVariableScope.Model:
@@ -241,7 +248,7 @@ namespace FRAMLab.Shared.MainApp.Services
                             {
                                 try
                                 {
-                                    var vars = iBG.variableList.ToDictionary(v => v.Name, v => new string[] { v.Value?.ToString() ?? "", "" });
+                                    var vars = iBG.variableList.ToDictionary(v => v.Name, v => new string[] { Function.VariableText(v), "" });
                                     var unresolved = new List<string>();
                                     var apiFailures = new List<FmiUnknownVariable>();
                                     var fnId = iBG.IDNr;
@@ -327,7 +334,7 @@ namespace FRAMLab.Shared.MainApp.Services
             }
             foreach (var variable in fn.variableList)
             {
-                var val = variable.Value?.ToString() ?? "";
+                var val = Function.VariableText(variable);
                 if (IncomingVariablePattern.IsMatch(variable.Name))
                 {
                     state.IncomingValues[variable.Name] = FmiValue.FromLegacyString(val);

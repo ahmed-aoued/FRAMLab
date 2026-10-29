@@ -373,16 +373,16 @@
                             <path fill="none" d=@($"M {path[1]} {path[2]} l 0 0") />
                         </g>
                         <g stroke-width="12" stroke=@endCvalue stroke-linecap="round" opacity="1">
-                            <path fill="none" d=@($"M {p_1 + p_4} {p_2 + p_5} l 0 0") />
+                            <path fill="none" d=@(FormattableString.Invariant($"M {p_1 + p_4} {p_2 + p_5} l 0 0")) />
                         </g>
                         <g stroke-width="12" stroke=@startCvalue stroke-linecap="butt" opacity="1">
-                            <path fill="none" d=@($"M {path[1]} {path[2]} l {midPointX} {midPointY}") />
+                            <path fill="none" d=@(FormattableString.Invariant($"M {path[1]} {path[2]} l {midPointX} {midPointY}")) />
                         </g>
                         <g stroke-width="12" stroke=@endCvalue stroke-linecap="butt" opacity="1">
-                            <path fill="none" d=@($"M {path[1]} {path[2]} m {midPointX} {midPointY} L {p_1 + p_4} {p_2 + p_5}") />
+                            <path fill="none" d=@(FormattableString.Invariant($"M {path[1]} {path[2]} m {midPointX} {midPointY} L {p_1 + p_4} {p_2 + p_5}")) />
                         </g>
                         <g stroke-width="12" stroke=@stateContainer.displaySetup[$"c_{i}2_value"] stroke-linecap="butt" opacity="1">
-                            <path fill="none" d=@($"M {path[1]} {path[2]} m {midPointX-0.5} {midPointY} l 1 0") />
+                            <path fill="none" d=@(FormattableString.Invariant($"M {path[1]} {path[2]} m {midPointX-0.5} {midPointY} l 1 0")) />
                         </g>
                     }
                     else

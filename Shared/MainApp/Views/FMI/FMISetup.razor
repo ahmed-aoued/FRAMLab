@@ -31,12 +31,12 @@
                     <li><strong>Script</strong> — the function's ST script (<span class="fmi-chip fmi-chip-st">ST</span>) runs last and may overwrite keys it outputs.</li>
                     <li><strong>Outputs</strong> — the function's metadata values flow to downstream functions along its couplings.</li>
                 </ol>
-                @if (usage.UsesScripts || usage.MacroCalls.Count > 0)
+                @if (usage.UsesScripts || usage.MacroCalls.Count > 0 || usage.ApiCalls.Count > 0)
                 {
                     <MudSimpleTable Dense="true" Elevation="0" Class="mt-2">
-                        <thead><tr><th>Function</th><th>Script</th><th>Macro calls (key ← macro)</th></tr></thead>
+                        <thead><tr><th>Function</th><th>Script</th><th>Macro calls (key ← macro)</th><th>Live data (source: timing)</th></tr></thead>
                         <tbody>
-                            @foreach (var fn in stateContainer.functionList.Where(f => usage.HasScript(f.IDNr) || usage.CallsMacros(f.IDNr)))
+                            @foreach (var fn in stateContainer.functionList.Where(f => usage.HasScript(f.IDNr) || usage.CallsMacros(f.IDNr) || usage.ReadsData(f.IDNr)))
                             {
                                 <tr>
                                     <td><a href="javascript:void(0)" @onclick="@(() => SelectFunction(fn.IDNr))">@fn.IDName</a></td>
@@ -45,6 +45,12 @@
                                         @if (usage.MacroCalls.TryGetValue(fn.IDNr, out var calls))
                                         {
                                             @string.Join(", ", calls.Select(kv => $"{kv.Key} ← {string.Join("/", kv.Value)}"))
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (usage.ApiCalls.TryGetValue(fn.IDNr, out var read))
+                                        {
+                                            @string.Join(", ", read.OrderBy(n => n).Select(n => $"{n}: {stateContainer.fmiDefinition.TimingFor(n, fn.IDNr)}"))
                                         }
                                     </td>
                                 </tr>

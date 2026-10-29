@@ -152,6 +152,7 @@ public class FmiRunEngineTests
             {
                 fn.Script.SyncAspects(Couplings, fn.IDNr, AspectVariable.DeclaredFromXml(doc, fn.IDNr));
             }
+            scripting.GlobalVariableDeclarations.AddRange(ScriptModel.ReadGlobals(doc)); // as the app does on load
             var defService = new FmiDefinitionService();
             Interpreter = new FmiInterpreter(new ExpressionEvaluator(), metadata);
             Interpreter.Initialize(defService.MergeWithImplicit(defService.Load(doc), Functions), Functions);
@@ -175,6 +176,8 @@ public class FmiRunEngineTests
         public bool LogShown { get; private set; }
         public List<(int Cycle, FmiLogLevel Level, string Text)> Entries { get; } = new();
         public List<string> Errors { get; } = new();
+        public List<string> Trace { get; } = new();
+        public ScriptingService Scripting => scripting;
 
         private FmiEvaluationContext Ctx => new() { FunctionList = Functions, CouplingList = Couplings, Cycle = Cycle };
 
@@ -196,6 +199,7 @@ public class FmiRunEngineTests
             if (script is not null)
             {
                 Errors.AddRange(script.RuntimeIssues.Where(i => i.Severity == "Error").Select(i => $"{fn.IDName}: {i.Message}"));
+                Trace.AddRange(script.Trace);
             }
             return result.UnknownVariables;
         }

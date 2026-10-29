@@ -111,7 +111,11 @@ namespace FRAMLab.Shared.MainApp.Services.Scripting
             var compiled = Compile(fn);
             if (compiled.HasErrors || compiled.Program is null)
             {
-                return null; // editor surfaces the compile diagnostics; don't run broken code
+                // don't run broken code, but say why (the FMI log shows these like runtime errors)
+                var failed = new ScriptExecutionContext(fn, cycle, globalStore);
+                failed.RuntimeIssues.AddRange(compiled.Diagnostics.Where(d => d.Severity == "Error")
+                    .Select(d => ScriptDiagnostic.Error($"Script not run, it does not compile: {d.Message}", d.StartLine, d.StartColumn)));
+                return failed;
             }
 
             // ensure globals exist in the store: both the shared declarations from the

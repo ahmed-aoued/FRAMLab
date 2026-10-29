@@ -145,3 +145,25 @@ public class ScriptBugfixTests
         Assert.Null(doc.SelectSingleNode("//FM/ScriptGlobals"));
     }
 }
+
+/// <summary>Aspect reads must use the coupling variable (I6_Key), never an aggregate (In_Key, Isum_Key).</summary>
+public class AspectReadTests
+{
+    [Fact]
+    public void AspectVariable_And_GetInput_IgnoreAggregates()
+    {
+        var doc = new XmlDocument();
+        doc.LoadXml("<FM><Function fnStyle=\"0\" orphans=\"0\" x=\"0\" y=\"0\"><IDNr>9</IDNr><FunctionType>0</FunctionType><IDName>f9</IDName></Function></FM>");
+        var fn = new Function(doc.SelectSingleNode("//Function")!);
+        fn.Script.AspectVariables.Add(new AspectVariable { Category = AspectCategory.Input, Label = "Loaded trucks", Type = ScriptVarType.INT });
+        fn.Script.Source = "Print(Loaded_trucks, ' ', GetInput('Loaded_trucks'));";
+        // aggregates listed before the coupling variable, as after an input was consumed and re-delivered
+        fn.newVariable("In_Loaded_trucks", new[] { "1" });
+        fn.newVariable("Isum_Loaded_trucks", new[] { "4" });
+        fn.newVariable("I6_Loaded_trucks", new[] { "4" });
+
+        var ctx = new ScriptingService(NullLogger<ScriptingService>.Instance).ExecuteCycle(fn, 1);
+
+        Assert.EndsWith("4 4", Assert.Single(ctx!.Trace));
+    }
+}

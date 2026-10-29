@@ -375,3 +375,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 .aider*
+
+# Local documentation (not versioned)
+/docs/

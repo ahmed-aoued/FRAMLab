@@ -859,6 +859,8 @@
         // definitions stored in the file were ignored until one was edited in the UI.
         stateContainer.initFmiRuntime();
         stateContainer.fmiRun?.Reset();
+        // Scripts name aspects as variables (e.g. Ice_risk_assessment); derive them from the couplings.
+        stateContainer.SyncScriptAspects();
         stateContainer.fileLoaded = true;
         stateContainer.debugOutput = "";
         //spreadsheet?.InitialState();
